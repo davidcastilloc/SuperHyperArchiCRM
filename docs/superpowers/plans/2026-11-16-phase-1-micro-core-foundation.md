@@ -6,9 +6,9 @@
 
 **Architecture:** Monorepo `pnpm` con paquetes ES Modules puros (`"sideEffects": false`). Cada caso de uso se define una sola vez mediante `defineCommand` en `@shac/kernel`, atravesando una cadena lineal (`profileLoader` -> `moduleGate` -> `authMiddleware` WebCrypto/KV) y exponiéndose simultáneamente como ruta tipada Hono RPC (`/api/*`) y herramienta MCP stateless (`/mcp` vía `createMcpHandler`). La persistencia relacional reside en Cloudflare D1 con Drizzle ORM filtrada obligatoriamente por `tenantId` y subárbol `orgPath`.
 
-**Tech Stack:** TypeScript 5.8+, `pnpm` workspaces, Cloudflare Workers (`compatibility_date: "2026-11-01"`), `hono`, `zod`, `drizzle-orm` (SQLite/D1), `agents` (`createMcpHandler`), `vitest` 4.1+ con `@cloudflare/vitest-plugin`, `wrangler`, `knip`.
+**Tech Stack:** TypeScript 5.8+, `pnpm` workspaces, Cloudflare Workers (`compatibility_date: "2026-11-01"`), `hono`, `zod`, `drizzle-orm` (SQLite/D1), `agents` (`createMcpHandler`), React 19 + Vite (`@cloudflare/vite-plugin`) + TanStack Router/Query (`offlineFirst`) + Tailwind CSS v4 + `shadcn/ui` (`@shac/ui`), `vitest` 4.1+ con `@cloudflare/vitest-plugin`, `wrangler`, `knip`.
 
-**Spec:** `SPEC.md` (v2.0.0) y `docs/superpowers/specs/2026-11-16-pilar-1-micro-core-pos-wms-spec.md`.
+**Spec:** `SPEC.md` (v2.2.0), `DATA_MODEL.md` (v2.2.0), `DESIGN.md` (v2.2.0) y `docs/superpowers/specs/2026-11-16-multi-market-storage-architecture.md`.
 
 ## Global Constraints
 

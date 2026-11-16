@@ -1,6 +1,7 @@
 # DATA_MODEL.md — Modelo de Datos Canónico Maestro All-in-One (`SuperHyperArchiCRM`)
 
-**Versión:** 2.1.0 (True All-in-One — Auditoría Completa a Nivel de Columna)  
+**Versión:** 2.2.0 (True All-in-One — Auditoría Completa a Nivel de Columna + Almacenamiento en 5 Capas)  
+**Documentos Compañeros:** `SPEC.md` (v2.2.0), `DESIGN.md` (v2.2.0), `AGENTS.md` (v2.2.0) y `STORAGE_ARCHITECTURE_PLAN.md`  
 **Fuentes Auditadas Columna por Columna:** **711 tablas/modelos y más de 10,000 columnas** consolidadas desde:
 1. `open-mercato` (**346 tablas**, 5,056 columnas en 57 módulos)
 2. `Doctors-EHR-New` local + **Supabase Cloud en vivo (`doctors-ehr` Postgres 17)** (**173 tablas únicas**, incluyendo las 22 tablas vivas `therapist_*` / `therapy_*` / `EVV`)
