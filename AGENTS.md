@@ -1,302 +1,124 @@
-# Agents Guidelines
+# AGENTS.md — Manual Operativo para Agentes de Código (SuperHyperArchiCRM)
 
-Leverage the module system and follow strict naming and coding conventions to keep the system consistent and safe to extend.
+**Documento Compañero Obligatorio:** `SPEC.md` (v2.0.0)  
+**Metodología:** Spec-Driven Development (SDD) + Organic, Outcome & Receipt-Driven Development (ODD / RDD)  
+**Entornos Soportados:** Google Antigravity, Claude Code, Gemini CLI, Codex, Neovim / Terminal Multi-Instancia (Windows, macOS, Linux)
 
-> **Instruction budget:** this file must stay under **32,768 bytes** (Codex's default
-> `project_doc_max_bytes`, shared with the nested `AGENTS.md` files below it) — anything past
-> that byte offset never reaches the agent. Keep hard rules and routing here, put long-form
-> procedure in `.ai/docs/*`, and run `yarn agents:check-budget`. See
-> [`.ai/docs/agent-instructions.md`](.ai/docs/agent-instructions.md).
+---
 
-## Always
+## 1. Jerarquía de Verdad y Sincronización Multi-Instancia
 
-- Check the Task Router below before research or coding; a single task may match multiple rows, and all relevant guides apply.
-- Check `.ai/specs/` and `.ai/specs/enterprise/` for existing specs before modifying a module.
-- Enter plan mode for non-trivial tasks with 3+ steps or architectural decisions.
-- Identify the reference module (`customers`) when building CRUD features.
-- Preserve behavior unless the user or a spec explicitly asks for a behavior change.
-- Keep changes minimal, focused, and integrated through real call sites.
-- Use the closest package/module `AGENTS.md` for local architecture, imports, and validation commands.
-- Follow `BACKWARD_COMPATIBILITY.md` before touching any contract surface.
-- Run `yarn generate` after adding or modifying module files that rely on auto-discovery.
-- Support optimistic locking on every NEW user-editable entity and edit/delete form (it is **default ON**): give the entity an `updated_at` column, return `updatedAt` in its list/detail API responses, and let `CrudForm` auto-derive the header from `initialValues.updatedAt` (covers update **and** delete) — or, for custom non-`CrudForm` handlers, wrap the mutating call with `withScopedApiRequestHeaders(buildOptimisticLockHeader(record.updatedAt), …)` and surface conflicts via `surfaceRecordConflict(err, t)`. When a form's `onSubmit` mutates OTHER entities, override the parent header per child with that child's own version (avoid false 409s). Details: the Task Router row.
+Ningún agente debe depender de la memoria conversacional de una sesión previa. Toda la memoria del proyecto vive versionada en Git bajo esta jerarquía estricta:
 
-## Ask First
+1. **`SPEC.md` (Raíz):** Define la arquitectura invariante del **Núcleo Universal + 4 Packs Compilables por Familia** (`commerce-wms`, `spaces-stays`, `cases-practice`, `physical-iot`), los **9 Presets de Mercado en KV**, el Control Plane de flota y el Hub Federado B2B/B2C. Si una instrucción contradice una invariante de `SPEC.md`, detente y pide confirmación explícita antes de escribir código.
+2. **`docs/superpowers/specs/` y `docs/superpowers/plans/`:** Especificaciones detalladas por pilar e hitos activos con checkboxes `- [ ]` / `- [x]`, sincronizados vía Git entre estaciones de trabajo.
+3. **`docs/superpowers/DECISIONS.md`:** Registro cronológico conciso (ADR) de decisiones arquitectónicas y hallazgos críticos.
+4. **Cero Rutas Absolutas de Sistema Operativo y Cero Symlinks:** Queda estrictamente prohibido escribir rutas dependientes del SO (unidades locales o directorios de usuario) en documentación, planes, configuraciones o código versionado. Usa siempre rutas relativas a la raíz del repositorio.
+5. **Identidad Git y Regla de Remotos (`origin` vs. `upstream`):**
+   - Verifica antes de cada commit que `git config user.name` sea `"David Castillo"` y `git config user.email` sea `"vikruzdavid@gmail.com"`, creando commits pequeños y atómicos (`feat(kernel): ...`, `fix(actor-branch): ...`, `docs(specs): ...`).
+   - `origin` (`https://github.com/davidcastilloc/SuperHyperArchiCRM.git`, rama `main`) aloja exclusivamente el monorepo 100% Cloudflare (`@shac/*`). Nunca hagas `git push` sin instrucción explícita del usuario.
+   - `upstream` ([open-mercato/open-mercato](https://github.com/open-mercato/open-mercato)) y los repositorios hermanos de cosecha actúan estrictamente como **referencia de dominio de solo lectura**; queda prohibido ejecutar `git merge upstream/main` sobre el Micro-Core.
 
-- Ask before reducing scope, changing architecture, changing public contracts, adding production dependencies, or touching multiple modules in a way not covered by an existing spec.
-- Ask before changing branch/PR automation, pipeline labels, QA flow, release behavior, or external official-module submodule pointers.
-- Ask before applying database migrations locally with `yarn db:migrate`; normal PRs should include migration files and snapshots.
-- Ask before introducing provider-specific preconfiguration outside the provider package.
-- Ask before an automated PR touches design-system governance files (see [pr-workflow](.ai/docs/pr-workflow.md)).
+---
 
-## Never
+## 2. Fase 0 Bloqueante: Auditar Disco Antes de Escribir (`Inspect First, Merge Deltas Only`)
 
-- Never expose cross-tenant data or skip tenant/organization scoping.
-- Never edit generated files by hand.
-- Never add code directly under `apps/mercato/src/` except committed, typed `*.generated.ts` registries described below.
-- Never create direct ORM relationships between modules.
-- Never bypass mutation guards, command side effects, encryption helpers, RBAC wildcard matching, or shared UI data-call helpers.
-- Never hard-code user-facing strings or design-system status colors.
-- Never commit credentials, raw tokens, private keys, local-only ops files, or fork-only infrastructure notes into upstream-friendly branches.
+Queda **estrictamente prohibido** sobrescribir archivos existentes a ciegas basándose en suposiciones. Antes de modificar cualquier paquete:
 
-## Validation Commands
+1. Ejecuta una inspección quirúrgica de solo lectura (`git status -sb`, `git log -n 5 --oneline`, búsquedas puntuales con `rg -n` evitando directorios pesados como `node_modules`, `dist`, `build`, `.wrangler`, `.svelte-kit`, y lectura directa de `package.json`, `pnpm-workspace.yaml`, `wrangler.jsonc` y los archivos objetivo).
+2. Identifica qué *bindings*, esquemas Drizzle, rutas o pruebas existen actualmente en el árbol local.
+3. Aplica **únicamente deltas quirúrgicos**, preservando configuraciones previas, *bindings* de Cloudflare y pruebas existentes.
 
-Choose the smallest relevant set for the change:
+---
 
-```bash
-yarn generate
-yarn build:packages
-yarn typecheck
-yarn lint
-yarn test
-yarn build:app
-```
+## 3. Límites por Iteración y Prevención de Degradación de Contexto (*Zero Context Rot*)
 
-The full CI-mirroring gate (used by review/automation skills) is the ordered `validation.commands` list in `.ai/agentic.config.json`.
+Para mantener precisión máxima y cero regresiones silenciosas, cada turno o subtarea delegada a un agente debe cumplir cuatro cotas físicas:
 
-**Where to run them:** decide once per gate sequence — Docker mode when a compose `app` container is running (then `yarn X` becomes `node scripts/docker-exec.mjs X`), otherwise local mode — and record the chosen runner in your output. Probe order and exact rules: [`.ai/docs/agent-instructions.md`](.ai/docs/agent-instructions.md).
+| Regla de Acotación | Límite Duro | Acción Obligatoria si la Tarea lo Supera |
+| :--- | :--- | :--- |
+| **Volumen por iteración** | **50 a 200 líneas** netas agregadas/modificadas | Dividir el trabajo en sub-pasos secuenciales verificados individualmente en terminal |
+| **Alcance de archivos por paso** | Máximo **3 archivos de implementación** + sus archivos `.test.ts` | Completar y verificar el primer corte vertical antes de abrir el siguiente paquete |
+| **Tamaño máximo por archivo fuente** | **300 líneas** por archivo `.ts` o `.svelte` | Al llegar a `260` líneas, realizar primero un commit estructural puro (*Tidy First*) extrayendo submódulos cohesivos sin cambiar comportamiento |
+| **Ejecución multi-agente en paralelo** | **1 `git worktree` aislado por agente** | Crear árbol independiente (`git worktree add ../wt-<tarea> -b feat/<tarea>`) para evitar colisiones de compilación o pisado de archivos |
 
-## Task Router — Where to Find Detailed Guidance
+### Asignación Eficiente de Modelos (*Model Tiering*)
 
-IMPORTANT: Before any research or coding, match the task to this table. A single task often maps to **multiple rows** — "add a new module with search" needs both the Module Development and Search guides. Read **all** matching guides first; they carry the imports, patterns and constraints you need. Only use Explore agents for topics no AGENTS.md covers.
+- **Razonamiento Arquitectónico y Concurrencia:** Usar modelos frontera para diseñar esquemas SQLite duales (D1 vs. Durable Object), lógica FEFO/bloqueo de espacios/idempotencia en `BranchInventoryDO`, aislamiento fiduciario Trust/IOLTA, criptografía Ed25519 del Hub Federado y diagnóstico de fallos complejos.
+- **Implementación Acotada y Mantenimiento:** Usar modelos rápidos/económicos para generar comandos CRUD tipados que sigan un `CommandSpec` ya aprobado, vistas SvelteKit repetitivas, pruebas unitarias adicionales y corrección de avisos de linter.
 
-Guide shorthand: `<pkg>` = `packages/<pkg>/AGENTS.md` (so `core` = `packages/core/AGENTS.md`, `ui` = `packages/ui/AGENTS.md`), `core:<module>` = `packages/core/src/modules/<module>/AGENTS.md`, `ui:backend` = `packages/ui/src/backend/AGENTS.md`. `→ Section` names the heading to read inside that file.
+---
 
-| Task | Guide |
-|------|-------|
-| **Module Development** | |
-| New module, scaffolding, auto-discovery paths | `core` + [`.ai/docs/module-development.md`](.ai/docs/module-development.md). **Standalone apps**: the `om-module-scaffold` skill scaffolds a module end-to-end |
-| Official modules via the `external/official-modules` submodule, activation (`yarn official-modules`, `official-modules.json`), committing to the submodule's git | [`.ai/docs/official-modules.md`](.ai/docs/official-modules.md) |
-| CRUD API routes, OpenAPI specs, `makeCrudRoute`, query engine integration | `core` → API Routes |
-| `setup.ts` tenant init, role features, syncing ACL grants to roles, seeding defaults/examples | `core` → Module Setup |
-| Typed events with `createModuleEvents`, CRUD/lifecycle events, subscribers | `core` → Events |
-| In-app notifications, subscriber-based alerts, renderers; reactive handlers (`notifications.handlers.ts`), `useNotificationEffect` | `core` → Notifications + `ui` |
-| Injecting UI widgets into other modules, spot IDs, cross-module UI extensions | `core` → Widgets |
-| Headless injection widgets (menu items, columns, fields), `InjectionPosition`, `useInjectionDataWidgets`; DataTable extension widgets (columns/row actions/bulk actions/filters); CrudForm field widgets (`crud-form:<entityId>:fields`) | `core` → Widget Injection + `ui` → DataTable / CrudForm Guidelines |
-| Menu items into main/settings/profile sidebars or topbar dropdown (`useInjectedMenuItems`, `mergeMenuItems`) | `ui` |
-| API route interceptors (`api/interceptors.ts`, before/after hooks, body/query rewrite) | `core` → API Interceptors |
-| Bulk operations, DataTable bulk actions, selected-row mutations, long-running operations with progress | `core:progress` + `ui` → DataTable Guidelines + `queue` |
-| Replacing/wrapping UI components via `widgets/components.ts` (`replace`/`wrapper`/`props`) | `core` → Component Replacement + `ui` |
-| Custom fields/entities, DSL helpers (`defineLink`, `cf.*`), `ce.ts` | `core` → Custom Fields |
-| Entity extensions, cross-module data links, `data/extensions.ts` | `core` → Extensions |
-| Coupling one module to another (events / widget injection + enrichers / FK-id + snapshot / soft-optional `tryResolve`), depending on an OPTIONAL integration | `core` → Cross-Module Coupling + `packages/core/src/__tests__/module-decoupling.test.ts` |
-| RBAC features in `acl.ts`, declarative guards, permission checks | `core` → Access Control |
-| Wildcard ACL handling in feature-gated runtime helpers (menus, notification handlers, mutation guards, command interceptors, AI tools) | `core` → Access Control + `shared` + `ui` + `core:auth` (portal: `core:customer_accounts`) |
-| Encrypted queries (`findWithDecryption`), encryption defaults, GDPR fields | `core` → Encryption |
-| Response enrichers for other modules' API responses | `core` → Response Enrichers |
-| Filtering CRUD list APIs by multiple IDs (`?ids=uuid1,uuid2`), interceptor-driven ID narrowing | `core` → API Interceptors + `shared` |
-| Optimistic locking / concurrent-edit conflicts: `updated_at` versioning (**default ON** for every `makeCrudRoute` entity, opt out with `OM_OPTIMISTIC_LOCK=off`), the 409 body, client helpers (`buildOptimisticLockHeader`, `extractOptimisticLockConflict`), command-pattern writes (`enforceCommandOptimisticLock`, the DI-overridable `createCommandOptimisticLockGuardService`), the unified conflict bar (`surfaceRecordConflict`) | `apps/docs/docs/framework/data-integrity/concurrency-locking.mdx` (§ Protecting command/action endpoints) + `.ai/specs/implemented/2026-05-25-oss-optimistic-locking.md` + `.ai/specs/2026-05-28-optimistic-locking-coverage-completion.md` + `packages/shared/src/lib/crud/optimistic-lock{,-command}.ts` + `packages/ui/src/backend/conflicts/` |
-| DOM Event Bridge (SSE real-time events to browser), `useAppEvent`, `useOperationProgress` | `events` → DOM Event Bridge |
-| Customer portal pages, portal auth, portal nav injection, portal event bridge | `ui` → Portal Extension + `om-backend-ui-design` skill |
-| Widget event handlers (`onFieldChange`, `onBeforeNavigate`, transformers) | `ui` |
-| AI agents/tools (`ai-agents.ts`, `ai-tools.ts`, tool packs, mutation approval via `prepareMutation`, attachments, provider/model selection) | `.ai/skills/om-create-ai-agent/SKILL.md` + `ai-assistant` + `apps/docs/docs/framework/ai-assistant/*.mdx` |
-| AI agent loop controls + overrides (`loop.stopWhen/prepareStep/budget`, per-tenant settings, replacing/disabling agents/tools, `entry.overrides`) | `ai-assistant` → Loop controls + How to Override; in `.ai/specs/implemented/`: `2026-04-28-ai-agents-agentic-loop-controls`, `2026-04-30-ai-overrides-and-module-disable`, `2026-05-04-modules-ts-unified-overrides` |
-| **Specific Modules** | |
-| Module-specific work (customers as CRUD reference, plus sales, catalog, auth, customer_accounts, currencies, workflows, integrations, data_sync, progress, warranty_claims / RMA, cart, promotions) | `packages/core/src/modules/<module>/AGENTS.md` |
-| Agent orchestration: propose-only agents, runs/proposals, traces, evals, guardrails, cockpit, OpenCode file agents, `INVOKE_AGENT` | `packages/enterprise/src/modules/agent_orchestrator/AGENTS.md` + `.ai/skills/om-create-opencode-agent/SKILL.md` |
-| Webhooks (outbound/inbound, Standard Webhooks signing, delivery queues, admin UI) | `webhooks` (cross-refs `queue`, `events`, `core:integrations`, `ui`) |
-| New integration provider (adapter, health check, credentials, bundle wiring) | `.ai/skills/om-integration-builder/SKILL.md` + `core:integrations` + `core:data_sync` + `channel-*` |
-| Agent web search/fetch — a new `@open-mercato/web-research-*` adapter, or racing/fusion/SSRF/policy | `.ai/skills/om-create-web-research-adapter/SKILL.md` + `web-research` |
-| **Packages** | |
-| Reusable utilities, encryption helpers, i18n (`useT`/`resolveTranslations`), boolean parsing, data engine types, request scoping | `shared` |
-| Structured logging (`createLogger`, `child()`, `OM_LOG_LEVEL`, `yarn logger:check-console`); error reporting — a catch that records an error MUST also `reportError` | `apps/docs/docs/framework/runtime/{logging,error-reporting}.mdx` + `telemetry` + `shared` |
-| Forms (`CrudForm`), data tables (`DataTable`), loading/error states, flash messages, `FormHeader`/`FormFooter`, dialog UX | `ui` + `om-backend-ui-design` skill (+ `om-ds-guardian` for DS-token compliance) |
-| Reusing backend component families (charts/KPIs, filters, detail sections, schedule, messages, notifications, page scaffolding, banners) — check BEFORE building any from scratch | [`.ai/ui-backend-components.md`](.ai/ui-backend-components.md) + `ui` |
-| Backend page components, `apiCall` usage, `RowActions` ids, `LoadingMessage`/`ErrorMessage` | `ui:backend` + `om-backend-ui-design` skill |
-| Fulltext/vector/token search, `search.ts`, reindexing entities, debugging search, search CLI | `search` |
-| MCP tools (`registerMcpTool`), OpenCode config, AI chat debugging, session tokens, command palette, two-tier auth | `ai-assistant` |
-| Generators (`yarn generate`), migrations (`yarn db:generate`), module scaffolding, build order | `cli` |
-| Event bus architecture, ephemeral vs persistent subscriptions, queue integration, event workers | `events` |
-| Cache in a module, tag-based invalidation, tenant-scoped caching, strategy (memory/SQLite/Redis) | `cache` |
-| Background workers, concurrency (I/O vs CPU-bound), idempotent jobs, queue strategies | `queue` |
-| Operation progress in the top bar, `ProgressJob`s, client-local progress events | `core:progress` + `events` → DOM Event Bridge |
-| Onboarding wizard steps, tenant setup hooks (`onTenantCreated`/`seedDefaults`), welcome/invitation emails | `onboarding` |
-| Static content pages (privacy policies, terms, legal pages) | `content` |
-| Standalone apps with Verdaccio, publishing packages, canary releases, template scaffolding | `create-app` |
-| Editing `apps/mercato/src/app/**`, `apps/mercato/src/i18n/**`, or env vars in `apps/mercato/.env.example` — MUST mirror into the create-app template in the same task (`yarn template:sync:fix`) | `create-app` → Template Sync Checklist |
-| Deploying a scaffolded app to Railway with `mercato deploy railway` | [`.ai/specs/2026-05-12-railway-one-command-deploy.md`](.ai/specs/2026-05-12-railway-one-command-deploy.md) + [`apps/docs/docs/deployment/railway.mdx`](apps/docs/docs/deployment/railway.mdx) + `cli` |
-| **Performance** | |
-| Profiling dev-mode memory (`yarn dev:profile`), ranking memory hogs, watcher / Vite-vs-Turbopack tradeoffs | `.ai/specs/2026-05-27-dev-mode-memory-quick-wins.md` + `scripts/profile-dev-rss.mjs` |
-| **Migration** | |
-| Migrating custom module code from MikroORM v6 to v7 (decorators, persist/flush, Knex→Kysely, ORM config, Jest setup) | `.ai/skills/om-migrate-mikro-orm/SKILL.md` |
-| **Testing** | |
-| Integration testing, Playwright tests, converting markdown test cases to TypeScript, CI test pipeline | `.ai/qa/AGENTS.md` + `.agents/skills/om-integration-tests/SKILL.md` |
-| Refreshing standalone-app AI harness coverage after module, extension-point, contract, generator/discovery, or release changes | `.ai/skills/om-refresh-standalone-harness/SKILL.md` + `packages/create-app/agentic/shared/ai/skills/om-evolve-harness/SKILL.md` |
-| **Spec & PR Automation** | |
-| Spec lifecycle (pre-implement → implement → write/update), code review, DS review | `.agents/skills/{om-spec-writing,om-code-review,om-pre-implement-spec}/SKILL.md` + `.ai/skills/{om-implement-spec,om-ds-guardian}/SKILL.md` + `.ai/specs/AGENTS.md` + `.ai/ds-rules.md` |
-| PR/issue automation (one-shot auto-PR, resumable loop variants, review/merge-buddy, post-merge sync, changelog, UI QA). **Default for one-off bug fixes / small features:** `om-auto-create-pr` | `.agents/skills/{om-auto-create-pr,om-auto-continue-pr,om-auto-create-pr-loop,om-auto-continue-pr-loop,om-auto-review-pr,om-auto-qa-pr,om-merge-buddy,om-review-prs,om-close-fixed-issues,om-auto-update-changelog,om-prepare-issue}/SKILL.md` |
-| Releases, release lines, backport labels | [`CONTRIBUTING.md`](CONTRIBUTING.md) → Releasing + `.ai/docs/pr-workflow.md` |
-| **Agent harness itself** | |
-| Editing this file or a package `AGENTS.md`; the instruction budget and boundary labels | [`.ai/docs/agent-instructions.md`](.ai/docs/agent-instructions.md) + `scripts/check-agents-md-budget.mjs` (`yarn agents:check-budget`) |
+## 4. Guardia contra APIs Obsoletas y Anti-Patrones Prohibidos
 
-Most `om-*` skills come from the shared [open-mercato/skills](https://github.com/open-mercato/skills) collection (`yarn install-skills`); settings live in `.ai/agentic.config.json` + `.ai/trackers/github.md`. Sources, repo-local overrides, tiers, installer flags: [`.ai/skills/README.md`](.ai/skills/README.md).
+La siguiente tabla tiene carácter de **bloqueo automático** en revisión de código:
 
-## Core Principles
+| Prohibido en SuperHyperArchiCRM (Legacy / Bloqueante) | Patrón Obligatorio 2026 en SuperHyperArchiCRM | Motivo Técnico Verificado |
+| :--- | :--- | :--- |
+| `McpAgent` basado en Durable Object por sesión | `createMcpHandler` desde `agents/mcp/server` (MCP SDK v2 stateless) | `McpAgent` está deprecado; `createMcpHandler` evita desperdiciar instancias de Durable Objects por sesión |
+| `@cloudflare/vitest-pool-workers` (Vitest 2/3) | `@cloudflare/vitest-plugin` con **Vitest 4.1+** | Estándar oficial vigente para probar D1, KV, Queues y Durable Objects sobre `workerd` |
+| Workers Sites o configuración legacy de Pages | **Workers Static Assets** con `not_found_handling: "single-page-application"` | Sirve la SPA SvelteKit gratis desde CDN sin invocar cómputo del Worker |
+| Contenedores DI dinámicos (`awilix`, `tsyringe`, decoradores OOP) | Funciones puras ES Modules (`"sideEffects": false`) + `ExecutionContext` explícito | Evita sobrecosto de 25–28 ms CPU/req y permite *tree-shaking* limpio por Pack de Familia |
+| `crypto.pbkdf2Sync`, `bcrypt` JS o `fs` de Node | `crypto.subtle` asíncrono (Web Crypto API) + caché de sesión en `SESSION_KV` | `pbkdf2Sync` consume ~207 ms de CPU y aborta en el límite de 10 ms CPU del plan Free |
+| Bucles `await db.select()` por ítem o `SELECT ... FOR UPDATE` | `db.batch([...])` en D1 y `ctx.storage.transactionSync` en `BranchInventoryDO` | Evita tormentas N+1 y serializa descuentos FEFO, cajas y reservas de espacios en `< 1 ms` |
+| Condicionales `if (tenantId === 'x')` o ramas Git por edición | `TenantMarketProfile` en `CONFIG_KV` + packs declarativos en `editions/*` + `v_cf_*` en D1 | Garantiza un único tronco para los 9 mercados y upgrades en caliente en `< 60 s` |
+| Números en punto flotante (`number` decimal) para dinero o tasas | Enteros en unidades menores (`basePriceMinor`), puntos básicos (`taxRateBps`) y micro-tasas (`exchangeRateMicros`) | Elimina errores de redondeo IEEE-754 en cobros mixtos multimoneda, arqueos ciegos, lotes y cuentas Trust/IOLTA |
+| Mezclar monedas en una misma cuenta de caja/banco | Validación estricta `account.currency === payment.currency` en cada asiento | Impide descuadres contables en economías bimonetarias/trimonetarias (`BS` / `USD` / `EUR`) |
 
-- **Simplicity First**: Make every change as simple as possible. Impact minimal code.
-- **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
-- **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
+---
 
-## Workflow Orchestration
+## 5. Reglas de Seguridad Multi-Tenant, Fiduciaria y Base de Datos
 
-1.  **Spec-first**: Enter plan mode for non-trivial tasks (3+ steps or architectural decisions). Check `.ai/specs/` and `.ai/specs/enterprise/` before coding; name new spec files `{YYYY-MM-DD}-{kebab-case-title}.md`. Skip for small fixes. Skills: `om-spec-writing` (research/phasing), `om-pre-implement-spec` (readiness audit), `om-implement-spec` (execution).
-2.  **Subagent strategy**: Use subagents liberally to keep main context clean. Offload research and parallel analysis. One task per subagent.
-3.  **Self-improvement**: After corrections, scan `.ai/lessons.md`; update one tagged lesson record + index row or the relevant AGENTS.md. Never bulk-read lessons.
-4.  **Verification**: Run tests, check build, suggest user verification. Ask: "Would a staff engineer approve this?"
-5.  **Elegance**: For non-trivial changes, pause and ask "is there a more elegant way?" Skip for simple fixes.
-6.  **Autonomous bug fixing**: When given a bug report, just fix it. Point at logs/errors, then resolve. Zero hand-holding.
+1. **Filtro Obligatorio de Inquilino y Sucursal:** Toda consulta Drizzle sobre tablas de negocio en D1 **debe** incluir `eq(table.tenantId, ctx.tenantId)` y validar que `orgId` pertenezca al subárbol autorizado `ctx.orgPath`. Queda prohibido exponer helpers de repositorio que reciban solo un `id` sin `tenantId`.
+2. **Aislamiento de Fondos en Custodia y Notas Confidenciales:** Los saldos de anticipos fiduciarios (`Trust/IOLTA` o depósitos *escrow* de arrendamiento) nunca pueden sumarse al disponible operativo ni sobregirarse por cliente. En portales externos (`external_portal`), toda nota o adjunto con `isConfidential = true` debe filtrarse a nivel de consulta SQL.
+3. **Migraciones D1 Estrictamente Aditivas (*Expand-Only*):** Ninguna migración SQL automática puede contener `DROP TABLE`, `DROP COLUMN` ni renombrados destructivos, preservando compatibilidad con actualizaciones en caliente y recuperación por **D1 Time Travel**.
+4. **Idempotencia Obligatoria en Mutaciones Físicas y Financieras:** Todo comando que descuente stock, registre un cobro POS, bloquee una habitación/unidad, emita un pase de acceso, procese un mensaje de `Cloudflare Queues` o reciba un `FederationEnvelope` debe exigir una clave de idempotencia (`clientMutationId` o `envelopeId`) y verificarla dentro de la misma transacción SQLite.
 
-## PR Workflow
+---
 
-Full policy — label taxonomy, priority/risk inference tables, pipeline transitions, the automated-verification exemption, the self-QA exception and the auto-skill claim protocol: [`.ai/docs/pr-workflow.md`](.ai/docs/pr-workflow.md). The boundaries:
+## 6. Desarrollo Guiado por Recibos (`RDD`): Comandos de Verificación Obligatorios
 
-- Pipeline labels are mutually exclusive: `review`, `changes-requested`, `qa`, `qa-failed`, `merge-queue`, `blocked`, `do-not-merge`. A ready non-draft PR carries `review` unless it is already in another pipeline state.
-- Category (`bug`, `feature`, `refactor`, `security`, `dependencies`, `enterprise`, `documentation`) and meta (`needs-qa`, `skip-qa`, `qa-approved`, `qa-self-verified`, `in-progress`, `ci-monitoring`, `screenshots`) labels are additive.
-- Every non-draft PR carries **exactly one** priority label (`priority-low|medium|high|extreme`, urgency) and **exactly one** risk label (`risk-low|medium|high`, blast radius). They are orthogonal; when signals conflict pick the higher one and say why in the label comment.
-- **QA-approval merge gate (hard rule): a PR carrying `needs-qa` MUST NOT be merged unless it also carries `qa-approved`**, even when every other check is green. `skip-qa` is the explicit opt-out; never combine it with `needs-qa`/`qa-approved`. `qa-failed`, `do-not-merge` and `blocked` are likewise hard merge blocks.
-- **Automated-verification exemption:** a change touching no UI-rendering file (no `.tsx` outside tests, nothing under `packages/ui/src/` or `**/components/**`) takes `skip-qa` — **but only** with the database structure and API surface unchanged, no `BACKWARD_COMPATIBILITY.md` contract broken, and automated tests for the changed behavior in the same PR; otherwise it keeps `needs-qa`.
-- `qa-approved`/`qa-self-verified` are label writes: a `read`-permission contributor posts the QA evidence comment and a maintainer applies the labels; a skill that cannot apply them MUST report it stopped there.
-- The `qa` pipeline label means manual QA is **in progress** and is set by QA reviewers only — `om-auto-*` skills request QA with `needs-qa` and never touch `qa`.
-- Auto-skills claim a PR/issue with all three signals (assignee, `in-progress` label, claim comment), release `in-progress` even on failure, and comment the rationale whenever they change a pipeline/meta label.
-- `ci-monitoring` is a meta label, **not** a claim signal: it means the work is finished and reported and only CI is still being watched. A PR carrying it without `in-progress`, a non-self assignee or a fresh claim comment MUST NOT be treated as in progress — it is free to claim.
+**Regla de Cierre Innegociable:** Ningún agente puede reportar una tarea como completada ni marcar `- [x]` en un plan sin haber ejecutado los comandos correspondientes en terminal real y comprobado código de salida `0`. Quedan prohibidos tests falsos (mocks que solo prueban mocks) o implementaciones incompletas (`TODO`).
 
-### Documentation and Specifications
-
-- OSS specs live in `.ai/specs/`; commercial/enterprise specs live in `.ai/specs/enterprise/` — see `.ai/specs/AGENTS.md` for naming, structure, and changelog conventions. Always check for existing specs before modifying a module, and update them when implementing significant changes.
-- For every new feature, the spec MUST list integration coverage for all affected API paths and key UI paths, and those integration tests MUST ship in the same change — see `.ai/qa/AGENTS.md`.
-- Integration tests MUST be self-contained: create required fixtures in test setup (prefer API fixtures), clean up created records in teardown/finally, and remain stable without relying on seeded/demo data.
-
-## Monorepo Structure
-
-### Apps (`apps/`)
-
--   **mercato**: Main Next.js app. Put user-created modules in `apps/mercato/src/modules/`.
--   **docs**: Documentation site.
-
-### Packages (`packages/`)
-
-All packages use the `@open-mercato/<package>` naming convention: **shared** (cross-cutting utilities, types, DSL helpers, i18n, data engine), **ui**, **core** (business modules: auth, catalog, customers, sales), **cli**, **cache** (always via DI, never raw Redis/SQLite), **queue** (background jobs via the worker contract, never custom queues), **events**, **search**, **ai-assistant**, **content**, **onboarding**, **enterprise** (commercial-only modules and overlays).
-
-### Where to Put Code
-
-- Put core platform features in `packages/<package>/src/modules/<module>/`
-- Put every external integration provider in a dedicated npm workspace package under `packages/<provider-package>/` (for example `packages/gateway-stripe`, `packages/carrier-inpost`) — do not add provider modules inside `packages/core/src/modules/`
-- Put shared utilities and types in `packages/shared/src/lib/` or `packages/shared/src/modules/`
-- Put UI components in `packages/ui/src/`
-- Put user/app-specific modules in `apps/mercato/src/modules/<module>/`
-- MUST NOT add code directly in `apps/mercato/src/` — it's a boilerplate for user apps. Narrow exception: committed, typed *generated registries* (`*.generated.ts`) that must survive `yarn clean-generated` and travel with the repo — see [Generated Files: versioned vs ephemeral](.ai/docs/module-development.md#generated-files-versioned-vs-ephemeral).
-
-### `external/official-modules/` (git submodule)
-
-An optional, uncommitted git submodule. When present it is **real working code** — first-class for search, grep and refactoring, not vendored build output. Edits there commit to the submodule's own git and ship as a separate PR; **never `git add external/official-modules`** (pointer bump) unless explicitly asked. Activation, module-id convention and cross-repo merge order: [`.ai/docs/official-modules.md`](.ai/docs/official-modules.md).
-
-### When You Need an Import
-
-Each package's AGENTS.md is the authoritative cheat sheet for its own imports: UI primitives, backend utilities (`apiCall`, `CrudForm`) and portal hooks → `ui` + `ui:backend`; AI helpers (`defineAiAgent`, `defineAiTool`, `prepareMutation`, `<AiChat>`) → `ai-assistant`; cross-cutting helpers (i18n, commands, encryption, scoped payloads, boolean parsing, data/query engine types, overrides) → `shared`; customer/portal auth helpers, custom-field helpers, CRUD/Indexer types → `shared` + `core`; everything else → the matching package.
-
-Examples worth memorising (used everywhere): `apiCall` from `@open-mercato/ui/backend/utils/apiCall`, `useT` from `@open-mercato/shared/lib/i18n/context`, `resolveTranslations` from `@open-mercato/shared/lib/i18n/server`, `Spinner` from `@open-mercato/ui/primitives/spinner`.
-
-Import strategy:
-- Prefer package-level imports (`@open-mercato/<package>/...`) over deep relative imports (`../../../...`) when crossing module boundaries, referencing shared module internals, or importing from deeply nested files.
-- Keep short relative imports for same-folder/local siblings (`./x`, `../x`) where they are clearer than package paths.
-
-## Conventions
-
-- Modules: plural, snake_case (folders and `id`). Special cases: `auth`, `example`.
-- **Event IDs**: `module.entity.action` (singular entity, past tense action, e.g., `pos.cart.completed`). use dots as separators.
-- `clientBroadcast: true` in EventDefinition bridges events to browser via SSE (DOM Event Bridge)
-- `portalBroadcast: true` in EventDefinition bridges events to customer portal via SSE (Portal Event Bridge)
-- JS/TS fields and identifiers: camelCase.
-- Database tables and columns: snake_case; table names plural.
-- Common columns: `id`, `created_at`, `updated_at`, `deleted_at`, `is_active`, `organization_id`, `tenant_id`.
-- UUID PKs, explicit FKs, junction tables for many-to-many.
-- Keep code minimal and focused; avoid side effects across modules.
-- Keep modules self-contained; re-use common utilities via `src/lib/`.
-
-## Backward Compatibility Contract
-
-> **Full specification**: [`BACKWARD_COMPATIBILITY.md`](BACKWARD_COMPATIBILITY.md) — MUST be read before modifying any contract surface. It enumerates the 13 contract-surface categories (auto-discovery files, types, signatures, import paths, event IDs, widget spot IDs, API routes, DB schema, DI keys, ACL features, notification IDs, CLI commands, generated files) and their FROZEN / STABLE / ADDITIVE-ONLY classification.
-
-Third-party module developers depend on stable platform APIs. Any change to a **contract surface** is a breaking change that blocks merge unless the deprecation protocol is followed.
-
-**Deprecation protocol** (summary): (1) never remove in one release, (2) add `@deprecated` JSDoc, (3) provide a bridge (re-export/alias/dual-emit) for ≥1 minor version, (4) document in UPGRADE_NOTES.md, (5) reference a spec with "Migration & Backward Compatibility" section.
-
-## Boundary Labels for Agent Rules
-
-Use `Always`, `Ask First`, `Never`, and `Validation Commands` headings when adding or reorganizing agent rules — definitions and the instruction-budget contract: [`.ai/docs/agent-instructions.md`](.ai/docs/agent-instructions.md).
-
-## Architecture, Data, UI, and Code Rules
-
-These are critical project-wide rules. The top-level `Always`, `Ask First`, and `Never` sections summarize their boundaries; this section keeps the detailed requirements.
-
-### Architecture
-
--   **NO direct ORM relationships between modules** — use foreign key IDs, fetch separately
--   Always filter by `organization_id` for tenant-scoped entities
--   Never expose cross-tenant data from API handlers
--   Use DI (Awilix) to inject services; avoid `new`-ing directly
--   Modules must remain isomorphic and independent
--   When extending another module's data, add a separate extension entity and declare a link in `data/extensions.ts`
-
-### Data & Security
-
--   Validate all inputs with zod; place validators in `data/validators.ts`
--   Derive TypeScript types from zod via `z.infer<typeof schema>`
--   Use `findWithDecryption`/`findOneWithDecryption` instead of `em.find`/`em.findOne`
--   Default migration workflow: update ORM entities, run `yarn db:generate`, and review the generated SQL plus `migrations/.snapshot-open-mercato.json`
--   Coding-agent exception: if `yarn db:generate` emits unrelated migrations, delete the unrelated output, keep or write only the intended SQL migration for this entity change, and update the affected module's `.snapshot-open-mercato.json`. Never run `yarn db:migrate` just to make the generator quiet.
--   Hash passwords with bcryptjs (cost >=10), never log credentials
--   Return minimal error messages for auth (avoid revealing whether email exists)
--   RBAC: prefer declarative guards (`requireAuth`, `requireFeatures`) in page metadata; avoid `requireRoles` — role names are mutable and can be spoofed; use feature-based guards with immutable IDs from `acl.ts` instead
--   Portal RBAC: use `requireCustomerAuth` and `requireCustomerFeatures` in page metadata for portal pages
-
-### UI & HTTP
-
--   Use `apiCall`/`apiCallOrThrow`/`readApiResultOrThrow` from `@open-mercato/ui/backend/utils/apiCall` — never use raw `fetch`
--   If a backend page cannot use `CrudForm`, wrap every write (`POST`/`PUT`/`PATCH`/`DELETE`) in `useGuardedMutation(...).runMutation(...)` and include `retryLastMutation` in the injection context
--   For CRUD forms: `createCrud`/`updateCrud`/`deleteCrud` (auto-handle `raiseCrudError`)
--   For local validation errors: throw `createCrudFormError(message, fieldErrors?)` from `@open-mercato/ui/backend/utils/serverErrors`
--   Read JSON defensively: `readJsonSafe(response, fallback)` — never `.json().catch(() => ...)`
--   Use `LoadingMessage`/`ErrorMessage` from `@open-mercato/ui/backend/detail`
--   i18n: `useT()` client-side, `resolveTranslations()` server-side
--   Never hard-code user-facing strings — use locale files
--   Prefix purely internal `throw new Error(...)` / `createCrudFormError(...)` / `toast.*(...)` messages with `[internal]` so the i18n hardcoded-string checker treats them as opted out; user-facing variants MUST route through `t('module.errors.<key>')`. Run `yarn i18n:check-hardcoded` (and `yarn i18n:check-values` for non-English coverage) to inspect the surface — both are advisory in Phase 1 of `.ai/specs/2026-05-26-missing-translations-audit-and-remediation.md`. Use `<module>/i18n/.hardcoded-allowlist.json` for module-scoped exceptions (legal copy, framework chrome).
--   Every dialog: `Cmd/Ctrl+Enter` submit, `Escape` cancel
--   Keep `pageSize` at or below 100
-
-### Code Quality
-
-- No `any` types — use zod schemas with `z.infer`, narrow with runtime checks
-- Prefer functional, data-first utilities over classes
-- No one-letter variable names, no inline comments (self-documenting code)
-- Don't add docstrings/comments/type annotations to code you didn't change
-- Boolean parsing: use `parseBooleanToken`/`parseBooleanWithDefault` from `@open-mercato/shared/lib/boolean`
-- Confirm project still builds after changes
-
-## Design System Rules
-
-> Foundations (token tables, decision trees, color/spacing/typography rules): `.ai/ds-rules.md`  
-> Component reference (variants, sizes, props, examples, MUST rules per primitive): `.ai/ui-components.md`  
-> Workflow guidance (CrudForm, DataTable, Loading, Flash, Notifications, Portal): `packages/ui/AGENTS.md`
-
-- NEVER use hardcoded Tailwind status colors (`text-red-*`, `bg-green-*`, `text-amber-*`, etc.) — use `{property}-status-{status}-{role}` tokens
-- NEVER use arbitrary values (`text-[13px]`, `p-[13px]`, `rounded-[24px]`, `z-[9999]`) — use DS scale
-- NEVER add `dark:` overrides on semantic/status tokens — they already handle dark mode
-- NEVER hardcode hex/rgb in `className` — always use CSS token names
-- NEVER use hardcoded Tailwind color shades for borders (`border-gray-300`) — use `border-border`, `border-input`
-
-**Boy Scout Rule**: When touching a file that has hardcoded status colors, arbitrary text sizes, or `dark:` overrides on status colors, migrate at minimum the lines you touched to semantic tokens.
-
-## Key Commands
+### 6.1 Batería Estándar tras Cada Iteración (50–200 líneas)
 
 ```bash
-yarn dev                  # Compact dev runtime; press `d` for raw logs (`:verbose`, `:app`, `:greenfield` variants)
-yarn dev:reset            # Clear .mercato/next/dev plus legacy .next caches when Turbopack serves stale chunks
-yarn build                # Build everything (`build:packages` / `build:app` for one side)
-yarn lint                 # Lint all packages
-yarn test                 # Run unit tests (`test:integration` for Playwright, headless)
-yarn generate             # Run module generators
-yarn db:generate          # Generate database migrations (`db:migrate` applies them — ask first)
-yarn initialize           # Full project initialization
-yarn agents:check-budget  # Verify AGENTS.md files fit the agent instruction budget
+# 1. Verificación estricta de tipos en todo el monorepo (Hono RPC + Drizzle + SvelteKit)
+pnpm -r typecheck
+
+# 2. Detección de exportaciones huérfanas, archivos muertos y dependencias no usadas
+pnpm dlx knip --strict
+
+# 3. Ejecución de pruebas reales sobre runtime workerd (D1 + Durable Objects + KV + Queues)
+pnpm --filter <paquete-afectado> test:run
 ```
+
+### 6.2 Batería de Presupuesto de Borde y Empaquetado (Antes de Cerrar un Módulo, Pack o Fase)
+
+```bash
+# 4. Compilación real en seco con Wrangler para auditar peso total y gzip del Worker
+pnpm --filter @shac/node-worker exec wrangler deploy --dry-run --outdir .wrangler/dist
+
+# Presupuesto obligatorio en la salida de Wrangler:
+# - Edición individual por Pack (retail-pos / distro-wms / hospitality-pms / clinic-practice / legal-psa / industrial-gate): gzip < 500 KiB
+# - Binario completo Omni-Enterprise (los 4 Packs unidos): gzip < 1024 KiB (tope Free: 3072 KiB)
+
+# 5. Guardia de seguridad sobre migraciones SQL generadas para D1 (debe retornar 0 coincidencias)
+! rg -i "DROP TABLE|DROP COLUMN" packages/db-d1/migrations/
+```
+
+### 6.3 Recibos Específicos de Rendimiento y Concurrencia
+
+- **Presupuesto de consultas D1 por endpoint:** Todo test de integración de lectura/listado en D1 debe envolver el binding con un contador de sentencias y afirmar `expect(queryCount).toBeLessThanOrEqual(2)` usando `db.batch()`.
+- **Prueba de fuego en `BranchInventoryDO`:** Cualquier cambio en `@shac/actor-branch`, `@shac/mod-wms`, `@shac/mod-pos` o `@shac/mod-spaces` debe pasar el test de ráfaga concurrente (`Promise.all` con 25 a 50 operaciones simultáneas contra el mismo lote o habitación/unidad) verificando saldo `>= 0`, cero dobles reservas, orden **FEFO** respetado y cero duplicados ante reintento del mismo `clientMutationId`.
+
+---
+
+## 7. Checklist Canónico para Implementar un Nuevo Comando o Módulo
+
+1. **Inspeccionar contratos vivos:** Lee `SPEC.md` y `packages/kernel/src/contracts.ts` para reutilizar tipos monetarios enteros, paginación por cursor y códigos de error estándar.
+2. **Modelar esquema SQLite (si aplica):** Declara las tablas en `@shac/db-d1` (datos maestros/históricos) o en `@shac/actor-branch` (estado caliente por sede), con índices compuestos encabezados por `tenant_id`.
+3. **Escribir el `CommandSpec` puro (`< 150` líneas):** Define `inputSchema` y `outputSchema` en Zod, asigna `requiredPermission`, configura `mcp: { expose: true, ... }` y escribe el `handler` puro sin estado global.
+4. **Registrar en el `ModuleManifest` y Pack:** Exporta el comando manteniendo `"sideEffects": false` para no romper la poda estática entre ediciones.
+5. **Escribir pruebas reales de aislamiento y borde:** Cubre en `.test.ts`: (a) caso exitoso, (b) intento de acceso cruzado desde otro `tenantId` (`404`/`403`), (c) módulo apagado en `TenantMarketProfile` (`403 MODULE_NOT_ENABLED`), y (d) idempotencia en reintentos.
+6. **Emitir Recibo RDD y Handoff Atómico:** Ejecuta los comandos de la Sección 6, marca `- [x]` en `docs/superpowers/plans/<plan>.md`, registra cualquier decisión no obvia en `docs/superpowers/DECISIONS.md` y crea el commit atómico.
