@@ -13,3 +13,11 @@ export {
   type AuthBranchGateProps,
   type BranchOption,
 } from './components/AuthBranchGate.js';
+export { KpiCard, type KpiCardProps, type KpiTrend } from './components/KpiCard.js';
+export { EmptyState, type EmptyStateProps } from './components/EmptyState.js';
+export {
+  RowActions,
+  SectionHeader,
+  type RowActionItem,
+  type SectionHeaderProps,
+} from './components/SectionHeader.js';

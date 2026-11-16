@@ -113,4 +113,27 @@ describe('@shac/ui smoke tests', () => {
     expect(shell).toHaveClass('dark');
     expect(screen.getByText('Offline · 3 mutaciones en cola')).toBeInTheDocument();
   });
+
+  it('renders ported Open Mercato primitives: KpiCard, EmptyState, SectionHeader, and RowActions', async () => {
+    const { KpiCard, EmptyState, SectionHeader, RowActions } = await import('../src/index.js');
+    const onAction = vi.fn();
+    const onSelect = vi.fn();
+    const { container } = render(
+      <div>
+        <KpiCard title="Pipeline Abierto" value="$1,250.00" trend={{ value: 12, direction: 'up' }} />
+        <SectionHeader title="Oportunidades" count={3} />
+        <EmptyState title="Sin registros" actionLabel="Crear" onAction={onAction} />
+        <RowActions items={[{ id: 'open', label: 'Abrir ficha', onSelect }]} />
+      </div>,
+    );
+    expect(container.querySelector('[data-slot="kpi-card"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="section-header"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="empty-state"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="row-actions"]')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }));
+    expect(onAction).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Acciones' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Abrir ficha' }));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
 });
