@@ -1,8 +1,10 @@
 import { defineModule, type ModuleManifest } from '@shac/kernel';
+import { servicesClaimsListCommand } from './commands/claims-list.js';
 import { servicesEvvRecordCommand } from './commands/evv-record.js';
 import { servicesRmaClaimCommand } from './commands/rma-claim.js';
 import { servicesWorkOrdersUpsertCommand } from './commands/work-orders-upsert.js';
 
+export { servicesClaimsListCommand } from './commands/claims-list.js';
 export { servicesEvvRecordCommand } from './commands/evv-record.js';
 export { servicesRmaClaimCommand } from './commands/rma-claim.js';
 export { servicesWorkOrdersUpsertCommand } from './commands/work-orders-upsert.js';
@@ -17,6 +19,7 @@ export const modServicesManifest: ModuleManifest = defineModule({
   commands: [
     servicesWorkOrdersUpsertCommand,
     servicesRmaClaimCommand,
+    servicesClaimsListCommand,
     servicesEvvRecordCommand,
   ],
 });

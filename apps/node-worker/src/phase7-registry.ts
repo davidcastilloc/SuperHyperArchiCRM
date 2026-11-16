@@ -19,6 +19,7 @@ import {
 import { modPortalManifest, portalRecordsListCommand } from '@shac/mod-portal';
 import {
   modServicesManifest,
+  servicesClaimsListCommand,
   servicesEvvRecordCommand,
   servicesRmaClaimCommand,
   servicesWorkOrdersUpsertCommand,
@@ -43,6 +44,10 @@ export const PHASE7_COMMANDS: readonly CommandSpec<any, any, ShacD1Database>[] =
 /** Mounts /api/services/* RPC routes with full Hono type inference. */
 export function createServicesRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
+    .get(
+      '/claims',
+      queryCommandHandler(servicesClaimsListCommand, profileLoader),
+    )
     .post(
       '/work-orders',
       jsonCommandHandler(servicesWorkOrdersUpsertCommand, profileLoader),

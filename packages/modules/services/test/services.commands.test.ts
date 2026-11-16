@@ -15,11 +15,12 @@ describe('@shac/mod-services commands on workerd', () => {
     await setupServicesD1(env.DB);
   });
 
-  it('exposes modServicesManifest with id services and 3 MCP-enabled commands', () => {
+  it('exposes modServicesManifest with id services and 4 MCP-enabled commands', () => {
     expect(modServicesManifest.id).toBe('services');
     expect(modServicesManifest.commands.map((c) => c.id)).toEqual([
       'services.work_orders.upsert',
       'services.rma.claim',
+      'services.claims.list',
       'services.evv.record',
     ]);
     for (const cmd of modServicesManifest.commands) {
@@ -218,5 +219,26 @@ describe('@shac/mod-services commands on workerd', () => {
         }),
       ),
     ).rejects.toBeInstanceOf(AppError);
+
+    const svcMod = await import('../src/index.js');
+    expect('servicesClaimsListCommand' in svcMod).toBe(true);
+    const { servicesClaimsListCommand } = svcMod as typeof import('../src/index.js') & {
+      servicesClaimsListCommand: {
+        inputSchema: { parse: (v: unknown) => unknown };
+        handler: (c: typeof ctx, i: never) => Promise<{
+          claims: Array<{ claimNumber: string }>;
+          workOrders: Array<{ ticketNumber: string }>;
+        }>;
+      };
+    };
+
+    counted.resetQueryCount();
+    const listRes = await servicesClaimsListCommand.handler(
+      ctx,
+      servicesClaimsListCommand.inputSchema.parse({ limit: 25 }) as never,
+    );
+    expect(counted.getQueryCount()).toBeLessThanOrEqual(2);
+    expect(listRes.claims.some((c) => c.claimNumber === 'RMA-2026-001')).toBe(true);
+    expect(listRes.workOrders.some((w) => w.ticketNumber === 'WO-2026-001')).toBe(true);
   });
 });

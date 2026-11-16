@@ -38,6 +38,7 @@ import {
   type HonoEnv,
 } from './command-registry.js';
 import { createAdaptiveCorsMiddleware } from './cors.js';
+import { createCustomFieldsRoutes } from './custom-fields-routes.js';
 import { createFederationRoutes } from './federation-routes.js';
 import { buildMcpServerForRequest } from './mcp-server.js';
 import {
@@ -171,6 +172,7 @@ function createWorkerApp(
       '/api/system/app-store/toggle',
       jsonCommandHandler(systemAppStoreToggleCommand, profileLoader),
     )
+    .route('/api/system', createCustomFieldsRoutes(profileLoader))
     .route(
       '/api/system',
       createSystemRoutes(profileLoader, authenticateWorkerActor),
