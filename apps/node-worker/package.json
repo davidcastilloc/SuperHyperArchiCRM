@@ -6,7 +6,7 @@
   "sideEffects": false,
   "exports": {
     ".": {
-      "types": "./src/index.ts",
+      "types": "./src/public-types.ts",
       "import": "./src/index.ts"
     }
   },
@@ -16,7 +16,9 @@
   },
   "dependencies": {
     "@shac/actor-branch": "workspace:*",
+    "@shac/control-plane": "workspace:*",
     "@shac/db-d1": "workspace:*",
+    "@shac/editions": "workspace:*",
     "@shac/kernel": "workspace:*",
     "@shac/mod-catalog": "workspace:*",
     "@shac/mod-customers": "workspace:*",

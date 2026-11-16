@@ -26,6 +26,7 @@ import {
   createBranchRoutes,
 } from './branch-routes.js';
 import {
+  authenticateWorkerActor,
   jsonCommandHandler,
   onWorkerError,
   queryCommandHandler,
@@ -38,6 +39,12 @@ import {
   createRegionalRoutes,
   createWmsRoutes,
 } from './pos-wms-registry.js';
+import {
+  createSystemRoutes,
+  setProfileInvalidator,
+  systemAppStoreToggleCommand,
+  systemGetProfileCommand,
+} from './system-routes.js';
 
 export type { WorkerEnv } from './command-registry.js';
 
@@ -50,6 +57,7 @@ export function invalidateProfileCache(): void {
 function createWorkerApp(
   profileLoader: ProfileLoader = defaultProfileLoader,
 ) {
+  setProfileInvalidator(() => profileLoader.invalidate());
   return new Hono<HonoEnv>()
     .use('*', createAdaptiveCorsMiddleware<HonoEnv>())
     .onError(onWorkerError)
@@ -111,6 +119,18 @@ function createWorkerApp(
     .route('/api/wms', createWmsRoutes(profileLoader))
     .route('/api/branch/inventory', createBranchRoutes(profileLoader))
     .route('/api/branch/pos', createBranchPosRoutes(profileLoader))
+    .get(
+      '/api/system/profile',
+      queryCommandHandler(systemGetProfileCommand, profileLoader),
+    )
+    .post(
+      '/api/system/app-store/toggle',
+      jsonCommandHandler(systemAppStoreToggleCommand, profileLoader),
+    )
+    .route(
+      '/api/system',
+      createSystemRoutes(profileLoader, authenticateWorkerActor),
+    )
     .all('/mcp', async (c) => {
       const requestId = c.req.header('X-Request-Id') ?? crypto.randomUUID();
       const handler = createMcpHandler(

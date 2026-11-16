@@ -19,6 +19,7 @@ import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
 import { CatalogView, PartiesView } from './views/Phase2Views';
 import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
+import { AppStoreView } from './views/AppStoreView';
 
 const DEFAULT_PROFILE: Pick<
   TenantMarketProfile,
@@ -76,6 +77,12 @@ const NAV_ITEMS: ShacNavItem[] = [
     href: '/wms',
     moduleId: 'wms',
     shortcut: 'F6',
+  },
+  {
+    id: 'app-store',
+    label: 'App Store',
+    href: '/app-store',
+    moduleId: 'core',
   },
 ];
 
@@ -160,6 +167,10 @@ function WmsPage() {
   return <WmsView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
 }
 
+function AppStorePage() {
+  return <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />;
+}
+
 const rootRoute = createRootRoute({ component: RootLayout });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -196,6 +207,11 @@ const wmsRoute = createRoute({
   path: '/wms',
   component: WmsPage,
 });
+const appStoreRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/app-store',
+  component: AppStorePage,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -205,6 +221,7 @@ const routeTree = rootRoute.addChildren([
   posRoute,
   kioskRoute,
   wmsRoute,
+  appStoreRoute,
 ]);
 const router = createRouter({ routeTree });
 

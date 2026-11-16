@@ -71,6 +71,7 @@ export interface ExecutionActor {
 
 export interface KvStore {
   get(key: string, type: 'text'): Promise<string | null>;
+  put?(key: string, value: string): Promise<void>;
 }
 
 export interface BranchActorStub {

@@ -9,9 +9,17 @@
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
       "project": ["src/**/*.ts!", "test/**/*.ts"]
     },
+    "apps/control-plane": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
     "apps/web-spa": {
       "entry": ["src/main.tsx!", "test/**/*.test.ts"],
       "project": ["src/**/*.{ts,tsx}!", "test/**/*.{ts,tsx}"]
+    },
+    "editions/presets": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
     },
     "packages/kernel": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],

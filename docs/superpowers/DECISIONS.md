@@ -62,3 +62,11 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
   1. Incorporar el puerto opcional `branchDo?: BranchActorResolver` dentro de `ExecutionContext` en `@shac/kernel` (`packages/kernel/src/contracts.ts`) para desacoplar `@shac/mod-pos` y `@shac/mod-wms` del `Env` del Worker.
   2. Exigir proyecciones explícitas y alias `.as(...)` sin columnas homónimas en toda consulta `JOIN` ejecutada dentro de `ctx.db.batch()` (aplicado en `pos.kiosk.smartcheck`, `wms.pickings.list` y `regional.fiscal.stamp`).
   3. Validar `fin_accounts.currency === payment.currency` (`422 ERR_CURRENCY_ACCOUNT_MISMATCH`) tanto en los comandos `@shac/mod-pos` (antes de tocar DO/D1) como dentro de `ctx.storage.transactionSync` en `BranchInventoryDO`, manteniendo todas las operaciones bajo idempotencia por `clientMutationId`.
+
+## ADR-010 (2026-11-16): Fase 4 — App Store en Vivo (`CONFIG_KV` `0 ms`), 9 Presets `@shac/editions` y Control Plane con Licencias `HMAC-SHA256`
+
+- **Contexto:** La arquitectura All-in-One requiere encender/apagar módulos o fusionar mercados verticales en vivo (`0 ms`) sobre un nodo activo sin migrar ni perder registros existentes en D1 / `BranchInventoryDO`, además de contar con un Control Plane multi-D1 capaz de emitir licencias offline/híbridas firmadas y monitorear cuotas del plan `BYOC_FREE`.
+- **Decisión:**
+  1. Ampliar `KvStore` en `@shac/kernel` (`put?`) para que los comandos del sistema actualicen `CONFIG_KV` (`profile:current`) e invaliden el caché en memoria del isolate (`ProfileLoader.invalidate()`) en el mismo request (`0 ms`).
+  2. Mantener los 4 Packs de Familia y 9 Presets canónicos en `@shac/editions` (`editions/presets`) con guardias que protegen `core` e `iam` y fusionan vocabularios sin tocar datos transaccionales.
+  3. Implementar `@shac/control-plane` (`apps/control-plane`) con las 5 tablas `cp_*`, firma y verificación WebCrypto `HMAC-SHA256` en tiempo constante (`crypto.subtle`), alertas tempranas `WARN_75` en cuentas `BYOC_FREE` y planificación de rollouts por anillos (`<= 1,200 req / 5 min`).
