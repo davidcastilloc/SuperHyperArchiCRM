@@ -13,6 +13,10 @@
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
       "project": ["src/**/*.ts!", "test/**/*.ts"]
     },
+    "apps/federation-hub": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
     "apps/web-spa": {
       "entry": ["src/main.tsx!", "test/**/*.test.ts"],
       "project": ["src/**/*.{ts,tsx}!", "test/**/*.{ts,tsx}"]
@@ -32,6 +36,10 @@
       "ignoreDependencies": ["zod"]
     },
     "packages/actor-branch": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/federation-sdk": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
       "project": ["src/**/*.ts!", "test/**/*.ts"]
     },

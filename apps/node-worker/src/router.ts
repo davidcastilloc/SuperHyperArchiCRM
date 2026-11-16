@@ -33,6 +33,7 @@ import {
   type HonoEnv,
 } from './command-registry.js';
 import { createAdaptiveCorsMiddleware } from './cors.js';
+import { createFederationRoutes } from './federation-routes.js';
 import { buildMcpServerForRequest } from './mcp-server.js';
 import {
   createPosRoutes,
@@ -119,6 +120,7 @@ function createWorkerApp(
     .route('/api/wms', createWmsRoutes(profileLoader))
     .route('/api/branch/inventory', createBranchRoutes(profileLoader))
     .route('/api/branch/pos', createBranchPosRoutes(profileLoader))
+    .route('/api/federation', createFederationRoutes(profileLoader))
     .get(
       '/api/system/profile',
       queryCommandHandler(systemGetProfileCommand, profileLoader),

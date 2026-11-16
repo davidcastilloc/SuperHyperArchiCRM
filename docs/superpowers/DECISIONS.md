@@ -70,3 +70,11 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
   1. Ampliar `KvStore` en `@shac/kernel` (`put?`) para que los comandos del sistema actualicen `CONFIG_KV` (`profile:current`) e invaliden el caché en memoria del isolate (`ProfileLoader.invalidate()`) en el mismo request (`0 ms`).
   2. Mantener los 4 Packs de Familia y 9 Presets canónicos en `@shac/editions` (`editions/presets`) con guardias que protegen `core` e `iam` y fusionan vocabularios sin tocar datos transaccionales.
   3. Implementar `@shac/control-plane` (`apps/control-plane`) con las 5 tablas `cp_*`, firma y verificación WebCrypto `HMAC-SHA256` en tiempo constante (`crypto.subtle`), alertas tempranas `WARN_75` en cuentas `BYOC_FREE` y planificación de rollouts por anillos (`<= 1,200 req / 5 min`).
+
+## ADR-011 (2026-11-16): Fase 5 — Federación Ed25519 (`FederationEnvelope`), Buffer 24h y Recepción ASN Automática
+
+- **Contexto:** Conectar nodos independientes (`Tienda D1 A` y `Distribuidora D1 B`) con un Hub federado B2B/B2C exige aislamiento estricto de datos privados (costos, márgenes, consumidores finales), prevención de replays y consolidación de reabastecimiento sin micro-órdenes.
+- **Decisión:**
+  1. Estandarizar `@shac/federation-sdk` con `FederationEnvelope` firmado vía WebCrypto `Ed25519` + `SHA-256(canonicalJson)` y ventana anti-replay de `300_000 ms`, más matcher determinista GTIN/UOM y buffer de consolidación 24h (`consolidateLowStockHours`).
+  2. Aislar `@shac/federation-hub` (`apps/federation-hub`) en su propia base D1 (`hub_nodes`, `hub_public_offers`, `hub_envelopes_idempotency`, `hub_b2b_orders`, `hub_inventory_holds`) exponiendo `findBestOffers`, búsqueda B2C y reserva temporal `holdInventoryTTL`.
+  3. Exponer `/api/federation/b2b/{reorder-evaluate,asn-receive}` en `@shac/node-worker` creando automáticamente recepciones `asn_receipt` en D1 ante sobres `B2B_SHIPMENT_DISPATCHED` / `B2B_EPOD_CONFIRMED` verificados.
