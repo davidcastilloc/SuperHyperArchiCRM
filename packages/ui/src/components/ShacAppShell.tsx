@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from 'react';
+import { useMemo, useState, type ReactNode, type Ref } from 'react';
 import type { MarketVocabulary, TenantMarketProfile } from '@shac/kernel';
 import { cn } from '../lib/cn.js';
 
@@ -13,6 +13,7 @@ export interface ShacNavItem {
   id: string;
   label: string;
   href: string;
+  group?: string;
   moduleId?: string;
   shortcut?: string;
 }
@@ -41,10 +42,8 @@ function formatSyncLabel(syncState: SyncState): string {
   switch (syncState.status) {
     case 'online':
       return 'En línea · Tiempo real';
-    case 'offline': {
-      const count = syncState.pendingMutations ?? 0;
-      return `Offline · ${count} mutaciones en cola`;
-    }
+    case 'offline':
+      return `Offline · ${syncState.pendingMutations ?? 0} mutaciones en cola`;
     case 'syncing':
       return 'Sincronizando...';
     case 'error':
@@ -94,7 +93,7 @@ export interface ShacAppShellProps {
   ref?: Ref<HTMLDivElement>;
 }
 
-/** Bimodal application shell driven by TenantMarketProfile and MarketVocabulary. */
+/** Open Mercato-style bimodal application shell with searchable collapsible sidebar. */
 export function ShacAppShell({
   profile,
   branchName,
@@ -112,9 +111,35 @@ export function ShacAppShell({
   ref,
 }: ShacAppShellProps) {
   const vocab: MarketVocabulary = profile.vocabulary;
-  const visibleNav = navItems.filter(
-    (item) => !item.moduleId || profile.activeModules.includes(item.moduleId),
-  );
+  const [navSearch, setNavSearch] = useState('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const visibleNav = useMemo(() => {
+    const term = navSearch.trim().toLowerCase();
+    return navItems.filter((item) => {
+      if (item.moduleId && !profile.activeModules.includes(item.moduleId)) return false;
+      if (term && !item.label.toLowerCase().includes(term) && !(item.group ?? '').toLowerCase().includes(term)) {
+        return false;
+      }
+      return true;
+    });
+  }, [navItems, profile.activeModules, navSearch]);
+
+  const groupedNav = useMemo(() => {
+    const map = new Map<string, ShacNavItem[]>();
+    for (const item of visibleNav) {
+      const key = item.group ?? 'GENERAL';
+      const list = map.get(key) ?? [];
+      list.push(item);
+      map.set(key, list);
+    }
+    return Array.from(map.entries());
+  }, [visibleNav]);
+
+  function toggleGroup(groupName: string) {
+    setCollapsedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
+  }
 
   return (
     <div
@@ -128,62 +153,96 @@ export function ShacAppShell({
         className,
       )}
     >
-      <aside
-        data-slot="app-shell-sidebar"
-        className="w-full lg:w-60 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card flex flex-col"
-      >
-        <div
-          data-slot="app-shell-brand"
-          className="h-14 px-4 border-b border-border flex items-center justify-between gap-2"
+      {sidebarOpen ? (
+        <aside
+          data-slot="app-shell-sidebar"
+          className="w-full lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card flex flex-col"
         >
-          <div className="min-w-0">
-            <p className="text-sm font-semibold truncate">{branchName}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {vocab.branchSingular} · {profile.editionPreset}
-            </p>
-          </div>
-        </div>
-
-        <nav data-slot="app-shell-nav" aria-label="Navegación principal" className="p-2 flex-1 space-y-1">
-          {loading ? (
-            <div data-slot="app-shell-nav-skeleton" className="space-y-2 p-2">
-              <div className="h-8 rounded-md bg-muted animate-pulse" />
-              <div className="h-8 rounded-md bg-muted animate-pulse" />
-              <div className="h-8 rounded-md bg-muted animate-pulse" />
+          <div
+            data-slot="app-shell-brand"
+            className="h-14 px-4 border-b border-border flex items-center gap-2.5"
+          >
+            <div className="size-7 shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+              SH
             </div>
-          ) : visibleNav.length === 0 ? (
-            <p data-slot="app-shell-nav-empty" className="px-3 py-2 text-xs text-muted-foreground">
-              Sin módulos activos
-            </p>
-          ) : (
-            visibleNav.map((item) => {
-              const isActive = activeHref === item.href;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  data-slot="app-shell-nav-item"
-                  data-active={isActive ? 'true' : 'false'}
-                  onClick={() => onNavigate?.(item.href)}
-                  className={cn(
-                    'w-full flex items-center justify-between rounded-md px-3 text-left text-sm font-medium transition-colors',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    density === 'touch' ? 'min-h-12 py-2.5 text-base' : 'h-9 py-1.5',
-                    isActive
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-foreground hover:bg-muted',
-                  )}
-                >
-                  <span className="truncate">{item.label}</span>
-                  {item.shortcut ? (
-                    <span className="ml-2 font-mono text-xs opacity-75">{item.shortcut}</span>
-                  ) : null}
-                </button>
-              );
-            })
-          )}
-        </nav>
-      </aside>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold truncate">{branchName}</p>
+              <p className="text-[11px] text-muted-foreground truncate">
+                {vocab.branchSingular} · {profile.editionPreset}
+              </p>
+            </div>
+          </div>
+
+          <div className="p-2.5 border-b border-border">
+            <input
+              type="search"
+              value={navSearch}
+              onChange={(e) => setNavSearch(e.target.value)}
+              placeholder="Buscar menú..."
+              className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+
+          <nav data-slot="app-shell-nav" aria-label="Navegación principal" className="p-2.5 flex-1 space-y-3 overflow-y-auto">
+            {loading ? (
+              <div data-slot="app-shell-nav-skeleton" className="space-y-2 p-2">
+                <div className="h-7 rounded-md bg-muted animate-pulse" />
+                <div className="h-7 rounded-md bg-muted animate-pulse" />
+                <div className="h-7 rounded-md bg-muted animate-pulse" />
+              </div>
+            ) : visibleNav.length === 0 ? (
+              <p data-slot="app-shell-nav-empty" className="px-3 py-2 text-xs text-muted-foreground">
+                Sin módulos activos
+              </p>
+            ) : (
+              groupedNav.map(([groupName, items]) => {
+                const isCollapsed = !navSearch.trim() && Boolean(collapsedGroups[groupName]);
+                return (
+                  <div key={groupName} className="space-y-1">
+                    {groupName !== 'GENERAL' ? (
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(groupName)}
+                        className="w-full flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+                      >
+                        <span>{groupName}</span>
+                        <span className="font-mono text-[10px]">{isCollapsed ? '▸' : '▾'}</span>
+                      </button>
+                    ) : null}
+                    {!isCollapsed
+                      ? items.map((item) => {
+                          const isActive = activeHref === item.href;
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              data-slot="app-shell-nav-item"
+                              data-active={isActive ? 'true' : 'false'}
+                              onClick={() => onNavigate?.(item.href)}
+                              className={cn(
+                                'w-full flex items-center justify-between rounded-md px-2.5 text-left text-sm font-medium transition-colors',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                density === 'touch' ? 'min-h-12 py-2.5 text-base' : 'h-8 py-1',
+                                isActive
+                                  ? 'bg-primary text-primary-foreground'
+                                  : 'text-foreground hover:bg-muted',
+                              )}
+                            >
+                              <span className="truncate">{item.label}</span>
+                              {item.shortcut ? (
+                                <span className="ml-2 font-mono text-[11px] opacity-75">{item.shortcut}</span>
+                              ) : null}
+                            </button>
+                          );
+                        })
+                      : null}
+                  </div>
+                );
+              })
+            )}
+          </nav>
+        </aside>
+      ) : null}
 
       <div className="flex-1 min-w-0 flex flex-col">
         <header
@@ -191,8 +250,23 @@ export function ShacAppShell({
           className="h-14 px-4 border-b border-border bg-card flex items-center justify-between gap-3"
         >
           <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              aria-label="Alternar barra lateral"
+              onClick={() => setSidebarOpen((prev) => !prev)}
+              className="h-8 rounded-md border border-border px-2 text-xs hover:bg-muted"
+            >
+              ☰
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigate?.('/')}
+              className="h-8 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              Inicio
+            </button>
             <span className="text-xs font-mono text-muted-foreground truncate">
-              {profile.tenantId}
+              · {profile.tenantId}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -215,7 +289,7 @@ export function ShacAppShell({
           </div>
         </header>
 
-        <main data-slot="app-shell-main" className="flex-1 p-4 overflow-auto">
+        <main data-slot="app-shell-main" className="flex-1 p-4 lg:p-6 overflow-auto">
           {children}
         </main>
       </div>

@@ -176,4 +176,28 @@ describe('@shac/ui smoke tests', () => {
     rerender(<DataTable columns={columns} data={[]} getRowId={(r) => r.id} emptyTitle="Sin clientes" />);
     expect(screen.getByText('Sin clientes')).toBeInTheDocument();
   });
+
+  it('groups ShacAppShell nav items into collapsible sections and filters them via sidebar search', () => {
+    render(
+      <ShacAppShell
+        profile={PROFILE}
+        branchName="Casa Matriz"
+        syncState={{ status: 'online' }}
+        navItems={[
+          { id: 'parties', label: 'Clientes', href: '/parties', group: 'CUSTOMERS', moduleId: 'iam' },
+          { id: 'pos', label: 'POS · Pedido', href: '/pos', group: 'SALES', moduleId: 'pos', shortcut: 'F2' },
+        ]}
+      >
+        <div>Dashboard</div>
+      </ShacAppShell>,
+    );
+
+    expect(screen.getByText('CUSTOMERS')).toBeInTheDocument();
+    expect(screen.getByText('SALES')).toBeInTheDocument();
+
+    const searchInput = screen.getByPlaceholderText('Buscar menú...');
+    fireEvent.change(searchInput, { target: { value: 'POS' } });
+    expect(screen.getByText('POS · Pedido')).toBeInTheDocument();
+    expect(screen.queryByText('Clientes')).not.toBeInTheDocument();
+  });
 });
