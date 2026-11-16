@@ -1,0 +1,200 @@
+import {
+  index,
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+
+export const iamTenants = sqliteTable(
+  'iam_tenants',
+  {
+    id: text('id').primaryKey(),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    legalName: text('legal_name'),
+    primaryCurrency: text('primary_currency').notNull().default('USD'),
+    defaultLocale: text('default_locale').notNull().default('en-US'),
+    encryptionKmsKeyRef: text('encryption_kms_key_ref'),
+    status: text('status').notNull().default('active'),
+    trialEndsAt: integer('trial_ends_at'),
+    billingExternalRefsJson: text('billing_external_refs_json').notNull().default('{}'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => [uniqueIndex('iam_tenants_slug_uniq').on(t.slug)],
+);
+
+export const iamOrganizations = sqliteTable(
+  'iam_organizations',
+  {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    parentId: text('parent_id'),
+    rootId: text('root_id').notNull(),
+    treePath: text('tree_path').notNull(),
+    depth: integer('depth').notNull().default(0),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    orgKind: text('org_kind').notNull().default('branch'),
+    taxId: text('tax_id'),
+    npiCode: text('npi_code'),
+    licenseNumber: text('license_number'),
+    phone: text('phone'),
+    email: text('email'),
+    addressJson: text('address_json').notNull().default('{}'),
+    latitude: real('latitude'),
+    longitude: real('longitude'),
+    timezone: text('timezone').notNull().default('UTC'),
+    operatingHoursJson: text('operating_hours_json').notNull().default('{}'),
+    brandingJson: text('branding_json').notNull().default('{}'),
+    receiptHeader: text('receipt_header'),
+    receiptFooter: text('receipt_footer'),
+    isPrimary: integer('is_primary', { mode: 'boolean' }).notNull().default(false),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    customFields: text('custom_fields').notNull().default('{}'),
+    version: integer('version').notNull().default(1),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [
+    uniqueIndex('iam_orgs_tenant_slug_uniq').on(t.tenantId, t.slug),
+    index('iam_orgs_tenant_path_idx').on(t.tenantId, t.treePath),
+    index('iam_orgs_tenant_parent_idx').on(t.tenantId, t.parentId),
+  ],
+);
+
+export const iamUsers = sqliteTable(
+  'iam_users',
+  {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    defaultOrgId: text('default_org_id').notNull(),
+    realm: text('realm').notNull().default('staff'),
+    email: text('email').notNull(),
+    emailHash: text('email_hash').notNull(),
+    username: text('username'),
+    fullName: text('full_name').notNull(),
+    avatarUrl: text('avatar_url'),
+    phone: text('phone'),
+    passwordHashWebcrypto: text('password_hash_webcrypto'),
+    floorPinHash: text('floor_pin_hash'),
+    isVerified: integer('is_verified', { mode: 'boolean' }).notNull().default(false),
+    failedLoginAttempts: integer('failed_login_attempts').notNull().default(0),
+    lockedUntil: integer('locked_until'),
+    sessionsRevokedAt: integer('sessions_revoked_at'),
+    lastLoginAt: integer('last_login_at'),
+    preferencesJson: text('preferences_json').notNull().default('{}'),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => [
+    uniqueIndex('iam_users_tenant_email_hash_uniq').on(t.tenantId, t.emailHash),
+    index('iam_users_tenant_realm_idx').on(t.tenantId, t.realm),
+  ],
+);
+
+export const iamApiKeys = sqliteTable(
+  'iam_api_keys',
+  {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    orgId: text('org_id').notNull(),
+    name: text('name').notNull(),
+    keyPrefix: text('key_prefix').notNull(),
+    keySha256: text('key_sha256').notNull(),
+    permissionsJson: text('permissions_json').notNull().default('[]'),
+    createdBy: text('created_by').notNull(),
+    lastUsedAt: integer('last_used_at'),
+    expiresAt: integer('expires_at'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('iam_api_keys_tenant_sha256_uniq').on(t.tenantId, t.keySha256),
+    index('iam_api_keys_tenant_org_idx').on(t.tenantId, t.orgId),
+  ],
+);
+
+export const iamDelegationPins = sqliteTable(
+  'iam_delegation_pins',
+  {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    orgId: text('org_id').notNull(),
+    grantorUserId: text('grantor_user_id').notNull(),
+    redeemerUserId: text('redeemer_user_id'),
+    pinSha256: text('pin_sha256').notNull(),
+    scopePermissionsJson: text('scope_permissions_json').notNull().default('[]'),
+    durationLabel: text('duration_label').notNull(),
+    redeemedAt: integer('redeemed_at'),
+    expiresAt: integer('expires_at').notNull(),
+    status: text('status').notNull().default('active'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    index('iam_delegation_pins_tenant_org_status_idx').on(
+      t.tenantId,
+      t.orgId,
+      t.status,
+    ),
+    index('iam_delegation_pins_tenant_sha256_idx').on(t.tenantId, t.pinSha256),
+  ],
+);
+
+export const kernelIdempotencyKeys = sqliteTable(
+  'kernel_idempotency_keys',
+  {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    orgId: text('org_id').notNull(),
+    clientMutationId: text('client_mutation_id').notNull(),
+    commandId: text('command_id').notNull(),
+    requestHash: text('request_hash').notNull(),
+    responseStatus: integer('response_status').notNull(),
+    responseJson: text('response_json').notNull(),
+    createdAt: integer('created_at').notNull(),
+    expiresAt: integer('expires_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('kernel_idempotency_tenant_mutation_uniq').on(
+      t.tenantId,
+      t.clientMutationId,
+    ),
+  ],
+);
+
+export const kernelActionLogs = sqliteTable(
+  'kernel_action_logs',
+  {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    orgId: text('org_id').notNull(),
+    logStream: text('log_stream').notNull().default('action_mutation'),
+    actorId: text('actor_id').notNull(),
+    delegatedById: text('delegated_by_id'),
+    targetPartyId: text('target_party_id'),
+    commandId: text('command_id').notNull(),
+    resourceKind: text('resource_kind').notNull(),
+    resourceId: text('resource_id').notNull(),
+    accessPurpose: text('access_purpose'),
+    snapshotBeforeJson: text('snapshot_before_json'),
+    snapshotAfterJson: text('snapshot_after_json'),
+    undoToken: text('undo_token'),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    hmacSignature: text('hmac_signature'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => [
+    index('kernel_action_logs_tenant_created_idx').on(t.tenantId, t.createdAt),
+    index('kernel_action_logs_tenant_resource_idx').on(
+      t.tenantId,
+      t.resourceKind,
+      t.resourceId,
+    ),
+  ],
+);

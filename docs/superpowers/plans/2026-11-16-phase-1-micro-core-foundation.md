@@ -70,7 +70,7 @@
   - `defineModule(manifest: ModuleManifest): ModuleManifest`
   - `AppError` (`code`, `status`, `message`) y tipos `TenantMarketProfile`, `ExecutionContext`, `CommandSpec`, `ModuleManifest`.
 
-- [ ] **Step 1: Crear configuración raíz del workspace y escribir el test fallido en `packages/kernel/test/contracts.test.ts`**
+- [x] **Step 1: Crear configuración raíz del workspace y escribir el test fallido en `packages/kernel/test/contracts.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -98,21 +98,21 @@ describe('@shac/kernel contracts', () => {
 });
 ```
 
-- [ ] **Step 2: Instalar dependencias mínimas y verificar que el test falla**
+- [x] **Step 2: Instalar dependencias mínimas y verificar que el test falla**
 
 Run: `pnpm install && pnpm --filter @shac/kernel test:run`
 Expected: FAIL porque `../src/index.js` aún no exporta `defineCommand`, `defineModule` ni `AppError`.
 
-- [ ] **Step 3: Implementar `packages/kernel/src/contracts.ts` y `packages/kernel/src/index.ts`**
+- [x] **Step 3: Implementar `packages/kernel/src/contracts.ts` y `packages/kernel/src/index.ts`**
 
 Implementar todos los tipos exactos de `SPEC.md` §4.1 más la clase `AppError extends Error` y las funciones identidad tipadas `defineCommand` y `defineModule` en `< 160` líneas con `"sideEffects": false`.
 
-- [ ] **Step 4: Ejecutar recibos de tipos, tests y `knip`**
+- [x] **Step 4: Ejecutar recibos de tipos, tests y `knip`**
 
 Run: `pnpm -r typecheck && pnpm --filter @shac/kernel test:run`
 Expected: PASS con código de salida `0`.
 
-- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+- [x] **Step 5: Marcar `[x]` y crear commit atómico**
 
 ```bash
 git add package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json packages/kernel docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
@@ -138,7 +138,7 @@ git commit -m "feat(kernel): bootstrap pnpm workspace and core command contracts
   - `verifyJwtEdDsa(token: string, publicKeyJwk: JsonWebKey, nowSec?: number): Promise<JwtActorClaims>`
   - `sha256Hex(input: string): Promise<string>`
 
-- [ ] **Step 1: Escribir el test fallido en `packages/kernel/test/crypto.test.ts`**
+- [x] **Step 1: Escribir el test fallido en `packages/kernel/test/crypto.test.ts`**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -173,21 +173,21 @@ describe('@shac/kernel WebCrypto primitives', () => {
 });
 ```
 
-- [ ] **Step 2: Ejecutar test para confirmar fallo**
+- [x] **Step 2: Ejecutar test para confirmar fallo**
 
 Run: `pnpm --filter @shac/kernel test:run`
 Expected: FAIL por exportaciones faltantes en `crypto.ts`.
 
-- [ ] **Step 3: Implementar `packages/kernel/src/crypto.ts` usando exclusivamente `crypto.subtle`**
+- [x] **Step 3: Implementar `packages/kernel/src/crypto.ts` usando exclusivamente `crypto.subtle`**
 
 Usar `PBKDF2` con `SHA-256` (100,000 iteraciones asíncronas en hilo nativo), comparación XOR de longitud constante para evitar ataques de timing y firma `Ed25519` estándar sobre Base64URL sin librerías Node externas.
 
-- [ ] **Step 4: Verificar tipos y tests**
+- [x] **Step 4: Verificar tipos y tests**
 
 Run: `pnpm -r typecheck && pnpm --filter @shac/kernel test:run`
 Expected: PASS con código de salida `0`.
 
-- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+- [x] **Step 5: Marcar `[x]` y crear commit atómico**
 
 ```bash
 git add packages/kernel docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
@@ -210,25 +210,25 @@ git commit -m "feat(kernel): implement async WebCrypto PBKDF2 and Ed25519 JWT pr
   - `enforceModuleGate(profile: TenantMarketProfile, moduleId: string): void`
   - `authenticateRequest(headers: Headers, sessionKv: KVNamespace, publicKeyJwk: JsonWebKey): Promise<ExecutionContext['actor'] & { tenantId: string; orgId: string; orgPath: string }>`
 
-- [ ] **Step 1: Escribir tests de guardia en `packages/kernel/test/pipeline.test.ts` cubriendo Review Focus #2, #3 y #4**
+- [x] **Step 1: Escribir tests de guardia en `packages/kernel/test/pipeline.test.ts` cubriendo Review Focus #2, #3 y #4**
 
 Probar: (a) caché en memoria de `60 s` evitando lecturas repetidas a KV, (b) fallo cerrado `503 PROFILE_UNAVAILABLE` cuando `CONFIG_KV` devuelve `null` o JSON corrupto, (c) `403 MODULE_NOT_ENABLED` cuando `moduleId` no está en `activeModules`, y (d) resolución de `Bearer <jwt>`, `Bearer mk_live_<key>` y cabecera `X-Delegation-Pin` válida/expirada en `SESSION_KV`.
 
-- [ ] **Step 2: Ejecutar test para confirmar fallo**
+- [x] **Step 2: Ejecutar test para confirmar fallo**
 
 Run: `pnpm --filter @shac/kernel test:run`
 Expected: FAIL porque `pipeline.ts` no existe.
 
-- [ ] **Step 3: Implementar `packages/kernel/src/pipeline.ts` y exportar desde `index.ts`**
+- [x] **Step 3: Implementar `packages/kernel/src/pipeline.ts` y exportar desde `index.ts`**
 
 Validar estructura mínima de `TenantMarketProfile` con Zod al hidratar desde KV (una sola vez cada `60 s`) y validar expiración estricta de sesiones de delegación (`delegatedById`).
 
-- [ ] **Step 4: Ejecutar recibos de tipos y tests**
+- [x] **Step 4: Ejecutar recibos de tipos y tests**
 
 Run: `pnpm -r typecheck && pnpm --filter @shac/kernel test:run`
 Expected: PASS (`exit code 0`).
 
-- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+- [x] **Step 5: Marcar `[x]` y crear commit atómico**
 
 ```bash
 git add packages/kernel docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
@@ -252,7 +252,7 @@ git commit -m "feat(kernel): add profileLoader cache, moduleGate, and multi-mode
   - `createD1Client(d1: D1Database): DrizzleD1Database`
   - `wrapD1WithCounter(d1: D1Database): { db: D1Database; getQueryCount(): number }`
 
-- [ ] **Step 1: Escribir el test fallido en `packages/db-d1/test/scope.test.ts` (Review Focus #1)**
+- [x] **Step 1: Escribir el test fallido en `packages/db-d1/test/scope.test.ts` (Review Focus #1)**
 
 ```ts
 import { describe, expect, it } from 'vitest';
@@ -269,21 +269,21 @@ describe('@shac/db-d1 tenant & org subtree guard', () => {
 });
 ```
 
-- [ ] **Step 2: Instalar `drizzle-orm` en `@shac/db-d1` y verificar fallo inicial**
+- [x] **Step 2: Instalar `drizzle-orm` en `@shac/db-d1` y verificar fallo inicial**
 
 Run: `pnpm install && pnpm --filter @shac/db-d1 test:run`
 Expected: FAIL por archivos aún no implementados.
 
-- [ ] **Step 3: Implementar esquema Drizzle (`iam.ts`), guardias (`scope.ts`) y migración aditiva (`0001_phase1_iam_core.sql`)**
+- [x] **Step 3: Implementar esquema Drizzle (`iam.ts`), guardias (`scope.ts`) y migración aditiva (`0001_phase1_iam_core.sql`)**
 
 Cuidar que `assertOrgScope` verifique límite de segmento exacto (`targetOrgPath === ctx.orgPath || targetOrgPath.startsWith(ctx.orgPath + '/')`) para impedir el bug clásico de prefijo parcial (`/root/north` vs `/root/north-east`).
 
-- [ ] **Step 4: Verificar tipos, tests y guardia SQL sin `DROP`**
+- [x] **Step 4: Verificar tipos, tests y guardia SQL sin `DROP`**
 
 Run: `pnpm -r typecheck && pnpm --filter @shac/db-d1 test:run`
 Expected: PASS (`exit code 0`), y `0` apariciones de `DROP TABLE` o `DROP COLUMN` en `packages/db-d1/migrations/`.
 
-- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+- [x] **Step 5: Marcar `[x]` y crear commit atómico**
 
 ```bash
 git add pnpm-lock.yaml packages/db-d1 docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
@@ -304,27 +304,27 @@ git commit -m "feat(db-d1): add additive IAM SQLite schema, org subtree guard, a
 - Produces:
   - `iamModule: ModuleManifest` (`id: 'iam'`, comandos: `iam.orgs.create`, `iam.orgs.list`, `iam.apiKeys.create`, `iam.delegation.issuePin`).
 
-- [ ] **Step 1: Escribir tests unitarios/contrato de comandos en `packages/modules/iam/test/iam.commands.test.ts`**
+- [x] **Step 1: Escribir tests unitarios/contrato de comandos en `packages/modules/iam/test/iam.commands.test.ts`**
 
 Cubrir metadatos MCP (`expose: true`, `readOnlyHint: true` en `iam.orgs.list`) y validación Zod de inputs (TTL permitido en `issuePin`: `'4h' | '8h' | '24h'`, `clientMutationId` obligatorio en escrituras).
 
-- [ ] **Step 2: Ejecutar test para verificar fallo**
+- [x] **Step 2: Ejecutar test para verificar fallo**
 
 Run: `pnpm install && pnpm --filter @shac/mod-iam test:run`
 Expected: FAIL por módulo no implementado.
 
-- [ ] **Step 3: Implementar `organizations.ts`, `delegation.ts` e `index.ts`**
+- [x] **Step 3: Implementar `organizations.ts`, `delegation.ts` e `index.ts`**
 
 - `iam.orgs.list`: Ejecuta `ctx.db.batch([itemsQuery, countQuery])` filtrando siempre por `eq(iamOrganizations.tenantId, ctx.tenantId)` y prefijo de subárbol `ctx.orgPath` (`<= 2` sentencias en 1 roundtrip).
 - `iam.orgs.create`: Verifica `kernelIdempotencyKeys` por `(tenantId, clientMutationId)` antes de insertar y escribe registro en `kernelActionLogs`.
 - `iam.delegation.issuePin`: Genera PIN criptográfico de 6 dígitos (`crypto.getRandomValues`), persiste hash SHA-256 en D1 y registra sesión temporal en `SESSION_KV` con `expirationTtl`.
 
-- [ ] **Step 4: Verificar tipos y tests**
+- [x] **Step 4: Verificar tipos y tests**
 
 Run: `pnpm -r typecheck && pnpm --filter @shac/mod-iam test:run`
 Expected: PASS (`exit code 0`).
 
-- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+- [x] **Step 5: Marcar `[x]` y crear commit atómico**
 
 ```bash
 git add pnpm-lock.yaml packages/modules/iam docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
@@ -345,7 +345,7 @@ git commit -m "feat(mod-iam): implement batched organizations, API keys, and 6-d
 - Produces:
   - Default Worker export (`{ fetch }`) + clase `BranchInventoryDO` (stub limpio listo para Fase 2) + tipo exportado `AppRouter` para cliente Hono RPC.
 
-- [ ] **Step 1: Escribir prueba de integración real sobre `workerd` en `apps/node-worker/test/worker.integration.test.ts`**
+- [x] **Step 1: Escribir prueba de integración real sobre `workerd` en `apps/node-worker/test/worker.integration.test.ts`**
 
 Usando `cloudflare:test` (`env.DB`, `env.CONFIG_KV`, `env.SESSION_KV`) con `@cloudflare/vitest-plugin`:
 1. Aplicar `0001_phase1_iam_core.sql` sobre `env.DB` y sembrar `profile:current` en `env.CONFIG_KV`.
@@ -354,16 +354,16 @@ Usando `cloudflare:test` (`env.DB`, `env.CONFIG_KV`, `env.SESSION_KV`) con `@clo
 4. Apagar `'iam'` en `CONFIG_KV` y verificar `403 MODULE_NOT_ENABLED` con `queryCount === 0` (Review Focus #2).
 5. Invocar `/mcp` (`tools/list` y `tools/call` sobre `iam.orgs.list`) verificando simetría REST <-> MCP stateless.
 
-- [ ] **Step 2: Instalar dependencias de `apps/node-worker` y confirmar fallo inicial**
+- [x] **Step 2: Instalar dependencias de `apps/node-worker` y confirmar fallo inicial**
 
 Run: `pnpm install && pnpm --filter @shac/node-worker test:run`
 Expected: FAIL porque `src/router.ts` y `src/index.ts` aún no están implementados.
 
-- [ ] **Step 3: Implementar `apps/node-worker/src/router.ts` y `apps/node-worker/src/index.ts`**
+- [x] **Step 3: Implementar `apps/node-worker/src/router.ts` y `apps/node-worker/src/index.ts`**
 
 Montar todos los `CommandSpec` de los módulos registrados en rutas Hono (`/api/...`) y construir el servidor MCP stateless por petición con `createMcpHandler` compartiendo exactamente la misma cadena `profileLoader` -> `moduleGate` -> `authenticateRequest`.
 
-- [ ] **Step 4: Ejecutar batería completa de recibos RDD de Cierre de Fase 1**
+- [x] **Step 4: Ejecutar batería completa de recibos RDD de Cierre de Fase 1**
 
 Run:
 ```bash
@@ -376,7 +376,7 @@ Expected:
 - `typecheck`, `knip --strict` y `test:run` con código de salida `0`.
 - Salida de `wrangler deploy --dry-run` reportando tamaño `gzip` **menor a `200 KiB`**.
 
-- [ ] **Step 5: Marcar `[x]`, actualizar `docs/superpowers/DECISIONS.md` si aplica y crear commit atómico**
+- [x] **Step 5: Marcar `[x]`, actualizar `docs/superpowers/DECISIONS.md` si aplica y crear commit atómico**
 
 ```bash
 git add pnpm-lock.yaml package.json apps/node-worker docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
@@ -396,25 +396,25 @@ git commit -m "feat(node-worker): wire Hono RPC, adaptive CORS, and stateless MC
 - Consumes: `MarketVocabulary`, `TenantMarketProfile` desde `@shac/kernel`.
 - Produces: `ShacAppShell`, `AuthBranchGate`, `globals.css` (`@theme inline`, `.dark`, `data-density="touch" | "compact"`).
 
-- [ ] **Step 1: Escribir prueba de renderizado y densidad táctil en `packages/ui/test/ui.smoke.test.tsx`**
+- [x] **Step 1: Escribir prueba de renderizado y densidad táctil en `packages/ui/test/ui.smoke.test.tsx`**
 
 Verificar que `AuthBranchGate` renderiza selector de sucursal y teclado numérico táctil de 6 dígitos (`min-h-14` / `56px`), y que `ShacAppShell` refleja `SyncStatusPill` (`En línea` vs `Offline`).
 
-- [ ] **Step 2: Ejecutar test para confirmar fallo inicial**
+- [x] **Step 2: Ejecutar test para confirmar fallo inicial**
 
 Run: `pnpm install && pnpm --filter @shac/ui test:run`
 Expected: FAIL porque los componentes aún no existen.
 
-- [ ] **Step 3: Implementar `globals.css`, `ShacAppShell.tsx`, `AuthBranchGate.tsx` e `index.ts`**
+- [x] **Step 3: Implementar `globals.css`, `ShacAppShell.tsx`, `AuthBranchGate.tsx` e `index.ts`**
 
 Usar React 19 puro (sin `forwardRef`), atributos `data-slot` y tokens exactos de `DESIGN.md` (`#2563EB`, `#059669`, `Plus Jakarta Sans` + `JetBrains Mono`).
 
-- [ ] **Step 4: Verificar tipos y tests**
+- [x] **Step 4: Verificar tipos y tests**
 
 Run: `pnpm -r typecheck && pnpm --filter @shac/ui test:run`
 Expected: PASS (`exit code 0`).
 
-- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+- [x] **Step 5: Marcar `[x]` y crear commit atómico**
 
 ```bash
 git add pnpm-lock.yaml packages/ui docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
@@ -434,20 +434,20 @@ git commit -m "feat(ui): add Tailwind v4 design tokens, ShacAppShell, and bimoda
 - Consumes: `@shac/ui` (`ShacAppShell`, `AuthBranchGate`) y tipo `AppRouter` desde `@shac/node-worker`.
 - Produces: Build estático en `apps/web-spa/dist` servido por Workers Static Assets.
 
-- [ ] **Step 1: Escribir test de cliente RPC y persistencia `offlineFirst` en `apps/web-spa/test/spa.offline.test.ts`**
+- [x] **Step 1: Escribir test de cliente RPC y persistencia `offlineFirst` en `apps/web-spa/test/spa.offline.test.ts`**
 
 Verificar configuración `networkMode: 'offlineFirst'` en `createShacQueryClient()` y construcción del cliente tipado `createRpcClient(baseUrl)`.
 
-- [ ] **Step 2: Ejecutar test para confirmar fallo**
+- [x] **Step 2: Ejecutar test para confirmar fallo**
 
 Run: `pnpm install && pnpm --filter @shac/web-spa test:run`
 Expected: FAIL por archivos aún no implementados.
 
-- [ ] **Step 3: Implementar `vite.config.ts`, `src/lib/rpc.ts`, `src/lib/queryClient.ts`, `src/main.tsx` e `index.html`**
+- [x] **Step 3: Implementar `vite.config.ts`, `src/lib/rpc.ts`, `src/lib/queryClient.ts`, `src/main.tsx` e `index.html`**
 
 Integrar `hc<AppRouter>`, `@tanstack/react-router` y `@tanstack/react-query` con persistencia IndexedDB.
 
-- [ ] **Step 4: Ejecutar batería completa de cierre de Fase 1**
+- [x] **Step 4: Ejecutar batería completa de cierre de Fase 1**
 
 Run:
 ```bash
@@ -460,7 +460,7 @@ pnpm --filter @shac/node-worker exec wrangler deploy --dry-run --outdir .wrangle
 ```
 Expected: Todo con código de salida `0` y Worker `gzip < 200 KiB`.
 
-- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+- [x] **Step 5: Marcar `[x]` y crear commit atómico**
 
 ```bash
 git add pnpm-lock.yaml apps/web-spa docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md

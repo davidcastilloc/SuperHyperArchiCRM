@@ -1,0 +1,48 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "shac-node-worker",
+  "main": "src/index.ts",
+  "minify": true,
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../web-spa/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/mcp", "/ws/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "shac-primary",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "../../packages/db-d1/migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "BRANCH_DO",
+        "class_name": "BranchInventoryDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["BranchInventoryDO"]
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CONFIG_KV",
+      "id": "00000000000000000000000000000001"
+    },
+    {
+      "binding": "SESSION_KV",
+      "id": "00000000000000000000000000000002"
+    }
+  ],
+  "vars": {
+    "CORS_ALLOWED_ORIGINS": ""
+  }
+}

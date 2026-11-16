@@ -1,0 +1,85 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+@custom-variant touch (&:where([data-density="touch"], [data-density="touch"] *));
+
+:root {
+  --radius: 0.5rem;
+  --background: #f6f7f9;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --muted: #eceef2;
+  --muted-foreground: #475569;
+  --destructive: #dc2626;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #2563eb;
+  --checkout: #059669;
+  --checkout-foreground: #ffffff;
+  --status-success: #059669;
+  --status-warning: #d97706;
+  --status-error: #dc2626;
+  --status-federation: #4f46e5;
+}
+
+.dark {
+  --background: #0c0e12;
+  --foreground: #f1f5f9;
+  --card: #141820;
+  --card-foreground: #f1f5f9;
+  --popover: #1c222d;
+  --popover-foreground: #f1f5f9;
+  --primary: #60a5fa;
+  --primary-foreground: #0c0e12;
+  --muted: #0f131a;
+  --muted-foreground: #94a3b8;
+  --destructive: #f87171;
+  --border: #262e3d;
+  --input: #262e3d;
+  --ring: #60a5fa;
+  --checkout: #34d399;
+  --checkout-foreground: #062e22;
+  --status-success: #34d399;
+  --status-warning: #fbbf24;
+  --status-error: #f87171;
+  --status-federation: #818cf8;
+}
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans", "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-checkout: var(--checkout);
+  --color-checkout-foreground: var(--checkout-foreground);
+  --color-ok: var(--status-success);
+  --color-warn: var(--status-warning);
+  --color-danger: var(--status-error);
+  --color-fed: var(--status-federation);
+}
+
+@layer base {
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+}
