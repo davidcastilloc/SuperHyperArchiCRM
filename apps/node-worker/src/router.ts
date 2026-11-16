@@ -41,6 +41,10 @@ import {
   createWmsRoutes,
 } from './pos-wms-registry.js';
 import {
+  createLeasesRoutes,
+  createSpacesRoutes,
+} from './spaces-leases-registry.js';
+import {
   createSystemRoutes,
   setProfileInvalidator,
   systemAppStoreToggleCommand,
@@ -118,6 +122,8 @@ function createWorkerApp(
     .route('/api/regional', createRegionalRoutes(profileLoader))
     .route('/api/pos', createPosRoutes(profileLoader))
     .route('/api/wms', createWmsRoutes(profileLoader))
+    .route('/api/spaces', createSpacesRoutes(profileLoader))
+    .route('/api/leases', createLeasesRoutes(profileLoader))
     .route('/api/branch/inventory', createBranchRoutes(profileLoader))
     .route('/api/branch/pos', createBranchPosRoutes(profileLoader))
     .route('/api/federation', createFederationRoutes(profileLoader))

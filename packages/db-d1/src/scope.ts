@@ -9,9 +9,11 @@ import {
   kernelRecordLocks,
 } from './schema/custom-fields.js';
 import * as iamSchema from './schema/iam.js';
+import * as leasesSchema from './schema/leases.js';
 import * as partiesSchema from './schema/parties.js';
 import * as posSchema from './schema/pos.js';
 import * as pricingSchema from './schema/pricing.js';
+import * as spacesSchema from './schema/spaces.js';
 import * as wmsFleetSchema from './schema/wms-fleet.js';
 import * as wmsWarehouseSchema from './schema/wms-warehouse.js';
 
@@ -28,6 +30,8 @@ const allSchemas = {
   ...commerceOrdersSchema,
   ...wmsWarehouseSchema,
   ...wmsFleetSchema,
+  ...spacesSchema,
+  ...leasesSchema,
 };
 
 export type ShacD1Database = DrizzleD1Database<typeof allSchemas>;

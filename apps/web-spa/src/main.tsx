@@ -19,6 +19,7 @@ import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
 import { CatalogView, PartiesView } from './views/Phase2Views';
 import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
+import { LeasesView, SpacesView } from './views/SpacesLeasesViews';
 import { AppStoreView } from './views/AppStoreView';
 
 const DEFAULT_PROFILE: Pick<
@@ -27,7 +28,7 @@ const DEFAULT_PROFILE: Pick<
 > = {
   tenantId: 'tenant-demo',
   editionPreset: 'omni-enterprise',
-  activeModules: ['core', 'iam', 'customers', 'catalog', 'pos', 'wms', 'crm'],
+  activeModules: ['core', 'iam', 'customers', 'catalog', 'pos', 'wms', 'spaces', 'leases', 'crm'],
   vocabulary: {
     partySingular: 'Cliente',
     partyPlural: 'Clientes',
@@ -77,6 +78,18 @@ const NAV_ITEMS: ShacNavItem[] = [
     href: '/wms',
     moduleId: 'wms',
     shortcut: 'F6',
+  },
+  {
+    id: 'spaces',
+    label: `${DEFAULT_PROFILE.vocabulary.spaceSingular}s · Rack`,
+    href: '/spaces',
+    moduleId: 'spaces',
+  },
+  {
+    id: 'leases',
+    label: 'Leases · Hub',
+    href: '/leases',
+    moduleId: 'leases',
   },
   {
     id: 'app-store',
@@ -167,6 +180,14 @@ function WmsPage() {
   return <WmsView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
 }
 
+function SpacesPage() {
+  return <SpacesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
+function LeasesPage() {
+  return <LeasesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
 function AppStorePage() {
   return <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />;
 }
@@ -207,6 +228,16 @@ const wmsRoute = createRoute({
   path: '/wms',
   component: WmsPage,
 });
+const spacesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/spaces',
+  component: SpacesPage,
+});
+const leasesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/leases',
+  component: LeasesPage,
+});
 const appStoreRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/app-store',
@@ -221,6 +252,8 @@ const routeTree = rootRoute.addChildren([
   posRoute,
   kioskRoute,
   wmsRoute,
+  spacesRoute,
+  leasesRoute,
   appStoreRoute,
 ]);
 const router = createRouter({ routeTree });

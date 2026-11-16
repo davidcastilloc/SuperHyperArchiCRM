@@ -78,3 +78,10 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
   1. Estandarizar `@shac/federation-sdk` con `FederationEnvelope` firmado vía WebCrypto `Ed25519` + `SHA-256(canonicalJson)` y ventana anti-replay de `300_000 ms`, más matcher determinista GTIN/UOM y buffer de consolidación 24h (`consolidateLowStockHours`).
   2. Aislar `@shac/federation-hub` (`apps/federation-hub`) en su propia base D1 (`hub_nodes`, `hub_public_offers`, `hub_envelopes_idempotency`, `hub_b2b_orders`, `hub_inventory_holds`) exponiendo `findBestOffers`, búsqueda B2C y reserva temporal `holdInventoryTTL`.
   3. Exponer `/api/federation/b2b/{reorder-evaluate,asn-receive}` en `@shac/node-worker` creando automáticamente recepciones `asn_receipt` en D1 ante sobres `B2B_SHIPMENT_DISPATCHED` / `B2B_EPOD_CONFIRMED` verificados.
+
+## ADR-012 (2026-11-16): Fase 6 — Bloqueo Atómico de Espacios en `BranchInventoryDO`, ADR/RevPAR y Split Rent Exacto
+
+- **Contexto:** Evitar dobles reservas de habitaciones, consultorios o unidades ante ráfagas concurrentes (OTAs + mostrador) y calcular prorrateos de renta (`Split Rent`) y métricas hoteleras (`ADR`, `RevPAR`) sin errores de redondeo IEEE-754.
+- **Decisión:**
+  1. Serializar cada reserva en `spaces.bookings.reserve` adquiriendo primero el lock en `BranchInventoryDO` (`/space-lock` sobre `hot_space_locks` dentro de `ctx.storage.transactionSync`) antes de persistir `spc_bookings_and_appointments` y `spc_folios` en D1 (`30` reservas concurrentes -> `1` exitosa, `29` `409 SPACE_ALREADY_LOCKED`).
+  2. Implementar `computeAdrAndRevParMinor` (`@shac/mod-spaces`) y `computeSplitRentShares` (`@shac/mod-leases`, `sum(shareBps) === 10_000` con distribución determinista del residuo) íntegramente en `BigInt`.

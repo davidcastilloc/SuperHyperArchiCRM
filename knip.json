@@ -71,6 +71,15 @@
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
       "project": ["src/**/*.ts!", "test/**/*.ts"],
       "ignoreDependencies": ["@shac/actor-branch"]
+    },
+    "packages/modules/spaces": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"],
+      "ignoreExportsUsedInFile": true
+    },
+    "packages/modules/leases": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
     }
   }
 }

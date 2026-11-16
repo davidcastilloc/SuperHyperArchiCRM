@@ -17,6 +17,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { z } from 'zod';
 import type { CorsEnv } from './cors.js';
 import { PHASE3_COMMANDS } from './pos-wms-registry.js';
+import { PHASE6_COMMANDS } from './spaces-leases-registry.js';
 import { PHASE4_SYSTEM_COMMANDS } from './system-routes.js';
 
 export interface WorkerEnv extends CorsEnv {
@@ -41,6 +42,7 @@ export const ALL_COMMANDS: readonly CommandSpec<any, any, ShacD1Database>[] = [
   ...modCatalogManifest.commands,
   ...PHASE3_COMMANDS,
   ...PHASE4_SYSTEM_COMMANDS,
+  ...PHASE6_COMMANDS,
 ];
 
 function normalizeAuthHeaders(rawHeaders: Headers): Headers {

@@ -8,5 +8,7 @@ export * from './schema/pos.js';
 export * from './schema/commerce-orders.js';
 export * from './schema/wms-warehouse.js';
 export * from './schema/wms-fleet.js';
+export * from './schema/spaces.js';
+export * from './schema/leases.js';
 export * from './idempotency.js';
 export * from './scope.js';
