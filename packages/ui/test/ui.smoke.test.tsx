@@ -223,4 +223,58 @@ describe('@shac/ui smoke tests', () => {
     fireEvent.click(screen.getByRole('button', { name: /Actualizar/i }));
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
+
+  it('opens CommandPalette via Ctrl+K in ShacAppShell and renders SavedViewsBar with CSV export', async () => {
+    const uiModule = await import('../src/index.js');
+    expect('SavedViewsBar' in uiModule).toBe(true);
+    expect('toCsvString' in uiModule).toBe(true);
+    const { SavedViewsBar, toCsvString } = uiModule as typeof import('../src/index.js') & {
+      SavedViewsBar: React.ComponentType<{
+        views: Array<{ id: string; label: string }>;
+        activeViewId: string;
+        onSelectView: (id: string) => void;
+        onExport?: () => void;
+      }>;
+      toCsvString: (headers: string[], rows: Array<Array<string | number>>) => string;
+    };
+
+    const onNavigate = vi.fn();
+    const onSelectView = vi.fn();
+    const onExport = vi.fn();
+
+    render(
+      <div>
+        <ShacAppShell
+          profile={PROFILE}
+          branchName="Casa Matriz"
+          syncState={{ status: 'online' }}
+          onNavigate={onNavigate}
+          navItems={[
+            { id: 'pos', label: 'POS · Pedido', href: '/pos', group: 'SALES', moduleId: 'pos' },
+          ]}
+        >
+          <SavedViewsBar
+            views={[
+              { id: 'all', label: 'Todas las vistas' },
+              { id: 'fulfilled', label: 'Completadas' },
+            ]}
+            activeViewId="all"
+            onSelectView={onSelectView}
+            onExport={onExport}
+          />
+        </ShacAppShell>
+      </div>,
+    );
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true });
+    const paletteInput = screen.getByPlaceholderText(/Ir a pantalla o buscar comando/i);
+    expect(paletteInput).toBeInTheDocument();
+    fireEvent.change(paletteInput, { target: { value: 'POS' } });
+    fireEvent.click(screen.getByRole('option', { name: /POS · Pedido/i }));
+    expect(onNavigate).toHaveBeenCalledWith('/pos');
+
+    fireEvent.click(screen.getByRole('button', { name: /Exportar/i }));
+    expect(onExport).toHaveBeenCalledTimes(1);
+    expect(toCsvString(['Order', 'Total'], [['ORD-1', 150]])).toContain('ORD-1,150');
+  });
 });

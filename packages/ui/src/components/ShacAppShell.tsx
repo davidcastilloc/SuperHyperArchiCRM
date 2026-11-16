@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode, type Ref } from 'react';
+import { useEffect, useMemo, useState, type ReactNode, type Ref } from 'react';
 import type { TenantMarketProfile } from '@shac/kernel';
 import {
   Building2,
@@ -13,6 +13,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { cn } from '../lib/cn.js';
+import { CommandPalette, NotificationBell } from './CommandPalette.js';
 import { ShacSidebar, type ShacNavItem } from './ShacSidebar.js';
 
 export type { ShacNavItem } from './ShacSidebar.js';
@@ -99,7 +100,7 @@ export interface ShacAppShellProps {
   ref?: Ref<HTMLDivElement>;
 }
 
-/** Open Mercato DS v3 bimodal application shell with searchable collapsible sidebar and topbar chrome. */
+/** Open Mercato DS v3 bimodal application shell with searchable sidebar, Ctrl+K palette, and topbar chrome. */
 export function ShacAppShell({
   profile,
   branchName,
@@ -119,17 +120,31 @@ export function ShacAppShell({
   const [navSearch, setNavSearch] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const enabledNav = useMemo(
+    () => navItems.filter((item) => !item.moduleId || profile.activeModules.includes(item.moduleId)),
+    [navItems, profile.activeModules],
+  );
 
   const visibleNav = useMemo(() => {
     const term = navSearch.trim().toLowerCase();
-    return navItems.filter((item) => {
-      if (item.moduleId && !profile.activeModules.includes(item.moduleId)) return false;
-      if (term && !item.label.toLowerCase().includes(term) && !(item.group ?? '').toLowerCase().includes(term)) {
-        return false;
-      }
-      return true;
-    });
-  }, [navItems, profile.activeModules, navSearch]);
+    if (!term) return enabledNav;
+    return enabledNav.filter(
+      (item) => item.label.toLowerCase().includes(term) || (item.group ?? '').toLowerCase().includes(term),
+    );
+  }, [enabledNav, navSearch]);
 
   const groupedNav = useMemo(() => {
     const map = new Map<string, ShacNavItem[]>();
@@ -146,10 +161,6 @@ export function ShacAppShell({
     () => navItems.find((item) => item.href === activeHref),
     [navItems, activeHref],
   );
-
-  function toggleGroup(groupName: string) {
-    setCollapsedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
-  }
 
   return (
     <div
@@ -172,7 +183,7 @@ export function ShacAppShell({
           navSearch={navSearch}
           onNavSearchChange={setNavSearch}
           collapsedGroups={collapsedGroups}
-          onToggleGroup={toggleGroup}
+          onToggleGroup={(g) => setCollapsedGroups((prev) => ({ ...prev, [g]: !prev[g] }))}
           activeHref={activeHref}
           onNavigate={onNavigate}
           density={density}
@@ -212,7 +223,7 @@ export function ShacAppShell({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onNavigate?.('/automation')}
+              onClick={() => setPaletteOpen(true)}
               className="hidden md:inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <Sparkles className="size-3.5 text-foreground" />
@@ -240,6 +251,13 @@ export function ShacAppShell({
               <Plug className="size-4" />
             </button>
 
+            <NotificationBell
+              syncState={syncState}
+              editionPreset={profile.editionPreset}
+              branchName={branchName}
+              onNavigate={onNavigate}
+            />
+
             <SyncStatusPill syncState={syncState} />
 
             {onToggleTheme ? (
@@ -266,6 +284,13 @@ export function ShacAppShell({
           <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>
+
+      <CommandPalette
+        open={paletteOpen}
+        onClose={() => setPaletteOpen(false)}
+        items={enabledNav}
+        onSelect={(href) => onNavigate?.(href)}
+      />
     </div>
   );
 }
