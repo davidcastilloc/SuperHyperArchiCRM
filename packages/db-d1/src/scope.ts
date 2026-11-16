@@ -1,8 +1,28 @@
 import { AppError, type ExecutionContext } from '@shac/kernel';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
+import * as catalogSchema from './schema/catalog.js';
+import * as crmHrSchema from './schema/crm-hr.js';
+import {
+  kernelCustomFieldDefs,
+  kernelCustomRecords,
+  kernelRecordLocks,
+} from './schema/custom-fields.js';
 import * as iamSchema from './schema/iam.js';
+import * as partiesSchema from './schema/parties.js';
+import * as pricingSchema from './schema/pricing.js';
 
-export type ShacD1Database = DrizzleD1Database<typeof iamSchema>;
+const allSchemas = {
+  ...iamSchema,
+  kernelCustomFieldDefs,
+  kernelCustomRecords,
+  kernelRecordLocks,
+  ...partiesSchema,
+  ...crmHrSchema,
+  ...catalogSchema,
+  ...pricingSchema,
+};
+
+export type ShacD1Database = DrizzleD1Database<typeof allSchemas>;
 
 function normalizeOrgPath(path: string): string {
   if (path.length > 1 && path.endsWith('/')) {
@@ -44,7 +64,7 @@ export function assertOrgScope(
 }
 
 export function createD1Client(d1: D1Database): ShacD1Database {
-  return drizzle(d1, { schema: iamSchema });
+  return drizzle(d1, { schema: allSchemas });
 }
 
 export interface CountedD1 {

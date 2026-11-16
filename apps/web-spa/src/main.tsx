@@ -16,6 +16,7 @@ import type { TenantMarketProfile } from '@shac/kernel';
 import { AuthBranchGate, ShacAppShell, type BranchOption, type ShacNavItem } from '@shac/ui';
 import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
+import { CatalogView, PartiesView } from './views/Phase2Views';
 
 const DEFAULT_PROFILE: Pick<
   TenantMarketProfile,
@@ -23,7 +24,7 @@ const DEFAULT_PROFILE: Pick<
 > = {
   tenantId: 'tenant-demo',
   editionPreset: 'omni-enterprise',
-  activeModules: ['core', 'pos', 'wms', 'crm'],
+  activeModules: ['core', 'iam', 'customers', 'catalog', 'pos', 'wms', 'crm'],
   vocabulary: {
     partySingular: 'Cliente',
     partyPlural: 'Clientes',
@@ -41,6 +42,18 @@ const DEFAULT_BRANCHES: BranchOption[] = [
 const NAV_ITEMS: ShacNavItem[] = [
   { id: 'home', label: 'Inicio', href: '/' },
   { id: 'auth', label: 'Acceso Sucursal', href: '/auth' },
+  {
+    id: 'parties',
+    label: DEFAULT_PROFILE.vocabulary.partyPlural,
+    href: '/parties',
+    moduleId: 'customers',
+  },
+  {
+    id: 'catalog',
+    label: 'Catálogo',
+    href: '/catalog',
+    moduleId: 'catalog',
+  },
 ];
 
 const queryClient = createShacQueryClient();
@@ -96,6 +109,14 @@ function AuthPage() {
   );
 }
 
+function PartiesPage() {
+  return <PartiesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
+function CatalogPage() {
+  return <CatalogView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
 const rootRoute = createRootRoute({ component: RootLayout });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -107,8 +128,23 @@ const authRoute = createRoute({
   path: '/auth',
   component: AuthPage,
 });
+const partiesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/parties',
+  component: PartiesPage,
+});
+const catalogRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/catalog',
+  component: CatalogPage,
+});
 
-const routeTree = rootRoute.addChildren([indexRoute, authRoute]);
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  authRoute,
+  partiesRoute,
+  catalogRoute,
+]);
 const router = createRouter({ routeTree });
 
 declare module '@tanstack/react-router' {

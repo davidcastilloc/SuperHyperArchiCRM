@@ -46,3 +46,11 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
 - **Decisión:**
   1. Unificar todos los documentos raíz y de fases (`v2.2.0`) alrededor del stack frontend React 19 + Vite + TanStack Router/Query + `@shac/ui`.
   2. Formalizar `STORAGE_ARCHITECTURE_PLAN.md` (`docs/superpowers/specs/2026-11-16-multi-market-storage-architecture.md`) estableciendo las 3 reglas de almacenamiento multi-mercado: **(a)** `1 Empresa = 1 Base D1 Física Aislada`, **(b)** `Tronco Universal (~35 tablas) + Satélites Tipados (~73 tablas) + Columnas Virtuales Indexadas v_cf_*`, y **(c)** separación estricta en **5 Cajas Físicas** (`KV`, `BranchInventoryDO`, `D1`, `R2` e `IndexedDB/Tauri`).
+
+## ADR-008 (2026-11-16): Fase 2 — Idempotencia Compartida en `@shac/db-d1`, Aritmética BigInt/Entera en Catálogo y Serialización FEFO en `BranchInventoryDO`
+
+- **Contexto:** Al implementar el Tronco Universal (`crm_parties`, `cat_products`, `v_cf_*` + `FTS5`) y el actor transaccional por sede (`BranchInventoryDO`) en la Fase 2, se necesitó evitar duplicación entre `@shac/mod-customers` y `@shac/mod-catalog`, prevenir desbordamientos o redondeos IEEE-754 al multiplicar montos *minor* por tasas `rateMicros` (ej. `USD -> VES`), y probar serialización real de las 8 tablas calientes sobre `workerd`.
+- **Decisión:**
+  1. Centralizar `checkIdempotency`, `buildIdempotencyInsert` y `buildActionLogInsert` dentro de `@shac/db-d1` (`packages/db-d1/src/idempotency.ts`) para reutilización directa en todos los módulos D1 (`@shac/mod-customers`, `@shac/mod-catalog` y sucesivos).
+  2. Ejecutar las conversiones de precios 5 capas (`CONTRACT_1TO1 -> GROUP_TARIFF -> PROMOTION_CHANNEL -> VARIANT_UOM -> BASE_PRICE`), margen mínimo (`marginBps`) y conversión cambiaria (`rateMicros`) con aritmética entera `BigInt` sin punto flotante en `@shac/mod-catalog`.
+  3. Mantener cada operación de inventario, bloqueo de espacios y turno de caja dentro de `ctx.storage.transactionSync(...)` en `BranchInventoryDO` (`@shac/actor-branch`), validado con la prueba de ráfaga concurrente de 50 descuentos FEFO (`40` exitosos en orden `LOT-EARLY` -> `LOT-LATE`, `10` rechazos `409 INSUFFICIENT_STOCK` y cero duplicados de `hot_outbox`).

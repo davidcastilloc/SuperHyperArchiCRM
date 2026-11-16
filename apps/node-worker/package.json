@@ -15,8 +15,11 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@shac/actor-branch": "workspace:*",
     "@shac/db-d1": "workspace:*",
     "@shac/kernel": "workspace:*",
+    "@shac/mod-catalog": "workspace:*",
+    "@shac/mod-customers": "workspace:*",
     "@shac/mod-iam": "workspace:*",
     "@modelcontextprotocol/server": "^2.4.0",
     "agents": "^0.33.0",

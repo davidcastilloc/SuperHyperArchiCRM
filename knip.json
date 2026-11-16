@@ -13,7 +13,32 @@
       "entry": ["src/main.tsx!", "test/**/*.test.ts"],
       "project": ["src/**/*.{ts,tsx}!", "test/**/*.{ts,tsx}"]
     },
+    "packages/kernel": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/db-d1": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"],
+      "ignoreDependencies": ["zod"]
+    },
+    "packages/actor-branch": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/ui": {
+      "entry": ["src/index.ts!", "test/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}!", "test/**/*.{ts,tsx}"]
+    },
     "packages/modules/iam": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/modules/customers": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/modules/catalog": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
       "project": ["src/**/*.ts!", "test/**/*.ts"]
     }

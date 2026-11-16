@@ -57,6 +57,8 @@ function zodToJsonSchemaNode(schema: z.ZodTypeAny): JsonSchema {
       return { type: 'string', enum: def.values ?? [] };
     case 'ZodLiteral':
       return { const: def.value };
+    case 'ZodRecord':
+      return { type: 'object' };
     case 'ZodArray':
       return {
         type: 'array',
