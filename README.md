@@ -7,7 +7,8 @@ Línea de productos empresariales (*Software Product Line*) multi-mercado y mult
 
 ## Documentación Maestra del Repositorio
 
-- [`SPEC.md`](./SPEC.md) — Arquitectura maestra v2.0.0 (Núcleo Universal, 4 Packs por Familia, 12 Motores, 9 Presets en KV, Control Plane y Hub Federado).
+- [`SPEC.md`](./SPEC.md) — Arquitectura maestra v2.1.0 (True All-in-One + App Store Interno en KV, 12 Dominios, 9 Presets iniciales, Control Plane y Hub Federado).
+- [`DATA_MODEL.md`](./DATA_MODEL.md) — Diccionario canónico unificado de **116 tablas** (`108` D1 + `8` Durable Object) destilado columna por columna desde **711 tablas/modelos** reales.
 - [`AGENTS.md`](./AGENTS.md) — Manual operativo obligatorio para agentes de código (SDD + ODD/RDD, cotas de iteración, tabla de anti-patrones prohibidos y recibos de verificación).
 - [`docs/superpowers/DECISIONS.md`](./docs/superpowers/DECISIONS.md) — Registro cronológico de decisiones arquitectónicas (ADR).
 - [`docs/superpowers/specs/`](./docs/superpowers/specs/) — Especificaciones detalladas por pilar y matriz de la Licuadora de 9 repositorios.

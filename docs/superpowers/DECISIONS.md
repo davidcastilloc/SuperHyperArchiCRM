@@ -32,3 +32,10 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
 
 - **Contexto:** El equipo coordina especificaciones estratégicas en la carpeta compartida de Google Drive (`SuperHyperArchiCRM`: subcarpetas `01` a `04`) y ejecuta código desde Git multi-instancia.
 - **Decisión:** Mantener paridad entre la raíz/`docs/superpowers/` del repositorio Git y las 4 carpetas de Google Drive (`01_Specs_y_Agentes`, `02_Micro-Core_POS_y_WMS`, `03_Control_Plane_y_Perfiles_KV`, `04_Hub_Federado_B2B_y_Marketplace`), sin incluir jamás rutas absolutas de sistema operativo.
+
+## ADR-006 (2026-11-16): Auditoría Columna por Columna (711 -> 116 Tablas) y Consolidación True All-in-One
+
+- **Contexto:** Al auditar columna por columna los 9 repositorios locales más la instancia viva de Supabase (`PC911 IT GLOBAL / doctors-ehr` Postgres 17), se contabilizaron **711 tablas/modelos y más de 10,000 columnas** (incluyendo 22 tablas en vivo `therapist_*` / `therapy_*` con Verificación Electrónica de Visitas `EVV` geocercada, terapia grupal y ensayos conductuales ABA).
+- **Decisión:**
+  1. Unificar las 711 tablas fuente en **116 tablas canónicas sin duplicación ni pérdida de columnas** (`108` en Cloudflare D1 + `8` calientes en `BranchInventoryDO`), documentadas en `DATA_MODEL.md`.
+  2. Adoptar el modelo **True All-in-One (`SPEC.md` v2.1.0)**: dado que la UI SvelteKit hace *code-splitting* estático (`0 KiB` en el Worker) y las 116 tablas Drizzle + Zod pesan `~145 KiB gzip` (dejando el binario completo bajo `< 900 KiB gzip`), un único motor incluye todos los dominios de fábrica y `CONFIG_KV` opera como un **App Store interno instantáneo (`0 ms`)** manteniendo a la vez la posibilidad de compilar ediciones recortadas si algún entorno embebido lo requiere.
