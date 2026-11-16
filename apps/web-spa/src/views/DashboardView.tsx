@@ -26,8 +26,17 @@ function outcomeTone(outcome: string): 'success' | 'warning' | 'error' | 'info' 
   return 'warning';
 }
 
-/** Open Mercato DS v3 3-column operational Dashboard widget grid. */
+/** Open Mercato DS v3 3-column Dashboard: Customer Tasks | New Customers | New Deals. */
 export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProps) {
+  const tasksQuery = useQuery({
+    queryKey: ['dashboard', 'tasks'],
+    queryFn: async () => {
+      const res = await rpc.api.customers.interactions.$get({ query: { limit: '5' } });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
+
   const partiesQuery = useQuery({
     queryKey: ['dashboard', 'parties'],
     queryFn: async () => {
@@ -46,18 +55,9 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
     },
   });
 
-  const productsQuery = useQuery({
-    queryKey: ['dashboard', 'products'],
-    queryFn: async () => {
-      const res = await rpc.api.catalog.products.$get({ query: { limit: '5' } });
-      if (!res.ok) throw await readApiError(res);
-      return res.json();
-    },
-  });
-
+  const tasks = tasksQuery.data?.items ?? [];
   const parties = partiesQuery.data?.items ?? [];
   const deals = dealsQuery.data?.items ?? [];
-  const products = productsQuery.data?.items ?? [];
   const dealsSummary = dealsQuery.data?.summary;
 
   return (
@@ -66,7 +66,7 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Organiza y monitorea los indicadores de {vocabulary.branchSingular} y tus registros recientes.
+            Organiza y monitorea las tareas, clientes y oportunidades activas de {vocabulary.branchSingular}.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -91,6 +91,12 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard
+          title="Tareas Pendientes"
+          value={tasksQuery.data?.summary.openCount ?? tasks.length}
+          loading={tasksQuery.isLoading}
+          comparisonLabel="Interacciones y recordatorios"
+        />
+        <KpiCard
           title={`Total ${vocabulary.partyPlural}`}
           value={partiesQuery.data?.total ?? parties.length}
           loading={partiesQuery.isLoading}
@@ -103,28 +109,68 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           trend={{ value: 100, direction: 'up' }}
           comparisonLabel="Oportunidades en negociación"
         />
-        <KpiCard
-          title="Catálogo & Mostrador"
-          value={productsQuery.data?.total ?? products.length}
-          loading={productsQuery.isLoading}
-          comparisonLabel="SKUs listos para SmartCheck y POS"
-        />
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="flex flex-col rounded-xl border border-border bg-card shadow-xs">
           <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
             <div className="space-y-0.5">
+              <h2 className="text-sm font-semibold tracking-tight">Tareas de {vocabulary.partyPlural}</h2>
+              <p className="text-xs text-muted-foreground">
+                Revisa las últimas tareas vinculadas a clientes y salta directo a su ficha.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Actualizar tareas"
+              onClick={() => void tasksQuery.refetch()}
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <RefreshCw className={`size-3.5 ${tasksQuery.isFetching ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          {tasks.length === 0 ? (
+            <div className="p-4">
+              <EmptyState size="sm" title="Sin tareas pendientes" actionLabel="Crear Tarea" onAction={() => onNavigate('/tasks')} />
+            </div>
+          ) : (
+            <div className="divide-y divide-border/70">
+              {tasks.map((task) => (
+                <div key={task.id} className="space-y-1.5 px-4 py-3.5 transition-colors hover:bg-muted/35">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="truncate text-sm font-medium">{task.partyName ?? 'General'}</p>
+                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{formatEpochDate(task.createdAt)}</span>
+                  </div>
+                  <p className="text-xs text-foreground">{task.title}</p>
+                  <p className="font-mono text-[11px] text-muted-foreground">customers:{task.kind}</p>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('/tasks')}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
+                  >
+                    <span>Ver registro</span>
+                    <ArrowUpRight className="size-3 text-muted-foreground" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col rounded-xl border border-border bg-card shadow-xs">
+          <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
+            <div className="space-y-0.5">
               <h2 className="text-sm font-semibold tracking-tight">Nuevos {vocabulary.partyPlural}</h2>
               <p className="text-xs text-muted-foreground">
-                Últimos registros agregados para seguimiento inmediato.
+                Últimos clientes agregados para seguimiento rápido.
               </p>
             </div>
             <button
               type="button"
               aria-label="Actualizar clientes"
               onClick={() => void partiesQuery.refetch()}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <RefreshCw className={`size-3.5 ${partiesQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
@@ -162,14 +208,14 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
             <div className="space-y-0.5">
               <h2 className="text-sm font-semibold tracking-tight">Nuevas Oportunidades</h2>
               <p className="text-xs text-muted-foreground">
-                Negociaciones activas y valor estimado del pipeline comercial.
+                Sigue los deals recién creados en tu pipeline comercial.
               </p>
             </div>
             <button
               type="button"
               aria-label="Actualizar deals"
               onClick={() => void dealsQuery.refetch()}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <RefreshCw className={`size-3.5 ${dealsQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
@@ -177,7 +223,7 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
 
           {deals.length === 0 ? (
             <div className="p-4">
-              <EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Crear Deal en CRM" onAction={() => onNavigate('/parties')} />
+              <EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Ir a Kanban Deals" onAction={() => onNavigate('/deals')} />
             </div>
           ) : (
             <div className="divide-y divide-border/70">
@@ -193,54 +239,7 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                   </div>
                   <button
                     type="button"
-                    onClick={() => onNavigate('/parties')}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
-                  >
-                    <span>Ver registro</span>
-                    <ArrowUpRight className="size-3 text-muted-foreground" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex flex-col rounded-xl border border-border bg-card shadow-xs">
-          <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
-            <div className="space-y-0.5">
-              <h2 className="text-sm font-semibold tracking-tight">Catálogo Activo</h2>
-              <p className="text-xs text-muted-foreground">
-                Productos disponibles para consulta rápida y facturación.
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-label="Actualizar productos"
-              onClick={() => void productsQuery.refetch()}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <RefreshCw className={`size-3.5 ${productsQuery.isFetching ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-
-          {products.length === 0 ? (
-            <div className="p-4">
-              <EmptyState size="sm" title="Sin productos" actionLabel="Ir a Catálogo" onAction={() => onNavigate('/catalog')} />
-            </div>
-          ) : (
-            <div className="divide-y divide-border/70">
-              {products.map((prod) => (
-                <div key={prod.id} className="space-y-1.5 px-4 py-3.5 transition-colors hover:bg-muted/35">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <p className="truncate text-sm font-medium">{prod.name}</p>
-                    <span className="shrink-0 font-mono text-xs font-semibold tabular-nums">
-                      {formatMinorUnits(prod.basePriceMinor, prod.primaryCurrency)}
-                    </span>
-                  </div>
-                  <p className="font-mono text-[11px] text-muted-foreground">{prod.sku}</p>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('/catalog')}
+                    onClick={() => onNavigate('/deals')}
                     className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
                   >
                     <span>Ver registro</span>

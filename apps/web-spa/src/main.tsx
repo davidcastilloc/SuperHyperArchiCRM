@@ -23,12 +23,17 @@ import { AppStoreView } from './views/AppStoreView';
 import { AuthPage } from './views/AuthPage';
 import { AutomationView } from './views/AutomationView';
 import { CasesView } from './views/CasesView';
+import { ClaimsAndServicesView } from './views/ClaimsAndServicesView';
+import { CustomerTasksView } from './views/CustomerTasksView';
+import { CustomFieldsView } from './views/CustomFieldsView';
 import { DashboardView } from './views/DashboardView';
+import { DealsKanbanView } from './views/DealsKanbanView';
 import { FinanceView } from './views/FinanceView';
 import { CatalogView, PartiesView } from './views/Phase2Views';
 import { PhysicalView } from './views/PhysicalView';
 import { PortalView } from './views/PortalView';
 import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
+import { SalesOrdersView } from './views/SalesOrdersView';
 import { LeasesView, SpacesView } from './views/SpacesLeasesViews';
 
 const queryClient = createShacQueryClient();
@@ -115,15 +120,16 @@ function RootLayout() {
   );
 }
 
+const voc = DEFAULT_PROFILE.vocabulary;
+
 function HomePage() {
   const navigate = useNavigate();
-  return (
-    <DashboardView
-      vocabulary={DEFAULT_PROFILE.vocabulary}
-      rpc={rpcClient}
-      onNavigate={(href) => void navigate({ to: href })}
-    />
-  );
+  return <DashboardView vocabulary={voc} rpc={rpcClient} onNavigate={(href) => void navigate({ to: href })} />;
+}
+
+function OrdersPage() {
+  const navigate = useNavigate();
+  return <SalesOrdersView vocabulary={voc} rpc={rpcClient} onNavigate={(href) => void navigate({ to: href })} />;
 }
 
 function LoginPage() {
@@ -131,20 +137,24 @@ function LoginPage() {
   return <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />;
 }
 
-const voc = DEFAULT_PROFILE.vocabulary;
 const rootRoute = createRootRoute({ component: RootLayout });
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: HomePage });
 const authRoute = createRoute({ getParentRoute: () => rootRoute, path: '/auth', component: LoginPage });
+const tasksRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tasks', component: () => <CustomerTasksView vocabulary={voc} rpc={rpcClient} /> });
 const partiesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/parties', component: () => <PartiesView vocabulary={voc} rpc={rpcClient} /> });
+const dealsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/deals', component: () => <DealsKanbanView vocabulary={voc} rpc={rpcClient} /> });
 const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/catalog', component: () => <CatalogView vocabulary={voc} rpc={rpcClient} /> });
 const posRoute = createRoute({ getParentRoute: () => rootRoute, path: '/pos', component: () => <PosView vocabulary={voc} rpc={rpcClient} /> });
+const ordersRoute = createRoute({ getParentRoute: () => rootRoute, path: '/orders', component: OrdersPage });
 const kioskRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kiosk/price-check', component: () => <SmartCheckKioskView vocabulary={voc} rpc={rpcClient} /> });
 const wmsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/wms', component: () => <WmsView vocabulary={voc} rpc={rpcClient} /> });
+const claimsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/claims', component: () => <ClaimsAndServicesView vocabulary={voc} rpc={rpcClient} /> });
 const spacesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/spaces', component: () => <SpacesView vocabulary={voc} rpc={rpcClient} /> });
 const leasesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/leases', component: () => <LeasesView vocabulary={voc} rpc={rpcClient} /> });
 const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/cases', component: () => <CasesView vocabulary={voc} rpc={rpcClient} /> });
 const financeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/finance', component: () => <FinanceView vocabulary={voc} rpc={rpcClient} /> });
 const portalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/portal', component: () => <PortalView vocabulary={voc} rpc={rpcClient} /> });
+const customFieldsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/custom-fields', component: () => <CustomFieldsView vocabulary={voc} rpc={rpcClient} /> });
 const automationRoute = createRoute({ getParentRoute: () => rootRoute, path: '/automation', component: () => <AutomationView vocabulary={voc} rpc={rpcClient} /> });
 const physicalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/physical', component: () => <PhysicalView vocabulary={voc} rpc={rpcClient} /> });
 const appStoreRoute = createRoute({ getParentRoute: () => rootRoute, path: '/app-store', component: () => <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} /> });
@@ -152,16 +162,21 @@ const appStoreRoute = createRoute({ getParentRoute: () => rootRoute, path: '/app
 const routeTree = rootRoute.addChildren([
   indexRoute,
   authRoute,
+  tasksRoute,
   partiesRoute,
+  dealsRoute,
   catalogRoute,
   posRoute,
+  ordersRoute,
   kioskRoute,
   wmsRoute,
+  claimsRoute,
   spacesRoute,
   leasesRoute,
   casesRoute,
   financeRoute,
   portalRoute,
+  customFieldsRoute,
   automationRoute,
   physicalRoute,
   appStoreRoute,

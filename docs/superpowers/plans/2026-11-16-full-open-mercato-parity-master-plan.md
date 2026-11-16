@@ -67,9 +67,9 @@
 - Modify: `packages/ui/src/components/ShacAppShell.tsx`, `packages/ui/src/index.ts`
 - Test: `packages/ui/test/ui.smoke.test.tsx`
 
-- [ ] **Step 1:** Add failing tests in `packages/ui/test/ui.smoke.test.tsx` for `CommandPalette` (`Ctrl+K` / `⌘K` open, filter, select, `Escape`), `NotificationBell` popover in `ShacAppShell`, and `SavedViewsBar` (`onSelectView` + `exportRowsToCsv`).
-- [ ] **Step 2:** Implement `CommandPalette.tsx`, `SavedViewsBar.tsx` (with `NotificationBell` + `SavedViewsBar` + CSV serializer), wire into `ShacAppShell.tsx` (`<= 290` LOC), and export from `packages/ui/src/index.ts`.
-- [ ] **Step 3:** Run `pnpm --filter @shac/ui test:run` and `pnpm --filter @shac/ui typecheck` -> PASS, then commit.
+- [x] **Step 1:** Add failing tests in `packages/ui/test/ui.smoke.test.tsx` for `CommandPalette` (`Ctrl+K` / `⌘K` open, filter, select, `Escape`), `NotificationBell` popover in `ShacAppShell`, and `SavedViewsBar` (`onSelectView` + `exportRowsToCsv`).
+- [x] **Step 2:** Implement `CommandPalette.tsx`, `SavedViewsBar.tsx` (with `NotificationBell` + `SavedViewsBar` + CSV serializer), wire into `ShacAppShell.tsx` (`<= 290` LOC), and export from `packages/ui/src/index.ts`.
+- [x] **Step 3:** Run `pnpm --filter @shac/ui test:run` and `pnpm --filter @shac/ui typecheck` -> PASS, then commit.
 
 ---
 
@@ -79,9 +79,9 @@
 - Modify Batch 2A: `apps/web-spa/src/views/SpacesView.tsx`, `apps/web-spa/src/views/LeasesView.tsx`, `apps/web-spa/src/views/CasesView.tsx`
 - Modify Batch 2B: `apps/web-spa/src/views/FinanceView.tsx`, `apps/web-spa/src/views/PhysicalView.tsx`, `apps/web-spa/src/views/AutomationView.tsx`, `apps/web-spa/src/views/AppStoreView.tsx`
 
-- [ ] **Step 1:** Upgrade Batch 2A (`SpacesView`, `LeasesView`, `CasesView`) to `PageHeader`, `KpiCard`, `DataTable`, `StatusBadge`, and `lucide-react` icons (`<= 280` LOC each).
-- [ ] **Step 2:** Upgrade Batch 2B (`FinanceView`, `PhysicalView`, `AutomationView`, `AppStoreView`) to Open Mercato DS v3 (`<= 280` LOC each).
-- [ ] **Step 3:** Run `pnpm --filter @shac/web-spa typecheck` and `pnpm --filter @shac/web-spa test:run` -> PASS, then commit.
+- [x] **Step 1:** Upgrade Batch 2A (`SpacesView`, `LeasesView`, `CasesView`) to `PageHeader`, `KpiCard`, `DataTable`, `StatusBadge`, and `lucide-react` icons (`<= 280` LOC each).
+- [x] **Step 2:** Upgrade Batch 2B (`FinanceView`, `PhysicalView`, `AutomationView`, `AppStoreView`) to Open Mercato DS v3 (`<= 280` LOC each).
+- [x] **Step 3:** Run `pnpm --filter @shac/web-spa typecheck` and `pnpm --filter @shac/web-spa test:run` -> PASS, then commit.
 
 ---
 
@@ -92,9 +92,9 @@
 - Modify: `packages/modules/pos/src/index.ts`, `apps/node-worker/src/pos-wms-registry.ts`
 - Test: `packages/modules/pos/test/pos.commands.test.ts`
 
-- [ ] **Step 1:** Add failing tests in `packages/modules/pos/test/pos.commands.test.ts` verifying `posOrdersListCommand` returns checked-out orders + KPI summary in `<= 2` D1 queries (`wrapD1WithCounter`), enforces tenant isolation, and rejects disabled module with `403`.
-- [ ] **Step 2:** Implement `posOrdersListCommand` using `db.batch([rowsQuery, aggQuery])` on `com_orders` and wire `GET /orders` in `pos-wms-registry.ts`.
-- [ ] **Step 3:** Run `pnpm --filter @shac/mod-pos test:run` -> PASS, then commit.
+- [x] **Step 1:** Add failing tests in `packages/modules/pos/test/pos.commands.test.ts` verifying `posOrdersListCommand` returns checked-out orders + KPI summary in `<= 2` D1 queries (`wrapD1WithCounter`), enforces tenant isolation, and rejects disabled module with `403`.
+- [x] **Step 2:** Implement `posOrdersListCommand` using `db.batch([rowsQuery, aggQuery])` on `com_orders` and wire `GET /orders` in `pos-wms-registry.ts`.
+- [x] **Step 3:** Run `pnpm --filter @shac/mod-pos test:run` -> PASS, then commit.
 
 ---
 
@@ -106,9 +106,9 @@
 - Modify: `packages/modules/customers/src/index.ts`, `apps/node-worker/src/router.ts`
 - Test: `packages/modules/customers/test/customers.commands.test.ts`
 
-- [ ] **Step 1:** Add failing tests for `customersInteractionsListCommand` (`<= 2` D1 queries), `customersInteractionsUpsertCommand` (idempotent via `clientMutationId`), and `customersDealsStageCommand` (stage & outcome update + history append).
-- [ ] **Step 2:** Implement `interactions.ts` and `deals-stage.ts`, export in `@shac/mod-customers`, and mount `/api/customers/interactions` (`GET`/`POST`) and `/api/customers/deals/stage` (`POST`) in `router.ts`.
-- [ ] **Step 3:** Run `pnpm --filter @shac/mod-customers test:run` -> PASS, then commit.
+- [x] **Step 1:** Add failing tests for `customersInteractionsListCommand` (`<= 2` D1 queries), `customersInteractionsUpsertCommand` (idempotent via `clientMutationId`), and `customersDealsStageCommand` (stage & outcome update + history append).
+- [x] **Step 2:** Implement `interactions.ts` and `deals-stage.ts`, export in `@shac/mod-customers`, and mount `/api/customers/interactions` (`GET`/`POST`) and `/api/customers/deals/stage` (`POST`) in `router.ts`.
+- [x] **Step 3:** Run `pnpm --filter @shac/mod-customers test:run` -> PASS, then commit.
 
 ---
 
@@ -120,9 +120,9 @@
 - Modify: `packages/modules/services/src/index.ts`, `apps/node-worker/src/phase7-registry.ts`, `apps/node-worker/src/router.ts`
 - Test: `packages/modules/services/test/services.commands.test.ts`
 
-- [ ] **Step 1:** Add failing tests in `services.commands.test.ts` for `servicesClaimsListCommand` and `servicesWorkOrdersListCommand` (`<= 2` D1 queries, tenant isolation).
-- [ ] **Step 2:** Implement `services-lists.ts` (`GET /api/services/claims`, `GET /api/services/work-orders`) and `custom-fields-routes.ts` (`GET/POST /api/system/custom-fields` on `kernel_custom_field_defs` using `buildVirtualColumnSql` validation), and mount in `phase7-registry.ts` / `router.ts`.
-- [ ] **Step 3:** Run `pnpm --filter @shac/mod-services test:run` and `pnpm --filter @shac/node-worker typecheck` -> PASS, then commit.
+- [x] **Step 1:** Add failing tests in `services.commands.test.ts` for `servicesClaimsListCommand` and `servicesWorkOrdersListCommand` (`<= 2` D1 queries, tenant isolation).
+- [x] **Step 2:** Implement `services-lists.ts` (`GET /api/services/claims`, `GET /api/services/work-orders`) and `custom-fields-routes.ts` (`GET/POST /api/system/custom-fields` on `kernel_custom_field_defs` using `buildVirtualColumnSql` validation), and mount in `phase7-registry.ts` / `router.ts`.
+- [x] **Step 3:** Run `pnpm --filter @shac/mod-services test:run` and `pnpm --filter @shac/node-worker typecheck` -> PASS, then commit.
 
 ---
 
@@ -136,6 +136,6 @@
 - Create: `apps/web-spa/src/views/CustomFieldsView.tsx`
 - Modify: `apps/web-spa/src/views/DashboardView.tsx`, `apps/web-spa/src/nav.ts`, `apps/web-spa/src/main.tsx`
 
-- [ ] **Step 1:** Build `SalesOrdersView.tsx` (`/orders`), `DealsKanbanView.tsx` (`/deals`), and `CustomerTasksView.tsx` (`/tasks`) + connect `DashboardView`'s 1st column to live Customer Tasks (`<= 280` LOC each).
-- [ ] **Step 2:** Build `ClaimsAndServicesView.tsx` (`/claims` with 5-step Open Mercato warranty timeline + RMA/WorkOrder forms) and `CustomFieldsView.tsx` (`/custom-fields` with live `v_cf_*` DDL preview & field creator), and register all 5 routes in `nav.ts` and `main.tsx` (`<= 280` LOC each).
-- [ ] **Step 3:** Run `pnpm -r typecheck`, `pnpm dlx knip --strict`, `impeccable.cmd detect --json`, `wrangler deploy --dry-run` (`< 1024 KiB` gzip), seed demo tasks/claims in remote `shac-primary`, deploy live, and verify `HTTP 200`.
+- [x] **Step 1:** Build `SalesOrdersView.tsx` (`/orders`), `DealsKanbanView.tsx` (`/deals`), and `CustomerTasksView.tsx` (`/tasks`) + connect `DashboardView`'s 1st column to live Customer Tasks (`<= 280` LOC each).
+- [x] **Step 2:** Build `ClaimsAndServicesView.tsx` (`/claims` with 5-step Open Mercato warranty timeline + RMA/WorkOrder forms) and `CustomFieldsView.tsx` (`/custom-fields` with live `v_cf_*` DDL preview & field creator), and register all 5 routes in `nav.ts` and `main.tsx` (`<= 280` LOC each).
+- [x] **Step 3:** Run `pnpm -r typecheck`, `pnpm dlx knip --strict`, `impeccable.cmd detect --json`, `wrangler deploy --dry-run` (`< 1024 KiB` gzip), seed demo tasks/claims in remote `shac-primary`, deploy live, and verify `HTTP 200`.

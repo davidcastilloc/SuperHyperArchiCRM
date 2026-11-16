@@ -6,7 +6,11 @@ import {
   Blocks,
   BriefcaseMedical,
   Building2,
+  ClipboardCheck,
+  Columns3,
+  Database,
   FileSignature,
+  FileSpreadsheet,
   KeyRound,
   Landmark,
   LayoutDashboard,
@@ -17,6 +21,7 @@ import {
   ShieldCheck,
   Sparkles,
   Warehouse,
+  Wrench,
 } from 'lucide-react';
 
 function navIcon(Icon: ComponentType<{ className?: string }>) {
@@ -64,12 +69,28 @@ export const NAV_ITEMS: ShacNavItem[] = [
   { id: 'home', label: 'Dashboard', href: '/', group: 'GENERAL', icon: navIcon(LayoutDashboard) },
   { id: 'auth', label: 'Acceso Sucursal', href: '/auth', group: 'GENERAL', icon: navIcon(KeyRound) },
   {
+    id: 'tasks',
+    label: 'Tareas & Agenda',
+    href: '/tasks',
+    group: 'CUSTOMERS',
+    moduleId: 'customers',
+    icon: navIcon(ClipboardCheck),
+  },
+  {
     id: 'parties',
     label: DEFAULT_PROFILE.vocabulary.partyPlural,
     href: '/parties',
     group: 'CUSTOMERS',
     moduleId: 'customers',
     icon: navIcon(Building2),
+  },
+  {
+    id: 'deals',
+    label: 'Deals (Kanban)',
+    href: '/deals',
+    group: 'CUSTOMERS',
+    moduleId: 'customers',
+    icon: navIcon(Columns3),
   },
   {
     id: 'portal',
@@ -97,6 +118,14 @@ export const NAV_ITEMS: ShacNavItem[] = [
     icon: navIcon(ReceiptText),
   },
   {
+    id: 'orders',
+    label: 'Órdenes de Venta',
+    href: '/orders',
+    group: 'SALES',
+    moduleId: 'pos',
+    icon: navIcon(FileSpreadsheet),
+  },
+  {
     id: 'kiosk',
     label: 'SmartCheck 10s',
     href: '/kiosk/price-check',
@@ -113,6 +142,14 @@ export const NAV_ITEMS: ShacNavItem[] = [
     moduleId: 'wms',
     shortcut: 'F6',
     icon: navIcon(Warehouse),
+  },
+  {
+    id: 'claims',
+    label: 'Garantías & RMA',
+    href: '/claims',
+    group: 'OPERACIONES',
+    moduleId: 'services',
+    icon: navIcon(Wrench),
   },
   {
     id: 'spaces',
@@ -153,6 +190,14 @@ export const NAV_ITEMS: ShacNavItem[] = [
     group: 'FINANZAS',
     moduleId: 'finance',
     icon: navIcon(Landmark),
+  },
+  {
+    id: 'custom-fields',
+    label: 'Campos Custom (v_cf)',
+    href: '/custom-fields',
+    group: 'SISTEMA',
+    moduleId: 'core',
+    icon: navIcon(Database),
   },
   {
     id: 'automation',
