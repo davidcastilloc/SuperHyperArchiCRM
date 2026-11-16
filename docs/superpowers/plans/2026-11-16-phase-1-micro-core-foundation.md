@@ -48,8 +48,11 @@
 - `packages/modules/iam/src/commands/delegation.ts` — Comandos `iam.delegation.issuePin` e `iam.apiKeys.create`.
 - `packages/modules/iam/src/index.ts` — `iamModule` (`ModuleManifest`).
 - `apps/node-worker/package.json`, `apps/node-worker/tsconfig.json`, `apps/node-worker/wrangler.jsonc`, `apps/node-worker/vitest.config.ts`
+- `apps/node-worker/src/cors.ts` — Middleware CORS adaptativo por `CORS_ALLOWED_ORIGINS` (`< 70` líneas, `OPTIONS` en `< 0.2 ms` sin tocar D1/KV).
 - `apps/node-worker/src/router.ts` — Adaptador Hono RPC + `createMcpHandler` stateless unificado.
 - `apps/node-worker/src/index.ts` — Entrypoint del Worker (`fetch` + stub mínimo `BranchInventoryDO` para enlace de bindings).
+- `packages/ui/package.json`, `packages/ui/tsconfig.json`, `packages/ui/src/styles/globals.css`, `packages/ui/src/components/ShacAppShell.tsx`, `packages/ui/src/components/AuthBranchGate.tsx`, `packages/ui/src/index.ts` — Sistema de diseño `DESIGN.md` en React 19 + Tailwind v4 + `shadcn/ui`.
+- `apps/web-spa/package.json`, `apps/web-spa/tsconfig.json`, `apps/web-spa/vite.config.ts`, `apps/web-spa/index.html`, `apps/web-spa/src/main.tsx`, `apps/web-spa/src/lib/rpc.ts`, `apps/web-spa/src/lib/queryClient.ts` — SPA React 19 + Vite (`@cloudflare/vite-plugin`) + TanStack Router + TanStack Query (`offlineFirst` + IndexedDB).
 
 ---
 
@@ -330,11 +333,11 @@ git commit -m "feat(mod-iam): implement batched organizations, API keys, and 6-d
 
 ---
 
-### Task 6: Worker `@shac/node-worker` (Hono RPC + `createMcpHandler` Stateless + Suite `@cloudflare/vitest-plugin` + Presupuesto `< 200 KiB`)
+### Task 6: Worker `@shac/node-worker` (Hono RPC + CORS Adaptativo + `createMcpHandler` Stateless + Suite `@cloudflare/vitest-plugin` + Presupuesto `< 200 KiB`)
 
 **Files:**
 - Create: `apps/node-worker/package.json`, `apps/node-worker/tsconfig.json`, `apps/node-worker/wrangler.jsonc`, `apps/node-worker/vitest.config.ts`
-- Create: `apps/node-worker/src/router.ts`, `apps/node-worker/src/index.ts`
+- Create: `apps/node-worker/src/cors.ts`, `apps/node-worker/src/router.ts`, `apps/node-worker/src/index.ts`
 - Test: `apps/node-worker/test/worker.integration.test.ts`
 
 **Interfaces:**
@@ -377,5 +380,89 @@ Expected:
 
 ```bash
 git add pnpm-lock.yaml package.json apps/node-worker docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
-git commit -m "feat(node-worker): wire Hono RPC and stateless MCP handler with workerd integration suite"
+git commit -m "feat(node-worker): wire Hono RPC, adaptive CORS, and stateless MCP handler with workerd suite"
+```
+
+---
+
+### Task 7: Sistema UI `@shac/ui` (Tokens Tailwind v4 + `ShacAppShell` + `AuthBranchGate`)
+
+**Files:**
+- Create: `packages/ui/package.json`, `packages/ui/tsconfig.json`, `packages/ui/src/styles/globals.css`
+- Create: `packages/ui/src/components/ShacAppShell.tsx`, `packages/ui/src/components/AuthBranchGate.tsx`, `packages/ui/src/index.ts`
+- Test: `packages/ui/test/ui.smoke.test.tsx`
+
+**Interfaces:**
+- Consumes: `MarketVocabulary`, `TenantMarketProfile` desde `@shac/kernel`.
+- Produces: `ShacAppShell`, `AuthBranchGate`, `globals.css` (`@theme inline`, `.dark`, `data-density="touch" | "compact"`).
+
+- [ ] **Step 1: Escribir prueba de renderizado y densidad táctil en `packages/ui/test/ui.smoke.test.tsx`**
+
+Verificar que `AuthBranchGate` renderiza selector de sucursal y teclado numérico táctil de 6 dígitos (`min-h-14` / `56px`), y que `ShacAppShell` refleja `SyncStatusPill` (`En línea` vs `Offline`).
+
+- [ ] **Step 2: Ejecutar test para confirmar fallo inicial**
+
+Run: `pnpm install && pnpm --filter @shac/ui test:run`
+Expected: FAIL porque los componentes aún no existen.
+
+- [ ] **Step 3: Implementar `globals.css`, `ShacAppShell.tsx`, `AuthBranchGate.tsx` e `index.ts`**
+
+Usar React 19 puro (sin `forwardRef`), atributos `data-slot` y tokens exactos de `DESIGN.md` (`#2563EB`, `#059669`, `Plus Jakarta Sans` + `JetBrains Mono`).
+
+- [ ] **Step 4: Verificar tipos y tests**
+
+Run: `pnpm -r typecheck && pnpm --filter @shac/ui test:run`
+Expected: PASS (`exit code 0`).
+
+- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+
+```bash
+git add pnpm-lock.yaml packages/ui docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
+git commit -m "feat(ui): add Tailwind v4 design tokens, ShacAppShell, and bimodal AuthBranchGate"
+```
+
+---
+
+### Task 8: SPA `@shac/web-spa` (React 19 + Vite + TanStack Router + TanStack Query `offlineFirst` + Hono RPC)
+
+**Files:**
+- Create: `apps/web-spa/package.json`, `apps/web-spa/tsconfig.json`, `apps/web-spa/vite.config.ts`, `apps/web-spa/index.html`
+- Create: `apps/web-spa/src/lib/rpc.ts`, `apps/web-spa/src/lib/queryClient.ts`, `apps/web-spa/src/main.tsx`
+- Test: `apps/web-spa/test/spa.offline.test.ts`
+
+**Interfaces:**
+- Consumes: `@shac/ui` (`ShacAppShell`, `AuthBranchGate`) y tipo `AppRouter` desde `@shac/node-worker`.
+- Produces: Build estático en `apps/web-spa/dist` servido por Workers Static Assets.
+
+- [ ] **Step 1: Escribir test de cliente RPC y persistencia `offlineFirst` en `apps/web-spa/test/spa.offline.test.ts`**
+
+Verificar configuración `networkMode: 'offlineFirst'` en `createShacQueryClient()` y construcción del cliente tipado `createRpcClient(baseUrl)`.
+
+- [ ] **Step 2: Ejecutar test para confirmar fallo**
+
+Run: `pnpm install && pnpm --filter @shac/web-spa test:run`
+Expected: FAIL por archivos aún no implementados.
+
+- [ ] **Step 3: Implementar `vite.config.ts`, `src/lib/rpc.ts`, `src/lib/queryClient.ts`, `src/main.tsx` e `index.html`**
+
+Integrar `hc<AppRouter>`, `@tanstack/react-router` y `@tanstack/react-query` con persistencia IndexedDB.
+
+- [ ] **Step 4: Ejecutar batería completa de cierre de Fase 1**
+
+Run:
+```bash
+pnpm -r typecheck
+pnpm dlx knip --strict
+pnpm -r test:run
+pnpm --filter @shac/web-spa build
+pnpm --filter @shac/node-worker exec wrangler deploy --dry-run --outdir .wrangler/dist
+! rg -i "DROP TABLE|DROP COLUMN" packages/db-d1/migrations/
+```
+Expected: Todo con código de salida `0` y Worker `gzip < 200 KiB`.
+
+- [ ] **Step 5: Marcar `[x]` y crear commit atómico**
+
+```bash
+git add pnpm-lock.yaml apps/web-spa docs/superpowers/plans/2026-11-16-phase-1-micro-core-foundation.md
+git commit -m "feat(web-spa): bootstrap React 19 Vite SPA with TanStack Router, offlineFirst Query, and Hono RPC"
 ```
