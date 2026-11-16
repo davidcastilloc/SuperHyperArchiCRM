@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { MoreHorizontal } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 
 export interface SectionHeaderProps {
@@ -13,14 +14,14 @@ export function SectionHeader({ title, count, action, className }: SectionHeader
   return (
     <div data-slot="section-header" className={cn('flex items-center justify-between gap-2', className)}>
       <div className="flex items-center gap-2">
-        <h3 className="text-sm font-semibold">{title}</h3>
+        <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
         {count !== undefined ? (
-          <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground tabular-nums">
+          <span className="rounded-full bg-status-info-bg px-2 py-0.5 font-mono text-[11px] font-medium text-status-info-text tabular-nums">
             {count}
           </span>
         ) : null}
       </div>
-      {action ? <div className="flex items-center gap-1">{action}</div> : null}
+      {action ? <div className="flex items-center gap-1.5">{action}</div> : null}
     </div>
   );
 }
@@ -66,14 +67,14 @@ export function RowActions({
           e.stopPropagation();
           setOpen((prev) => !prev);
         }}
-        className="h-7 rounded border border-border bg-background px-2 text-xs font-medium hover:bg-muted"
+        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        ⋯
+        <MoreHorizontal className="size-4" />
       </button>
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 min-w-40 rounded-md border border-border bg-popover p-1 shadow-md"
+          className="absolute right-0 z-20 mt-1 min-w-44 rounded-lg border border-border bg-popover p-1 shadow-md"
         >
           {items.map((item) => (
             <button
@@ -86,7 +87,7 @@ export function RowActions({
                 item.onSelect();
               }}
               className={cn(
-                'block w-full rounded px-2.5 py-1.5 text-left text-xs hover:bg-muted',
+                'block w-full rounded-md px-2.5 py-1.5 text-left text-xs font-medium transition-colors hover:bg-muted',
                 item.destructive && 'text-danger',
               )}
             >

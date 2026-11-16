@@ -1,21 +1,27 @@
 import { useMemo, useState, type ReactNode, type Ref } from 'react';
-import type { MarketVocabulary, TenantMarketProfile } from '@shac/kernel';
+import type { TenantMarketProfile } from '@shac/kernel';
+import {
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  Home,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plug,
+  Sparkles,
+  Sun,
+} from 'lucide-react';
 import { cn } from '../lib/cn.js';
+import { ShacSidebar, type ShacNavItem } from './ShacSidebar.js';
+
+export type { ShacNavItem } from './ShacSidebar.js';
 
 export type SyncStatus = 'online' | 'offline' | 'syncing' | 'error';
 
 export interface SyncState {
   status: SyncStatus;
   pendingMutations?: number;
-}
-
-export interface ShacNavItem {
-  id: string;
-  label: string;
-  href: string;
-  group?: string;
-  moduleId?: string;
-  shortcut?: string;
 }
 
 export interface SyncStatusPillProps {
@@ -25,17 +31,17 @@ export interface SyncStatusPillProps {
 }
 
 const SYNC_STYLES: Record<SyncStatus, string> = {
-  online: 'border-ok/30 bg-ok/10 text-ok',
-  offline: 'border-warn/30 bg-warn/10 text-warn',
-  syncing: 'border-primary/30 bg-primary/10 text-primary',
-  error: 'border-danger/30 bg-danger/10 text-danger',
+  online: 'border-status-success-border bg-status-success-bg text-status-success-text',
+  offline: 'border-status-warning-border bg-status-warning-bg text-status-warning-text',
+  syncing: 'border-status-info-border bg-status-info-bg text-status-info-text',
+  error: 'border-status-error-border bg-status-error-bg text-status-error-text',
 };
 
 const SYNC_DOT_STYLES: Record<SyncStatus, string> = {
-  online: 'bg-ok',
-  offline: 'bg-warn',
-  syncing: 'bg-primary animate-pulse',
-  error: 'bg-danger',
+  online: 'bg-status-success-icon',
+  offline: 'bg-status-warning-icon',
+  syncing: 'bg-status-info-icon animate-pulse',
+  error: 'bg-status-error-icon',
 };
 
 function formatSyncLabel(syncState: SyncState): string {
@@ -61,14 +67,14 @@ export function SyncStatusPill({ syncState, className, ref }: SyncStatusPillProp
       role="status"
       aria-live="polite"
       className={cn(
-        'inline-flex items-center gap-2 rounded-sm border px-2.5 py-1 text-xs font-medium tabular-nums',
+        'inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
         SYNC_STYLES[syncState.status],
         className,
       )}
     >
       <span
         data-slot="sync-status-dot"
-        className={cn('size-2 rounded-full', SYNC_DOT_STYLES[syncState.status])}
+        className={cn('size-1.5 rounded-full', SYNC_DOT_STYLES[syncState.status])}
         aria-hidden="true"
       />
       <span>{formatSyncLabel(syncState)}</span>
@@ -93,7 +99,7 @@ export interface ShacAppShellProps {
   ref?: Ref<HTMLDivElement>;
 }
 
-/** Open Mercato-style bimodal application shell with searchable collapsible sidebar. */
+/** Open Mercato DS v3 bimodal application shell with searchable collapsible sidebar and topbar chrome. */
 export function ShacAppShell({
   profile,
   branchName,
@@ -110,7 +116,6 @@ export function ShacAppShell({
   className,
   ref,
 }: ShacAppShellProps) {
-  const vocab: MarketVocabulary = profile.vocabulary;
   const [navSearch, setNavSearch] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -137,6 +142,11 @@ export function ShacAppShell({
     return Array.from(map.entries());
   }, [visibleNav]);
 
+  const activeNavItem = useMemo(
+    () => navItems.find((item) => item.href === activeHref),
+    [navItems, activeHref],
+  );
+
   function toggleGroup(groupName: string) {
     setCollapsedGroups((prev) => ({ ...prev, [groupName]: !prev[groupName] }));
   }
@@ -154,143 +164,106 @@ export function ShacAppShell({
       )}
     >
       {sidebarOpen ? (
-        <aside
-          data-slot="app-shell-sidebar"
-          className="w-full lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card flex flex-col"
-        >
-          <div
-            data-slot="app-shell-brand"
-            className="h-14 px-4 border-b border-border flex items-center gap-2.5"
-          >
-            <div className="size-7 shrink-0 rounded-md bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
-              SH
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{branchName}</p>
-              <p className="text-[11px] text-muted-foreground truncate">
-                {vocab.branchSingular} · {profile.editionPreset}
-              </p>
-            </div>
-          </div>
-
-          <div className="p-2.5 border-b border-border">
-            <input
-              type="search"
-              value={navSearch}
-              onChange={(e) => setNavSearch(e.target.value)}
-              placeholder="Buscar menú..."
-              className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
-
-          <nav data-slot="app-shell-nav" aria-label="Navegación principal" className="p-2.5 flex-1 space-y-3 overflow-y-auto">
-            {loading ? (
-              <div data-slot="app-shell-nav-skeleton" className="space-y-2 p-2">
-                <div className="h-7 rounded-md bg-muted animate-pulse" />
-                <div className="h-7 rounded-md bg-muted animate-pulse" />
-                <div className="h-7 rounded-md bg-muted animate-pulse" />
-              </div>
-            ) : visibleNav.length === 0 ? (
-              <p data-slot="app-shell-nav-empty" className="px-3 py-2 text-xs text-muted-foreground">
-                Sin módulos activos
-              </p>
-            ) : (
-              groupedNav.map(([groupName, items]) => {
-                const isCollapsed = !navSearch.trim() && Boolean(collapsedGroups[groupName]);
-                return (
-                  <div key={groupName} className="space-y-1">
-                    {groupName !== 'GENERAL' ? (
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(groupName)}
-                        className="w-full flex items-center justify-between px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                      >
-                        <span>{groupName}</span>
-                        <span className="font-mono text-[10px]">{isCollapsed ? '▸' : '▾'}</span>
-                      </button>
-                    ) : null}
-                    {!isCollapsed
-                      ? items.map((item) => {
-                          const isActive = activeHref === item.href;
-                          return (
-                            <button
-                              key={item.id}
-                              type="button"
-                              data-slot="app-shell-nav-item"
-                              data-active={isActive ? 'true' : 'false'}
-                              onClick={() => onNavigate?.(item.href)}
-                              className={cn(
-                                'w-full flex items-center justify-between rounded-md px-2.5 text-left text-sm font-medium transition-colors',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                                density === 'touch' ? 'min-h-12 py-2.5 text-base' : 'h-8 py-1',
-                                isActive
-                                  ? 'bg-primary text-primary-foreground'
-                                  : 'text-foreground hover:bg-muted',
-                              )}
-                            >
-                              <span className="truncate">{item.label}</span>
-                              {item.shortcut ? (
-                                <span className="ml-2 font-mono text-[11px] opacity-75">{item.shortcut}</span>
-                              ) : null}
-                            </button>
-                          );
-                        })
-                      : null}
-                  </div>
-                );
-              })
-            )}
-          </nav>
-        </aside>
+        <ShacSidebar
+          profile={profile}
+          groupedNav={groupedNav}
+          visibleCount={visibleNav.length}
+          loading={loading}
+          navSearch={navSearch}
+          onNavSearchChange={setNavSearch}
+          collapsedGroups={collapsedGroups}
+          onToggleGroup={toggleGroup}
+          activeHref={activeHref}
+          onNavigate={onNavigate}
+          density={density}
+        />
       ) : null}
 
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col bg-background">
         <header
           data-slot="app-shell-header"
-          className="h-14 px-4 border-b border-border bg-card flex items-center justify-between gap-3"
+          className="h-14 px-4 border-b border-border bg-background flex items-center justify-between gap-3"
         >
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <button
               type="button"
               aria-label="Alternar barra lateral"
               onClick={() => setSidebarOpen((prev) => !prev)}
-              className="h-8 rounded-md border border-border px-2 text-xs hover:bg-muted"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
             >
-              ☰
+              {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeftOpen className="size-4" />}
             </button>
             <button
               type="button"
+              aria-label="Inicio"
               onClick={() => onNavigate?.('/')}
-              className="h-8 rounded-md px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              Inicio
+              <Home className="size-4" />
             </button>
-            <span className="text-xs font-mono text-muted-foreground truncate">
-              · {profile.tenantId}
-            </span>
+            {activeNavItem && activeNavItem.href !== '/' ? (
+              <>
+                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70" />
+                <span className="truncate text-xs font-medium text-foreground">{activeNavItem.label}</span>
+              </>
+            ) : null}
           </div>
+
           <div className="flex items-center gap-2">
-            {headerActions}
+            <button
+              type="button"
+              onClick={() => onNavigate?.('/automation')}
+              className="hidden md:inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Sparkles className="size-3.5 text-foreground" />
+              <span>AI</span>
+              <kbd className="rounded border border-border bg-muted/60 px-1 py-0.5 font-mono text-[10px]">⌘K</kbd>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onNavigate?.('/auth')}
+              title={`Cambiar ${profile.vocabulary.branchSingular.toLowerCase()}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 text-xs font-medium text-foreground shadow-xs transition-colors hover:bg-muted"
+            >
+              <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
+              <span className="max-w-32 truncate">{branchName}</span>
+              <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+            </button>
+
+            <button
+              type="button"
+              aria-label="Módulos"
+              onClick={() => onNavigate?.('/app-store')}
+              className="hidden sm:inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Plug className="size-4" />
+            </button>
+
             <SyncStatusPill syncState={syncState} />
+
             {onToggleTheme ? (
               <button
                 type="button"
                 data-slot="theme-toggle"
                 onClick={onToggleTheme}
                 className={cn(
-                  'rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-muted',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  density === 'touch' ? 'min-h-12 px-3' : 'h-8',
+                  'inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+                  density === 'touch' ? 'min-h-11 px-3' : 'h-8',
                 )}
               >
-                {theme === 'dark' ? 'Claro' : 'Oscuro'}
+                {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+                <span className="hidden sm:inline">{theme === 'dark' ? 'Claro' : 'Oscuro'}</span>
               </button>
             ) : null}
+
+            {headerActions}
           </div>
         </header>
 
-        <main data-slot="app-shell-main" className="flex-1 p-4 lg:p-6 overflow-auto">
-          {children}
+        <main data-slot="app-shell-main" className="flex-1 p-5 lg:p-7 overflow-auto">
+          <div className="mx-auto max-w-7xl">{children}</div>
         </main>
       </div>
     </div>

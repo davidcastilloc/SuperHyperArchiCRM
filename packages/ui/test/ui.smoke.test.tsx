@@ -200,4 +200,27 @@ describe('@shac/ui smoke tests', () => {
     expect(screen.getByText('POS · Pedido')).toBeInTheDocument();
     expect(screen.queryByText('Clientes')).not.toBeInTheDocument();
   });
+
+  it('renders Open Mercato DS v3 StatusBadge (pill and dot) and PageHeader with refresh action', async () => {
+    const uiModule = await import('../src/index.js');
+    expect('StatusBadge' in uiModule).toBe(true);
+    expect('PageHeader' in uiModule).toBe(true);
+    const { StatusBadge, PageHeader } = uiModule as typeof import('../src/index.js') & {
+      StatusBadge: React.ComponentType<{ label: string; tone?: 'success' | 'warning' | 'error' | 'info' | 'neutral'; appearance?: 'pill' | 'dot' }>;
+      PageHeader: React.ComponentType<{ title: string; description?: string; onRefresh?: () => void }>;
+    };
+    const onRefresh = vi.fn();
+    const { container } = render(
+      <div>
+        <PageHeader title="Sales orders" description="Review documents" onRefresh={onRefresh} />
+        <StatusBadge label="Fulfilled" tone="success" appearance="dot" />
+        <StatusBadge label="Active" tone="success" appearance="pill" />
+      </div>,
+    );
+
+    expect(container.querySelector('[data-slot="page-header"]')).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-slot="status-badge"]')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: /Actualizar/i }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+  });
 });

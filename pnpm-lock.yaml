@@ -13,7 +13,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   apps/control-plane:
     dependencies:
@@ -35,7 +35,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -44,7 +44,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   apps/federation-hub:
     dependencies:
@@ -66,7 +66,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -75,7 +75,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   apps/node-worker:
     dependencies:
@@ -154,7 +154,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -166,7 +166,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
       wrangler:
         specifier: ^4.163.0
         version: 4.163.0(@cloudflare/workers-types@4.20260702.1)
@@ -194,6 +194,9 @@ importers:
       idb-keyval:
         specifier: ^6.2.1
         version: 6.3.0
+      lucide-react:
+        specifier: ^1.73.0
+        version: 1.73.0(@types/react@19.3.0)(react@19.3.1)
       react:
         specifier: ^19.0.0
         version: 19.3.1
@@ -249,7 +252,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/actor-branch:
     dependencies:
@@ -262,7 +265,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -271,7 +274,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/db-d1:
     dependencies:
@@ -287,7 +290,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -296,7 +299,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/federation-sdk:
     dependencies:
@@ -315,7 +318,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/kernel:
     dependencies:
@@ -331,7 +334,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/automation:
     dependencies:
@@ -350,7 +353,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -359,7 +362,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/cases:
     dependencies:
@@ -378,7 +381,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -387,7 +390,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/catalog:
     dependencies:
@@ -406,7 +409,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -415,7 +418,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/customers:
     dependencies:
@@ -434,7 +437,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -443,7 +446,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/finance:
     dependencies:
@@ -462,7 +465,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -471,7 +474,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/iam:
     dependencies:
@@ -496,7 +499,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/leases:
     dependencies:
@@ -515,7 +518,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -524,7 +527,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/physical:
     dependencies:
@@ -543,7 +546,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -552,7 +555,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/portal:
     dependencies:
@@ -571,7 +574,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -580,7 +583,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/pos:
     dependencies:
@@ -605,7 +608,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -614,7 +617,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/regional:
     dependencies:
@@ -633,7 +636,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -642,7 +645,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/services:
     dependencies:
@@ -661,7 +664,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -670,7 +673,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/spaces:
     dependencies:
@@ -692,7 +695,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -701,7 +704,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/wms:
     dependencies:
@@ -723,7 +726,7 @@ importers:
     devDependencies:
       '@cloudflare/vitest-plugin':
         specifier: ^1.8.3
-        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
       '@cloudflare/workers-types':
         specifier: ^4.20250401.0
         version: 4.20260702.1
@@ -732,7 +735,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/ui:
     dependencies:
@@ -742,6 +745,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      lucide-react:
+        specifier: ^1.73.0
+        version: 1.73.0(@types/react@19.3.0)(react@19.3.1)
       tailwind-merge:
         specifier: ^3.2.0
         version: 3.7.0
@@ -778,7 +784,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
-        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
 packages:
 
@@ -2627,6 +2633,15 @@ packages:
   lru-cache@5.1.1:
     resolution: {integrity: sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w==}
 
+  lucide-react@1.73.0:
+    resolution: {integrity: sha512-fVOzGviL9mTfHenG1PbCfIceavyGlnpYNSYr+aGZHLRymAJ7DTP6KHuqt0uBkCKAoenr1UVkwSbDIYt2xIesEQ==}
+    peerDependencies:
+      '@types/react': '*'
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+
   lz-string@1.5.0:
     resolution: {integrity: sha512-h5bgJWpxJNswbU7qCrV0tIKQCaS3blPDrqKWx+QxzuzL1zGUzij9XCWLrSLsJPu5t+eWA/ycetzYAO5IOMcWAQ==}
     hasBin: true
@@ -3410,12 +3425,12 @@ snapshots:
     optionalDependencies:
       workerd: 1.20261116.1
 
-  '@cloudflare/vitest-plugin@1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))':
+  '@cloudflare/vitest-plugin@1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))':
     dependencies:
       cjs-module-lexer: 1.2.3
       esbuild: 0.28.2
       miniflare: 5.20261116.0-beta
-      vitest: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+      vitest: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
       wrangler: 4.163.0(@cloudflare/workers-types@4.20260702.1)
       zod: 4.6.6
     transitivePeerDependencies:
@@ -4566,6 +4581,12 @@ snapshots:
     dependencies:
       yallist: 3.1.1
 
+  lucide-react@1.73.0(@types/react@19.3.0)(react@19.3.1):
+    dependencies:
+      react: 19.3.1
+    optionalDependencies:
+      '@types/react': 19.3.0
+
   lz-string@1.5.0: {}
 
   magic-string@0.30.21:
@@ -4911,7 +4932,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)):
+  vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0)(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
       '@vitest/expect': 4.1.12
       '@vitest/mocker': 4.1.12(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))

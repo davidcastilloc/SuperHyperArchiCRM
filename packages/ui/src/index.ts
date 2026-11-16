@@ -31,3 +31,10 @@ export {
   type DataTableColumn,
   type DataTableProps,
 } from './components/DataTable.js';
+export {
+  PageHeader,
+  StatusBadge,
+  type PageHeaderProps,
+  type StatusBadgeProps,
+  type StatusTone,
+} from './components/StatusBadge.js';

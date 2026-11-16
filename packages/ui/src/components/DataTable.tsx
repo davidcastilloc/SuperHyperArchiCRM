@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
+import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { EmptyState } from './EmptyState.js';
 import { RowActions, type RowActionItem } from './SectionHeader.js';
@@ -27,7 +28,7 @@ export interface DataTableProps<TRow> {
   className?: string;
 }
 
-/** Sortable enterprise DataTable with EmptyState & RowActions ported from @open-mercato/ui. */
+/** Sortable enterprise DataTable with hairline header dividers & RowActions ported from @open-mercato/ui. */
 export function DataTable<TRow>({
   columns,
   data,
@@ -72,7 +73,10 @@ export function DataTable<TRow>({
 
   if (loading) {
     return (
-      <div data-slot="data-table-loading" className={cn('space-y-2 rounded-lg border border-border bg-card p-4', className)}>
+      <div
+        data-slot="data-table-loading"
+        className={cn('space-y-2 rounded-lg border border-border bg-card p-4 shadow-xs', className)}
+      >
         <div className="h-8 animate-pulse rounded bg-muted" />
         <div className="h-8 animate-pulse rounded bg-muted" />
         <div className="h-8 animate-pulse rounded bg-muted" />
@@ -93,27 +97,43 @@ export function DataTable<TRow>({
   }
 
   return (
-    <div data-slot="data-table" className={cn('overflow-x-auto rounded-lg border border-border bg-card', className)}>
+    <div
+      data-slot="data-table"
+      className={cn('overflow-x-auto rounded-lg border border-border bg-card shadow-xs', className)}
+    >
       <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
+        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
           <tr>
             {columns.map((col) => {
               const isSorted = sortColId === col.id;
               return (
                 <th
                   key={col.id}
-                  className={cn('px-3 py-2 font-medium', col.align === 'right' && 'text-right', col.className)}
+                  className={cn(
+                    'border-r border-border/60 last:border-r-0 px-3.5 py-2.5 font-medium',
+                    col.align === 'right' && 'text-right',
+                    col.className,
+                  )}
                 >
                   {col.sortValue ? (
                     <button
                       type="button"
                       onClick={() => toggleSort(col.id)}
-                      className="inline-flex items-center gap-1 hover:text-foreground"
+                      className={cn(
+                        'inline-flex items-center gap-1.5 transition-colors hover:text-foreground',
+                        col.align === 'right' && 'ml-auto',
+                      )}
                     >
                       <span>{col.header}</span>
-                      <span className="font-mono text-[10px]">
-                        {isSorted ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}
-                      </span>
+                      {isSorted ? (
+                        sortDir === 'asc' ? (
+                          <ArrowUp className="size-3.5 text-foreground" />
+                        ) : (
+                          <ArrowDown className="size-3.5 text-foreground" />
+                        )
+                      ) : (
+                        <ChevronsUpDown className="size-3.5 text-muted-foreground/60" />
+                      )}
                     </button>
                   ) : (
                     col.header
@@ -121,7 +141,9 @@ export function DataTable<TRow>({
                 </th>
               );
             })}
-            {rowActions ? <th className="w-12 px-3 py-2 text-right">Acciones</th> : null}
+            {rowActions ? (
+              <th className="w-16 px-3.5 py-2.5 text-right font-medium">Acciones</th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -134,21 +156,21 @@ export function DataTable<TRow>({
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 data-selected={selected ? 'true' : 'false'}
                 className={cn(
-                  'border-b border-border last:border-b-0 transition-colors',
-                  onRowClick && 'cursor-pointer hover:bg-muted/40',
-                  selected && 'bg-primary/5',
+                  'border-b border-border/80 last:border-b-0 transition-colors',
+                  onRowClick && 'cursor-pointer hover:bg-muted/45',
+                  selected && 'bg-muted/70',
                 )}
               >
                 {columns.map((col) => (
                   <td
                     key={col.id}
-                    className={cn('px-3 py-2', col.align === 'right' && 'text-right', col.className)}
+                    className={cn('px-3.5 py-2.5 align-middle', col.align === 'right' && 'text-right', col.className)}
                   >
                     {col.cell(row)}
                   </td>
                 ))}
                 {rowActions ? (
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3.5 py-2.5 text-right align-middle">
                     <RowActions items={rowActions(row)} />
                   </td>
                 ) : null}

@@ -224,11 +224,11 @@ export function AuthBranchGate({
                 data-slot="pin-slot"
                 data-filled={filled ? 'true' : 'false'}
                 className={cn(
-                  'h-12 rounded-md border flex items-center justify-center text-xl font-bold',
-                  filled ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-muted',
+                  'h-12 rounded-md border flex items-center justify-center',
+                  filled ? 'border-primary bg-muted text-foreground' : 'border-border bg-muted/50',
                 )}
               >
-                {filled ? '•' : ''}
+                {filled ? <span aria-hidden="true" className="size-2.5 rounded-full bg-foreground" /> : null}
               </div>
             );
           })}

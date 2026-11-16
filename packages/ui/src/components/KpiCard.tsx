@@ -1,4 +1,5 @@
 import type { ReactNode, Ref } from 'react';
+import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 
 export interface KpiTrend {
@@ -29,12 +30,12 @@ function defaultFormatValue(value: number): string {
 }
 
 const TREND_STYLE: Record<KpiTrend['direction'], string> = {
-  up: 'bg-ok/10 text-ok',
-  down: 'bg-danger/10 text-danger',
-  unchanged: 'bg-muted text-muted-foreground',
+  up: 'bg-status-success-bg text-status-success-text border-status-success-border',
+  down: 'bg-status-error-bg text-status-error-text border-status-error-border',
+  unchanged: 'bg-status-neutral-bg text-status-neutral-text border-status-neutral-border',
 };
 
-/** KPI summary card ported from @open-mercato/ui for React 19 + Tailwind v4. */
+/** KPI summary card ported from @open-mercato/ui DS v3 for React 19 + Tailwind v4. */
 export function KpiCard({
   title,
   value,
@@ -61,11 +62,13 @@ export function KpiCard({
     <div
       ref={ref}
       data-slot="kpi-card"
-      className={cn('rounded-lg border border-border bg-card p-4 text-card-foreground', className)}
+      className={cn('rounded-xl border border-border bg-card p-4 text-card-foreground shadow-xs', className)}
     >
       {title || headerAction ? (
         <div className="mb-2 flex items-center justify-between gap-2">
-          {title ? <p className="text-xs font-medium text-muted-foreground">{title}</p> : null}
+          {title ? (
+            <p className="text-overline font-medium uppercase text-muted-foreground">{title}</p>
+          ) : null}
           {headerAction}
         </div>
       ) : null}
@@ -75,12 +78,23 @@ export function KpiCard({
       ) : loading ? (
         <div className="h-7 w-24 animate-pulse rounded bg-muted" />
       ) : (
-        <div className="flex items-baseline justify-between gap-2">
-          <p className="font-mono text-2xl font-bold tracking-tight tabular-nums">{formatted}</p>
+        <div className="flex items-baseline gap-2.5">
+          <p className="text-2xl font-semibold tracking-tight tabular-nums">{formatted}</p>
           {trend ? (
-            <span className={cn('inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium tabular-nums', TREND_STYLE[trend.direction])}>
-              {trend.direction === 'up' ? '↑' : trend.direction === 'down' ? '↓' : '—'}{' '}
-              {Math.abs(trend.value)}%
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium tabular-nums',
+                TREND_STYLE[trend.direction],
+              )}
+            >
+              {trend.direction === 'up' ? (
+                <TrendingUp className="size-3" />
+              ) : trend.direction === 'down' ? (
+                <TrendingDown className="size-3" />
+              ) : (
+                <Minus className="size-3" />
+              )}
+              <span>{Math.abs(trend.value)}%</span>
             </span>
           ) : null}
         </div>
