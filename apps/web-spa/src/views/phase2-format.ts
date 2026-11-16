@@ -27,6 +27,24 @@ export function parseNonNegInt(raw: string, fallback = 0): number {
   return parsed;
 }
 
+/** Parses a human decimal string (e.g. "12.50") to integer minor units without float math. */
+export function parseMajorToMinor(raw: string): number {
+  const cleaned = raw.trim().replace(',', '.');
+  if (!/^\d+(\.\d*)?$/.test(cleaned)) return 0;
+  const [wholePart = '0', fracPart = ''] = cleaned.split('.');
+  const cents = fracPart.padEnd(2, '0').slice(0, 2);
+  const value = Number.parseInt(wholePart, 10) * 100 + Number.parseInt(cents, 10);
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+/** Formats integer minor units as plain decimal string for inputs (e.g. 1250 -> "12.50"). */
+export function formatMinorToInput(amountMinor: number): string {
+  const abs = Math.max(0, Math.trunc(amountMinor));
+  const major = Math.floor(abs / 100);
+  const cents = String(abs % 100).padStart(2, '0');
+  return `${major}.${cents}`;
+}
+
 /** Structured error thrown when a SHAC Worker endpoint returns a non-2xx status. */
 export class ShacApiError extends Error {
   readonly status: number;

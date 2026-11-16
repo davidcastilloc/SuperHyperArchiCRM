@@ -325,4 +325,15 @@ describe('@shac/web-spa offlineFirst, RPC client & IndexedDB offline queue', () 
       'https://edge.shac.local/api/catalog/rates',
     );
   });
+
+  it('parses decimal currency strings to integer minor units without floating-point drift', async () => {
+    const mod = (await import('../src/views/phase2-format')) as {
+      parseMajorToMinor?: (raw: string) => number;
+    };
+    expect(typeof mod.parseMajorToMinor).toBe('function');
+    expect(mod.parseMajorToMinor!('19.99')).toBe(1999);
+    expect(mod.parseMajorToMinor!('1.5')).toBe(150);
+    expect(mod.parseMajorToMinor!('25')).toBe(2500);
+    expect(mod.parseMajorToMinor!('0.05')).toBe(5);
+  });
 });
