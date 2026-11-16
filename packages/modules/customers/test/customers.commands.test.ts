@@ -129,6 +129,9 @@ describe('@shac/mod-customers manifest, parties.upsert & parties.list', () => {
     expect(counted.getQueryCount()).toBeLessThanOrEqual(2);
     expect(listRes.total).toBe(1);
     expect(listRes.items[0]?.id).toBe(created.id);
+    expect(listRes.items[0]?.profile?.mrnCode).toBe('MRN-MARIA-01');
+    expect(listRes.items[0]?.profile?.screeningScore).toBeNull();
+    expect(listRes.items[0]?.profile?.agreedCreditCheck).toBe(true);
 
     const ten2 = makeCustomersCtx(env.DB, {
       tenantId: 'ten_2',

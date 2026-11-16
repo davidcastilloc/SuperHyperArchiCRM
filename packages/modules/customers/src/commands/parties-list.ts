@@ -8,7 +8,11 @@ import { and, asc, eq, isNull, like, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { partyKindSchema, partyRoleSchema } from '../lib/identity.js';
 import { buildOrgSubtreeFilter, escapeSqlLike } from '../lib/scope-helpers.js';
-import { mapPartyRow, partySummarySchema } from './parties-schemas.js';
+import {
+  mapPartyRow,
+  partySummarySchema,
+  profileSelectFields,
+} from './parties-schemas.js';
 
 const listPartiesInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -88,7 +92,7 @@ export const customersPartiesListCommand = defineCommand<
     const itemsQuery = ctx.db
       .select({
         party: crmParties,
-        profile: crmPartyProfiles,
+        profile: profileSelectFields,
       })
       .from(crmParties)
       .leftJoin(

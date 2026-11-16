@@ -1,3 +1,4 @@
+import { crmPartyProfiles } from '@shac/db-d1';
 import { z } from 'zod';
 import {
   nationalitySchema,
@@ -7,6 +8,23 @@ import {
   partyRoleSchema,
   taxIdTypeSchema,
 } from '../lib/identity.js';
+
+export const profileSelectFields = {
+  partyId: crmPartyProfiles.partyId,
+  birthDate: crmPartyProfiles.birthDate,
+  gender: crmPartyProfiles.gender,
+  maritalStatus: crmPartyProfiles.maritalStatus,
+  preferredLanguage: crmPartyProfiles.preferredLanguage,
+  occupation: crmPartyProfiles.occupation,
+  employerName: crmPartyProfiles.employerName,
+  annualIncomeMinor: crmPartyProfiles.annualIncomeMinor,
+  screeningScore: crmPartyProfiles.screeningScore,
+  mrnCode: crmPartyProfiles.mrnCode,
+  guestPreferencesJson: crmPartyProfiles.guestPreferencesJson,
+  hasEvictions: crmPartyProfiles.hasEvictions,
+  agreedCreditCheck: crmPartyProfiles.agreedCreditCheck,
+  notes: crmPartyProfiles.notes,
+} as const;
 
 const partyProfileInputSchema = z.object({
   birthDate: z.string().max(32).nullable().optional(),
@@ -172,7 +190,7 @@ export interface PartyProfileRowInput {
 function mapPartyProfileRow(
   row: PartyProfileRowInput | null | undefined,
 ): PartyProfileOutput | null {
-  if (!row) {
+  if (!row || !row.partyId) {
     return null;
   }
   return {

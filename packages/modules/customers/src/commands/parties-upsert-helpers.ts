@@ -8,7 +8,10 @@ import {
 import type { ExecutionContext } from '@shac/kernel';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { z } from 'zod';
-import type { upsertPartyInputSchema } from './parties-schemas.js';
+import {
+  profileSelectFields,
+  type upsertPartyInputSchema,
+} from './parties-schemas.js';
 
 type UpsertInput = z.infer<typeof upsertPartyInputSchema>;
 
@@ -33,7 +36,7 @@ export async function findExistingPartyForUpsert(
     .select({
       party: crmParties,
       orgTreePath: iamOrganizations.treePath,
-      profile: crmPartyProfiles,
+      profile: profileSelectFields,
     })
     .from(crmParties)
     .leftJoin(
