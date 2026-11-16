@@ -136,4 +136,44 @@ describe('@shac/ui smoke tests', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Abrir ficha' }));
     expect(onSelect).toHaveBeenCalledTimes(1);
   });
+
+  it('renders FilterBar and sortable DataTable with EmptyState fallback', async () => {
+    const { FilterBar, DataTable } = await import('../src/index.js');
+    const onSearchChange = vi.fn();
+    const onSelectChip = vi.fn();
+    const onRowClick = vi.fn();
+    const rows = [
+      { id: '1', name: 'Zeta Corp', score: 20 },
+      { id: '2', name: 'Alfa S.A.', score: 50 },
+    ];
+    const columns = [
+      { id: 'name', header: 'Nombre', cell: (r: (typeof rows)[number]) => r.name, sortValue: (r: (typeof rows)[number]) => r.name },
+      { id: 'score', header: 'Puntos', cell: (r: (typeof rows)[number]) => r.score, sortValue: (r: (typeof rows)[number]) => r.score },
+    ];
+
+    const { rerender, container } = render(
+      <div>
+        <FilterBar
+          searchValue=""
+          onSearchChange={onSearchChange}
+          chips={[{ id: 'all', label: 'Todos', count: 2 }]}
+          activeChipId="all"
+          onSelectChip={onSelectChip}
+        />
+        <DataTable columns={columns} data={rows} getRowId={(r) => r.id} onRowClick={onRowClick} />
+      </div>,
+    );
+
+    expect(container.querySelector('[data-slot="filter-bar"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-slot="data-table"]')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Nombre/i }));
+    const firstBodyCell = container.querySelector('tbody tr td');
+    expect(firstBodyCell?.textContent).toBe('Alfa S.A.');
+
+    fireEvent.click(screen.getByText('Alfa S.A.'));
+    expect(onRowClick).toHaveBeenCalledWith(rows[1]);
+
+    rerender(<DataTable columns={columns} data={[]} getRowId={(r) => r.id} emptyTitle="Sin clientes" />);
+    expect(screen.getByText('Sin clientes')).toBeInTheDocument();
+  });
 });

@@ -21,3 +21,13 @@ export {
   type RowActionItem,
   type SectionHeaderProps,
 } from './components/SectionHeader.js';
+export {
+  FilterBar,
+  type FilterBarProps,
+  type FilterChipOption,
+} from './components/FilterBar.js';
+export {
+  DataTable,
+  type DataTableColumn,
+  type DataTableProps,
+} from './components/DataTable.js';
