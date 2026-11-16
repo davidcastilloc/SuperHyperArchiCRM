@@ -30,6 +30,7 @@ import {
   createBranchPosRoutes,
   createBranchRoutes,
 } from './branch-routes.js';
+import { createCatalogExtRoutes } from './catalog-ext-routes.js';
 import {
   authenticateWorkerActor,
   jsonCommandHandler,
@@ -37,9 +38,13 @@ import {
   queryCommandHandler,
   type HonoEnv,
 } from './command-registry.js';
+import { createConnectorsRoutes } from './connectors-routes.js';
 import { createAdaptiveCorsMiddleware } from './cors.js';
 import { createCustomFieldsRoutes } from './custom-fields-routes.js';
 import { createFederationRoutes } from './federation-routes.js';
+import { createFormsWorkflowsRoutes } from './forms-workflows-routes.js';
+import { createIamAdminRoutes } from './iam-admin-routes.js';
+import { createStaffRoutes } from './staff-routes.js';
 import { buildMcpServerForRequest } from './mcp-server.js';
 import {
   createPosRoutes,
@@ -173,6 +178,11 @@ function createWorkerApp(
       jsonCommandHandler(systemAppStoreToggleCommand, profileLoader),
     )
     .route('/api/system', createCustomFieldsRoutes(profileLoader))
+    .route('/api/staff', createStaffRoutes(profileLoader))
+    .route('/api', createIamAdminRoutes(profileLoader))
+    .route('/api', createCatalogExtRoutes(profileLoader))
+    .route('/api', createFormsWorkflowsRoutes(profileLoader))
+    .route('/api', createConnectorsRoutes(profileLoader))
     .route(
       '/api/system',
       createSystemRoutes(profileLoader, authenticateWorkerActor),
