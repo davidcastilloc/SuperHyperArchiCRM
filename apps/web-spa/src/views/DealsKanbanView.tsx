@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowRight, Columns3, Table2, Trophy, XCircle } from 'lucide-react';
+import { ArrowRight, Columns3, MapPin, Table2, Trophy, XCircle } from 'lucide-react';
 import {
   DataTable,
   downloadCsvFile,
@@ -22,7 +22,7 @@ const KANBAN_STAGES = [
 /** Open Mercato DS v3 CRM Deals Pipeline Kanban Board + Table view. */
 export function DealsKanbanView({ vocabulary, rpc }: Phase2ViewProps) {
   const queryClient = useQueryClient();
-  const [mode, setMode] = useState<'kanban' | 'table'>('kanban');
+  const [mode, setMode] = useState<'kanban' | 'table' | 'map'>('kanban');
   const [viewFilter, setViewFilter] = useState('all');
 
   const dealsQuery = useQuery({
@@ -138,6 +138,16 @@ export function DealsKanbanView({ vocabulary, rpc }: Phase2ViewProps) {
                 <Table2 className="size-3.5" />
                 <span>Tabla</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setMode('map')}
+                className={`inline-flex h-8 items-center gap-1.5 rounded px-2.5 text-xs font-medium ${
+                  mode === 'map' ? 'bg-muted text-foreground' : 'text-muted-foreground'
+                }`}
+              >
+                <MapPin className="size-3.5" />
+                <span>Mapa</span>
+              </button>
             </div>
           </>
         }
@@ -150,7 +160,26 @@ export function DealsKanbanView({ vocabulary, rpc }: Phase2ViewProps) {
         <KpiCard title="Cerrado Ganado" value={formatMinorUnits(summary?.wonValueMinor ?? 0, 'USD')} loading={dealsQuery.isLoading} />
       </div>
 
-      {mode === 'table' ? (
+      {mode === 'map' ? (
+        <div className="grid gap-4 rounded-xl border border-border bg-card p-5 shadow-xs md:grid-cols-2">
+          <div className="flex min-h-64 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/25 p-6 text-center">
+            <MapPin className="mb-2 size-6 text-muted-foreground" />
+            <p className="text-sm font-semibold">Mapa Territorial de Oportunidades</p>
+            <p className="mt-1 text-xs text-muted-foreground">Distribución geográfica de {deals.length} deals activos por sucursal.</p>
+          </div>
+          <div className="divide-y divide-border/70 rounded-lg border border-border">
+            {deals.map((d) => (
+              <div key={d.id} className="flex items-center justify-between gap-2 px-3.5 py-2.5 text-xs">
+                <div>
+                  <p className="font-medium">{d.title}</p>
+                  <p className="text-muted-foreground">{d.partyName ?? d.partyId} · Org {d.orgId}</p>
+                </div>
+                <span className="font-mono font-semibold tabular-nums">{formatMinorUnits(d.valueMinor, d.currency)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : mode === 'table' ? (
         <DataTable
           columns={tableCols}
           data={deals}
