@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@source "../components";
 
 @custom-variant dark (&:is(.dark *));
 @custom-variant touch (&:where([data-density="touch"], [data-density="touch"] *));
