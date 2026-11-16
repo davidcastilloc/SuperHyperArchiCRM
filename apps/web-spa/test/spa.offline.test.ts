@@ -314,5 +314,15 @@ describe('@shac/web-spa offlineFirst, RPC client & IndexedDB offline queue', () 
     expect(err.code).toBe('SHIFT_ALREADY_OPEN');
     expect(err.message).toBe('Shift open on REG-1');
     expect(err.details?.openShiftId).toBe('sh_123');
+
+    const nonJsonRes = new Response('Bad Gateway', { status: 502 });
+    const nonJsonErr = await mod.readApiError!(nonJsonRes);
+    expect(nonJsonErr.status).toBe(502);
+    expect(nonJsonErr.code).toBe('HTTP_502');
+
+    const rpc = createRpcClient('https://edge.shac.local');
+    expect(rpc.api.catalog.rates.$url().toString()).toBe(
+      'https://edge.shac.local/api/catalog/rates',
+    );
   });
 });

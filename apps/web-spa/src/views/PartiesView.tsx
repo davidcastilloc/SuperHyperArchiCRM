@@ -4,6 +4,7 @@ import {
   formatMinorUnits,
   INPUT_CLS,
   parseNonNegInt,
+  readApiError,
   type Phase2ViewProps,
 } from './phase2-format';
 
@@ -35,7 +36,7 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
       const res = await rpc.api.customers.parties.$get({
         query: trimmed ? { limit: '50', search: trimmed } : { limit: '50' },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
   });
@@ -51,7 +52,7 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
           creditLimitMinor: parseNonNegInt(creditLimitMinor, 0),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: () => {
