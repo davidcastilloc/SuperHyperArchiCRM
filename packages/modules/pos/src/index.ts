@@ -1,5 +1,6 @@
 import { defineModule, type ModuleManifest } from '@shac/kernel';
 import { posSalesCheckoutCommand } from './commands/pos-checkout.js';
+import { posOrdersListCommand } from './commands/pos-orders-list.js';
 import {
   posShiftsCloseCommand,
   posShiftsOpenCommand,
@@ -10,6 +11,7 @@ import {
 } from './commands/smartcheck-and-returns.js';
 
 export { posSalesCheckoutCommand } from './commands/pos-checkout.js';
+export { posOrdersListCommand } from './commands/pos-orders-list.js';
 export {
   posShiftsCloseCommand,
   posShiftsOpenCommand,
@@ -38,6 +40,7 @@ export const modPosManifest: ModuleManifest = defineModule({
     posShiftsOpenCommand,
     posShiftsCloseCommand,
     posSalesCheckoutCommand,
+    posOrdersListCommand,
     posKioskSmartCheckCommand,
     posReturnsSettleCommand,
   ],

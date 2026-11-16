@@ -3,6 +3,7 @@ import type { CommandSpec, ProfileLoader } from '@shac/kernel';
 import {
   modPosManifest,
   posKioskSmartCheckCommand,
+  posOrdersListCommand,
   posReturnsSettleCommand,
   posSalesCheckoutCommand,
   posShiftsCloseCommand,
@@ -62,6 +63,10 @@ export function createPosRoutes(profileLoader: ProfileLoader) {
     .post(
       '/sales/checkout',
       jsonCommandHandler(posSalesCheckoutCommand, profileLoader),
+    )
+    .get(
+      '/orders',
+      queryCommandHandler(posOrdersListCommand, profileLoader),
     )
     .get(
       '/kiosk/smartcheck',

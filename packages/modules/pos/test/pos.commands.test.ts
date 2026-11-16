@@ -38,12 +38,13 @@ describe('@shac/mod-pos checkout & SmartCheck on workerd', () => {
     await seedAmoxBranchLots(env.BRANCH_DO);
   });
 
-  it('exports modPosManifest with 5 MCP-exposed commands', () => {
+  it('exports modPosManifest with 6 MCP-exposed commands', () => {
     expect(modPosManifest.id).toBe('pos');
     expect(modPosManifest.commands.map((c) => c.id)).toEqual([
       'pos.shifts.open',
       'pos.shifts.close',
       'pos.sales.checkout',
+      'pos.orders.list',
       'pos.kiosk.smartcheck',
       'pos.returns.settle',
     ]);
@@ -203,5 +204,37 @@ describe('@shac/mod-pos checkout & SmartCheck on workerd', () => {
     expect(baseRes.variantId).toBeNull();
     expect(baseRes.unitPriceInclTaxMinor).toBe(2500);
     expect(baseRes.secondaryUnitPriceInclTaxMinor).toBe(91_250);
+  });
+
+  it('lists sales orders with party names and revenue KPI summary in <= 2 D1 queries and isolates tenants', async () => {
+    const posModule = await import('../src/index.js');
+    expect('posOrdersListCommand' in posModule).toBe(true);
+    const { posOrdersListCommand } = posModule as typeof import('../src/index.js') & {
+      posOrdersListCommand: typeof posKioskSmartCheckCommand;
+    };
+
+    const counted = wrapD1WithCounter(env.DB);
+    const ctxA = makePosCtx(counted.db, env.BRANCH_DO);
+    const resA = await posOrdersListCommand.handler(
+      ctxA,
+      posOrdersListCommand.inputSchema.parse({ limit: 25 }),
+    );
+    expect(counted.getQueryCount()).toBeLessThanOrEqual(2);
+    const typedA = resA as unknown as {
+      items: Array<{ orderNumber: string; grandTotalMinor: number }>;
+      summary: { totalCount: number; grossRevenueMinor: number };
+    };
+    expect(typedA.items.length).toBeGreaterThanOrEqual(1);
+    expect(typedA.summary.totalCount).toBeGreaterThanOrEqual(1);
+    expect(typedA.summary.grossRevenueMinor).toBeGreaterThan(0);
+
+    const ctxB = { ...makePosCtx(env.DB, env.BRANCH_DO), tenantId: 'ten_b', orgId: 'org_b', orgPath: '/org_b' };
+    const resB = (await posOrdersListCommand.handler(
+      ctxB,
+      posOrdersListCommand.inputSchema.parse({ limit: 25 }),
+    )) as unknown as { items: unknown[]; summary: { totalCount: number; grossRevenueMinor: number } };
+    expect(resB.items).toHaveLength(0);
+    expect(resB.summary.totalCount).toBe(0);
+    expect(resB.summary.grossRevenueMinor).toBe(0);
   });
 });
