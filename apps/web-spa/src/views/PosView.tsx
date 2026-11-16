@@ -9,6 +9,8 @@ import {
   formatMinorUnits,
   INPUT_CLS,
   parseNonNegInt,
+  readApiError,
+  ShacApiError,
   type Phase2ViewProps,
 } from './phase2-format';
 
@@ -22,26 +24,51 @@ function computeRestanteTargetMinor(
   return Number((BigInt(remainingOrder) * BigInt(safeRate) + 500_000n) / 1_000_000n);
 }
 
-/** Multi-currency POS terminal with 1-click "Restante" tender and IndexedDB offline queue. */
+/** Multi-currency POS terminal with catalog selector, shift close, and offline queue. */
 export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   const queryClient = useQueryClient();
   const [registerId, setRegisterId] = useState('REG-1');
   const [shiftId, setShiftId] = useState('');
   const [cashierName, setCashierName] = useState('Cajero');
-  const [productId, setProductId] = useState('prod_amox');
+  const [productId, setProductId] = useState('');
   const [qty, setQty] = useState('1');
-  const [orderTotalMinor, setOrderTotalMinor] = useState('2500');
-  const [rateMicros, setRateMicros] = useState('36500000');
+  const [orderTotalMinor, setOrderTotalMinor] = useState('0');
+  const [rateMicros, setRateMicros] = useState('54750000');
   const [usdAccountId, setUsdAccountId] = useState('acc_usd_cash');
-  const [usdAmountMinor, setUsdAmountMinor] = useState('1000');
+  const [usdAmountMinor, setUsdAmountMinor] = useState('0');
   const [vesAccountId, setVesAccountId] = useState('acc_ves_pm');
   const [vesAmountMinor, setVesAmountMinor] = useState('0');
+  const [closeUsdMinor, setCloseUsdMinor] = useState('0');
+  const [closeVesMinor, setCloseVesMinor] = useState('0');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  const productsQuery = useQuery({
+    queryKey: ['catalog', 'products', 'pos-select'],
+    queryFn: async () => {
+      const res = await rpc.api.catalog.products.$get({ query: { limit: '50' } });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
 
   const queueQuery = useQuery({
     queryKey: ['pos', 'offlineQueue'],
     queryFn: () => listOfflineQueue(),
   });
+
+  const products = productsQuery.data?.items ?? [];
+  const activeProductId = productId || products[0]?.id || '';
+  const activeProduct = products.find((p) => p.id === activeProductId);
+
+  function syncProductTotals(nextId: string, nextQtyRaw: string) {
+    const found = products.find((p) => p.id === nextId);
+    if (!found) return;
+    const units = Math.max(1, parseNonNegInt(nextQtyRaw, 1));
+    const total = found.basePriceMinor * units;
+    setOrderTotalMinor(String(total));
+    setUsdAmountMinor(String(total));
+    setVesAmountMinor('0');
+  }
 
   const openShiftMutation = useMutation({
     mutationFn: async () => {
@@ -53,12 +80,44 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
           initialBalancesMinor: { USD: 0, VES: 0 },
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
       setShiftId(data.shiftId);
-      setStatusMsg(`Turno abierto en ${vocabulary.spaceSingular} ${data.registerId}`);
+      setStatusMsg(`Turno abierto en ${vocabulary.spaceSingular} ${data.registerId}: ${data.shiftId}`);
+    },
+    onError: (err) => {
+      if (err instanceof ShacApiError && err.code === 'SHIFT_ALREADY_OPEN') {
+        const openId = err.details?.openShiftId;
+        if (typeof openId === 'string' && openId.length > 0) {
+          setShiftId(openId);
+          setStatusMsg(`Turno activo recuperado en ${registerId}: ${openId}`);
+          return;
+        }
+      }
+      setStatusMsg(err.message);
+    },
+  });
+
+  const closeShiftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await rpc.api.pos.shifts.close.$post({
+        json: {
+          clientMutationId: crypto.randomUUID(),
+          shiftId: shiftId.trim(),
+          actualCountedBalancesMinor: {
+            USD: parseNonNegInt(closeUsdMinor, 0),
+            VES: parseNonNegInt(closeVesMinor, 0),
+          },
+        },
+      });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setStatusMsg(`Turno ${data.shiftId} cerrado (${data.status})`);
+      setShiftId('');
     },
     onError: (err) => setStatusMsg(err.message),
   });
@@ -80,7 +139,7 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
         clientMutationId,
         ...(shiftId.trim() ? { shiftId: shiftId.trim() } : { registerId: registerId.trim() }),
         orderCurrency: 'USD',
-        items: [{ productId: productId.trim(), qty: Math.max(1, parseNonNegInt(qty, 1)) }],
+        items: [{ productId: activeProductId.trim(), qty: Math.max(1, parseNonNegInt(qty, 1)) }],
         payments,
       };
 
@@ -90,7 +149,7 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
           await enqueueOfflineMutation({ clientMutationId, endpoint: '/api/pos/sales/checkout', kind: 'pos.sales.checkout', payload });
           return { queued: true as const };
         }
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) throw await readApiError(res);
         return { queued: false as const, sale: await res.json() };
       } catch (err) {
         if (err instanceof TypeError) {
@@ -121,21 +180,25 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   });
 
   function handleRestante() {
+    const total = parseNonNegInt(orderTotalMinor, activeProduct ? activeProduct.basePriceMinor : 0);
     const nextVes = computeRestanteTargetMinor(
-      parseNonNegInt(orderTotalMinor, 0),
+      total,
       parseNonNegInt(usdAmountMinor, 0),
-      parseNonNegInt(rateMicros, 36_500_000),
+      parseNonNegInt(rateMicros, 54_750_000),
     );
     setVesAmountMinor(String(nextVes));
   }
 
   function handleCheckout(e: FormEvent) {
     e.preventDefault();
-    if (!productId.trim() || checkoutMutation.isPending) return;
+    if (!activeProductId.trim() || checkoutMutation.isPending) return;
     checkoutMutation.mutate();
   }
 
   const pendingCount = queueQuery.data?.length ?? 0;
+  const displayTotalMinor =
+    parseNonNegInt(orderTotalMinor, 0) ||
+    (activeProduct ? activeProduct.basePriceMinor * Math.max(1, parseNonNegInt(qty, 1)) : 0);
 
   return (
     <section className="space-y-4 p-4" data-slot="pos-view">
@@ -156,19 +219,58 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-4">
-        <input type="text" value={registerId} onChange={(e) => setRegisterId(e.target.value)} placeholder={vocabulary.spaceSingular} className={INPUT_CLS} />
-        <input type="text" value={cashierName} onChange={(e) => setCashierName(e.target.value)} placeholder="Cajero" className={INPUT_CLS} />
-        <input type="text" value={shiftId} onChange={(e) => setShiftId(e.target.value)} placeholder="Shift ID (auto al abrir)" className={`${INPUT_CLS} font-mono text-xs`} />
-        <button type="button" onClick={() => openShiftMutation.mutate()} disabled={openShiftMutation.isPending} className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
-          Abrir {vocabulary.spaceSingular}
-        </button>
+      <div className="space-y-2 rounded-lg border border-border bg-card p-3">
+        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
+          <input type="text" value={registerId} onChange={(e) => setRegisterId(e.target.value)} placeholder={vocabulary.spaceSingular} className={INPUT_CLS} />
+          <input type="text" value={cashierName} onChange={(e) => setCashierName(e.target.value)} placeholder="Cajero" className={INPUT_CLS} />
+          <input type="text" value={shiftId} onChange={(e) => setShiftId(e.target.value)} placeholder="Shift ID (auto al abrir)" className={`${INPUT_CLS} font-mono text-xs`} />
+          <button type="button" onClick={() => openShiftMutation.mutate()} disabled={openShiftMutation.isPending} className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
+            {openShiftMutation.isPending ? 'Abriendo...' : `Abrir ${vocabulary.spaceSingular}`}
+          </button>
+        </div>
+        {shiftId.trim() ? (
+          <div className="grid grid-cols-1 gap-2 border-t border-border pt-2 md:grid-cols-3">
+            <input type="number" min={0} step={1} value={closeUsdMinor} onChange={(e) => setCloseUsdMinor(e.target.value)} placeholder="Conteo cierre USD (minor)" className={`${INPUT_CLS} font-mono tabular-nums`} />
+            <input type="number" min={0} step={1} value={closeVesMinor} onChange={(e) => setCloseVesMinor(e.target.value)} placeholder="Conteo cierre VES (minor)" className={`${INPUT_CLS} font-mono tabular-nums`} />
+            <button type="button" onClick={() => closeShiftMutation.mutate()} disabled={closeShiftMutation.isPending} className="h-9 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted disabled:opacity-50">
+              {closeShiftMutation.isPending ? 'Cerrando...' : 'Cerrar Turno'}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <form onSubmit={handleCheckout} className="space-y-3 rounded-lg border border-border bg-card p-3">
         <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-          <input type="text" value={productId} onChange={(e) => setProductId(e.target.value)} placeholder="Product ID" className={`${INPUT_CLS} font-mono`} />
-          <input type="number" min={1} step={1} value={qty} onChange={(e) => setQty(e.target.value)} placeholder="Cantidad" className={`${INPUT_CLS} font-mono tabular-nums`} />
+          <select
+            value={activeProductId}
+            onChange={(e) => {
+              setProductId(e.target.value);
+              syncProductTotals(e.target.value, qty);
+            }}
+            className={INPUT_CLS}
+          >
+            {products.length === 0 ? (
+              <option value="">Sin productos en catálogo</option>
+            ) : (
+              products.map((prod) => (
+                <option key={prod.id} value={prod.id}>
+                  {prod.sku} · {prod.name} ({formatMinorUnits(prod.basePriceMinor, prod.primaryCurrency)})
+                </option>
+              ))
+            )}
+          </select>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={qty}
+            onChange={(e) => {
+              setQty(e.target.value);
+              syncProductTotals(activeProductId, e.target.value);
+            }}
+            placeholder="Cantidad"
+            className={`${INPUT_CLS} font-mono tabular-nums`}
+          />
           <input type="number" min={0} step={1} value={orderTotalMinor} onChange={(e) => setOrderTotalMinor(e.target.value)} placeholder="Total USD minor" className={`${INPUT_CLS} font-mono tabular-nums`} />
           <input type="number" min={1} step={1} value={rateMicros} onChange={(e) => setRateMicros(e.target.value)} placeholder="Tasa micros" className={`${INPUT_CLS} font-mono tabular-nums`} />
         </div>
@@ -181,13 +283,13 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
             <button type="button" onClick={handleRestante} className="h-9 rounded-md border border-border px-3 text-xs font-medium hover:bg-muted">
               Restante
             </button>
-            <button type="submit" disabled={checkoutMutation.isPending} className="h-9 flex-1 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
-              Cobrar
+            <button type="submit" disabled={checkoutMutation.isPending || !activeProductId} className="h-9 flex-1 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
+              {checkoutMutation.isPending ? 'Cobrando...' : 'Cobrar'}
             </button>
           </div>
         </div>
         <p className="text-xs font-mono text-muted-foreground">
-          Total: {formatMinorUnits(parseNonNegInt(orderTotalMinor, 0), 'USD')} · USD: {formatMinorUnits(parseNonNegInt(usdAmountMinor, 0), 'USD')} · VES: {formatMinorUnits(parseNonNegInt(vesAmountMinor, 0), 'VES')}
+          Total: {formatMinorUnits(displayTotalMinor, 'USD')} · USD: {formatMinorUnits(parseNonNegInt(usdAmountMinor, 0), 'USD')} · VES: {formatMinorUnits(parseNonNegInt(vesAmountMinor, 0), 'VES')}
         </p>
       </form>
 

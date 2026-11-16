@@ -1,18 +1,27 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { formatMinorUnits, INPUT_CLS, type Phase2ViewProps } from './phase2-format';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { formatMinorUnits, INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** 10-second auto-closing SmartCheck dual-currency price verifier kiosk. */
 export function SmartCheckKioskView({ vocabulary, rpc }: Phase2ViewProps) {
   const [code, setCode] = useState('');
   const [secondsLeft, setSecondsLeft] = useState(0);
 
+  const productsQuery = useQuery({
+    queryKey: ['catalog', 'products', 'smartcheck-chips'],
+    queryFn: async () => {
+      const res = await rpc.api.catalog.products.$get({ query: { limit: '12' } });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
+
   const checkMutation = useMutation({
     mutationFn: async (lookupCode: string) => {
       const res = await rpc.api.pos.kiosk.smartcheck.$get({
         query: { code: lookupCode, secondaryCurrency: 'VES' },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -42,6 +51,7 @@ export function SmartCheckKioskView({ vocabulary, rpc }: Phase2ViewProps) {
   }
 
   const item = checkMutation.data;
+  const quickProducts = productsQuery.data?.items ?? [];
 
   return (
     <section className="mx-auto max-w-xl space-y-4 p-6" data-slot="smartcheck-kiosk-view">
@@ -57,7 +67,7 @@ export function SmartCheckKioskView({ vocabulary, rpc }: Phase2ViewProps) {
           type="text"
           value={code}
           onChange={(e) => setCode(e.target.value)}
-          placeholder="Escanea SKU, GTIN o código de barras..."
+          placeholder="Escanea SKU o código de producto..."
           className={`${INPUT_CLS} h-12 flex-1 font-mono text-base`}
         />
         <button
@@ -69,9 +79,27 @@ export function SmartCheckKioskView({ vocabulary, rpc }: Phase2ViewProps) {
         </button>
       </form>
 
+      {quickProducts.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {quickProducts.map((prod) => (
+            <button
+              key={prod.id}
+              type="button"
+              onClick={() => {
+                setCode(prod.sku);
+                checkMutation.mutate(prod.sku);
+              }}
+              className="min-h-10 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted"
+            >
+              <span className="font-mono text-muted-foreground">{prod.sku}</span> · {prod.name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {checkMutation.isError ? (
         <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
-          Producto no encontrado o sin sesión en {vocabulary.branchSingular}.
+          {checkMutation.error.message}
         </p>
       ) : null}
 

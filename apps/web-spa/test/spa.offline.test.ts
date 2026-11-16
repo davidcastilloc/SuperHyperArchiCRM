@@ -288,4 +288,31 @@ describe('@shac/web-spa offlineFirst, RPC client & IndexedDB offline queue', () 
     });
     expect(getAuthSession()).toBeNull();
   });
+
+  it('extracts code, message, and details.openShiftId from SHAC error responses via readApiError', async () => {
+    const mod = (await import('../src/views/phase2-format')) as {
+      readApiError?: (res: Response) => Promise<{
+        status: number;
+        code: string;
+        message: string;
+        details?: Record<string, unknown>;
+      }>;
+    };
+    expect(typeof mod.readApiError).toBe('function');
+    const res = new Response(
+      JSON.stringify({
+        error: {
+          code: 'SHIFT_ALREADY_OPEN',
+          message: 'Shift open on REG-1',
+          details: { openShiftId: 'sh_123' },
+        },
+      }),
+      { status: 409, headers: { 'Content-Type': 'application/json' } },
+    );
+    const err = await mod.readApiError!(res);
+    expect(err.status).toBe(409);
+    expect(err.code).toBe('SHIFT_ALREADY_OPEN');
+    expect(err.message).toBe('Shift open on REG-1');
+    expect(err.details?.openShiftId).toBe('sh_123');
+  });
 });
