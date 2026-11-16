@@ -1,5 +1,27 @@
+import { createElement, type ComponentType } from 'react';
 import type { TenantMarketProfile } from '@shac/kernel';
 import type { BranchOption, ShacNavItem } from '@shac/ui';
+import {
+  BedDouble,
+  Blocks,
+  BriefcaseMedical,
+  Building2,
+  FileSignature,
+  KeyRound,
+  Landmark,
+  LayoutDashboard,
+  Package,
+  QrCode,
+  ReceiptText,
+  ScanBarcode,
+  ShieldCheck,
+  Sparkles,
+  Warehouse,
+} from 'lucide-react';
+
+function navIcon(Icon: ComponentType<{ className?: string }>) {
+  return createElement(Icon, { className: 'size-4' });
+}
 
 export const DEFAULT_PROFILE: Pick<
   TenantMarketProfile,
@@ -39,16 +61,32 @@ export const DEFAULT_BRANCHES: BranchOption[] = [
 ];
 
 export const NAV_ITEMS: ShacNavItem[] = [
-  { id: 'home', label: 'Dashboard', href: '/', group: 'GENERAL' },
-  { id: 'auth', label: 'Acceso Sucursal', href: '/auth', group: 'GENERAL' },
+  { id: 'home', label: 'Dashboard', href: '/', group: 'GENERAL', icon: navIcon(LayoutDashboard) },
+  { id: 'auth', label: 'Acceso Sucursal', href: '/auth', group: 'GENERAL', icon: navIcon(KeyRound) },
   {
     id: 'parties',
     label: DEFAULT_PROFILE.vocabulary.partyPlural,
     href: '/parties',
     group: 'CUSTOMERS',
     moduleId: 'customers',
+    icon: navIcon(Building2),
   },
-  { id: 'catalog', label: 'Productos y Tarifas', href: '/catalog', group: 'CATALOG', moduleId: 'catalog' },
+  {
+    id: 'portal',
+    label: 'Portal Cliente',
+    href: '/portal',
+    group: 'CUSTOMERS',
+    moduleId: 'portal',
+    icon: navIcon(ShieldCheck),
+  },
+  {
+    id: 'catalog',
+    label: 'Productos y Tarifas',
+    href: '/catalog',
+    group: 'CATALOG',
+    moduleId: 'catalog',
+    icon: navIcon(Package),
+  },
   {
     id: 'pos',
     label: `POS · ${DEFAULT_PROFILE.vocabulary.orderSingular}`,
@@ -56,6 +94,7 @@ export const NAV_ITEMS: ShacNavItem[] = [
     group: 'SALES',
     moduleId: 'pos',
     shortcut: 'F2',
+    icon: navIcon(ReceiptText),
   },
   {
     id: 'kiosk',
@@ -64,6 +103,7 @@ export const NAV_ITEMS: ShacNavItem[] = [
     group: 'SALES',
     moduleId: 'pos',
     shortcut: 'F4',
+    icon: navIcon(ScanBarcode),
   },
   {
     id: 'wms',
@@ -72,6 +112,7 @@ export const NAV_ITEMS: ShacNavItem[] = [
     group: 'WMS',
     moduleId: 'wms',
     shortcut: 'F6',
+    icon: navIcon(Warehouse),
   },
   {
     id: 'spaces',
@@ -79,18 +120,54 @@ export const NAV_ITEMS: ShacNavItem[] = [
     href: '/spaces',
     group: 'OPERACIONES',
     moduleId: 'spaces',
+    icon: navIcon(BedDouble),
   },
-  { id: 'leases', label: 'Leases · Hub', href: '/leases', group: 'OPERACIONES', moduleId: 'leases' },
+  {
+    id: 'leases',
+    label: 'Leases · Hub',
+    href: '/leases',
+    group: 'OPERACIONES',
+    moduleId: 'leases',
+    icon: navIcon(FileSignature),
+  },
   {
     id: 'cases',
     label: `${DEFAULT_PROFILE.vocabulary.caseSingular}s · Med/Legal`,
     href: '/cases',
     group: 'OPERACIONES',
     moduleId: 'cases',
+    icon: navIcon(BriefcaseMedical),
   },
-  { id: 'finance', label: 'Finanzas · Trust/GAAP', href: '/finance', group: 'FINANZAS', moduleId: 'finance' },
-  { id: 'portal', label: 'Portal Cliente', href: '/portal', group: 'CUSTOMERS', moduleId: 'portal' },
-  { id: 'automation', label: 'Automatización IA', href: '/automation', group: 'SISTEMA', moduleId: 'automation' },
-  { id: 'physical', label: 'IoT · Accesos & LPR', href: '/physical', group: 'OPERACIONES', moduleId: 'physical' },
-  { id: 'app-store', label: 'App Store (Módulos)', href: '/app-store', group: 'SISTEMA', moduleId: 'core' },
+  {
+    id: 'physical',
+    label: 'IoT · Accesos & LPR',
+    href: '/physical',
+    group: 'OPERACIONES',
+    moduleId: 'physical',
+    icon: navIcon(QrCode),
+  },
+  {
+    id: 'finance',
+    label: 'Finanzas · Trust/GAAP',
+    href: '/finance',
+    group: 'FINANZAS',
+    moduleId: 'finance',
+    icon: navIcon(Landmark),
+  },
+  {
+    id: 'automation',
+    label: 'Automatización IA',
+    href: '/automation',
+    group: 'SISTEMA',
+    moduleId: 'automation',
+    icon: navIcon(Sparkles),
+  },
+  {
+    id: 'app-store',
+    label: 'App Store (Módulos)',
+    href: '/app-store',
+    group: 'SISTEMA',
+    moduleId: 'core',
+    icon: navIcon(Blocks),
+  },
 ];

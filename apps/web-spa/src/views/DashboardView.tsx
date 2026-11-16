@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { EmptyState, KpiCard } from '@shac/ui';
+import { ArrowUpRight, ReceiptText, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { EmptyState, KpiCard, StatusBadge } from '@shac/ui';
 import { formatMinorUnits, readApiError, type Phase2ViewProps } from './phase2-format';
 
 interface DashboardViewProps extends Phase2ViewProps {
@@ -18,7 +19,14 @@ function formatEpochDate(epochSec: number): string {
   }
 }
 
-/** Open Mercato-style 3-column operational Dashboard widget grid. */
+function outcomeTone(outcome: string): 'success' | 'warning' | 'error' | 'info' {
+  if (outcome === 'won' || outcome === 'win') return 'success';
+  if (outcome === 'lost') return 'error';
+  if (outcome === 'open') return 'info';
+  return 'warning';
+}
+
+/** Open Mercato DS v3 3-column operational Dashboard widget grid. */
 export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProps) {
   const partiesQuery = useQuery({
     queryKey: ['dashboard', 'parties'],
@@ -54,85 +62,94 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
 
   return (
     <section className="space-y-6" data-slot="dashboard-view">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            Resumen operativo de {vocabulary.branchSingular} y accesos directos a tus registros recientes.
+            Organiza y monitorea los indicadores de {vocabulary.branchSingular} y tus registros recientes.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onNavigate('/pos')}
-            className="h-9 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"
+            onClick={() => onNavigate('/app-store')}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs transition-colors hover:bg-muted"
           >
-            Abrir POS (F2)
+            <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+            <span>Personalizar</span>
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('/app-store')}
-            className="h-9 rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-muted"
+            onClick={() => onNavigate('/pos')}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary-hover"
           >
-            Personalizar
+            <ReceiptText className="size-3.5" />
+            <span>Abrir POS (F2)</span>
           </button>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <KpiCard
           title={`Total ${vocabulary.partyPlural}`}
           value={partiesQuery.data?.total ?? parties.length}
           loading={partiesQuery.isLoading}
+          comparisonLabel="Directorio activo en sucursal"
         />
         <KpiCard
-          title="Oportunidades Abiertas"
+          title="Pipeline Abierto"
           value={formatMinorUnits(dealsSummary?.openValueMinor ?? 0, 'USD')}
           loading={dealsQuery.isLoading}
+          trend={{ value: 100, direction: 'up' }}
+          comparisonLabel="Oportunidades en negociación"
         />
         <KpiCard
-          title="Productos en Catálogo"
+          title="Catálogo & Mostrador"
           value={productsQuery.data?.total ?? products.length}
           loading={productsQuery.isLoading}
+          comparisonLabel="SKUs listos para SmartCheck y POS"
         />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="flex flex-col rounded-xl border border-border bg-card p-4 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold">Nuevos {vocabulary.partyPlural}</h2>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        <div className="flex flex-col rounded-xl border border-border bg-card shadow-xs">
+          <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-semibold tracking-tight">Nuevos {vocabulary.partyPlural}</h2>
               <p className="text-xs text-muted-foreground">
-                Últimos registros agregados para seguimiento rápido.
+                Últimos registros agregados para seguimiento inmediato.
               </p>
             </div>
             <button
               type="button"
               aria-label="Actualizar clientes"
               onClick={() => void partiesQuery.refetch()}
-              className="h-7 w-7 shrink-0 rounded border border-border text-xs hover:bg-muted"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              ↻
+              <RefreshCw className={`size-3.5 ${partiesQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {parties.length === 0 ? (
-            <EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel="Ir a Clientes" onAction={() => onNavigate('/parties')} />
+            <div className="p-4">
+              <EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel="Ir a Clientes" onAction={() => onNavigate('/parties')} />
+            </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-border/70">
               {parties.map((party) => (
-                <div key={party.id} className="rounded-lg border border-border bg-background p-3 space-y-1.5">
+                <div key={party.id} className="space-y-1.5 px-4 py-3.5 transition-colors hover:bg-muted/35">
                   <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-sm font-medium truncate">{party.displayName}</p>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{formatEpochDate(party.createdAt)}</span>
+                    <p className="truncate text-sm font-medium">{party.displayName}</p>
+                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{formatEpochDate(party.createdAt)}</span>
                   </div>
-                  <p className="font-mono text-[11px] text-muted-foreground">{party.rolesMask.join(', ')}</p>
+                  <p className="text-xs text-muted-foreground">{party.rolesMask.join(', ')}</p>
                   <button
                     type="button"
                     onClick={() => onNavigate('/parties')}
-                    className="text-xs font-medium text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
                   >
-                    Ver registro
+                    <span>Ver registro</span>
+                    <ArrowUpRight className="size-3 text-muted-foreground" />
                   </button>
                 </div>
               ))}
@@ -140,44 +157,47 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           )}
         </div>
 
-        <div className="flex flex-col rounded-xl border border-border bg-card p-4 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold">Nuevas Oportunidades (Deals)</h2>
+        <div className="flex flex-col rounded-xl border border-border bg-card shadow-xs">
+          <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-semibold tracking-tight">Nuevas Oportunidades</h2>
               <p className="text-xs text-muted-foreground">
-                Negociaciones activas y valor estimado del pipeline.
+                Negociaciones activas y valor estimado del pipeline comercial.
               </p>
             </div>
             <button
               type="button"
               aria-label="Actualizar deals"
               onClick={() => void dealsQuery.refetch()}
-              className="h-7 w-7 shrink-0 rounded border border-border text-xs hover:bg-muted"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              ↻
+              <RefreshCw className={`size-3.5 ${dealsQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {deals.length === 0 ? (
-            <EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Crear Deal en CRM" onAction={() => onNavigate('/parties')} />
+            <div className="p-4">
+              <EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Crear Deal en CRM" onAction={() => onNavigate('/parties')} />
+            </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-border/70">
               {deals.map((deal) => (
-                <div key={deal.id} className="rounded-lg border border-border bg-background p-3 space-y-1.5">
+                <div key={deal.id} className="space-y-1.5 px-4 py-3.5 transition-colors hover:bg-muted/35">
                   <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-sm font-medium truncate">{deal.title}</p>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{formatEpochDate(deal.createdAt)}</span>
+                    <p className="truncate text-sm font-medium">{deal.title}</p>
+                    <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{formatEpochDate(deal.createdAt)}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {deal.partyName ?? deal.partyId} · <span className="font-mono">{deal.outcome}</span> ·{' '}
-                    <span className="font-mono font-medium text-foreground">{formatMinorUnits(deal.valueMinor, deal.currency)}</span>
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <StatusBadge label={deal.outcome} tone={outcomeTone(deal.outcome)} appearance="dot" />
+                    <span className="font-mono text-xs font-medium tabular-nums">{formatMinorUnits(deal.valueMinor, deal.currency)}</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => onNavigate('/parties')}
-                    className="text-xs font-medium text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
                   >
-                    Ver registro
+                    <span>Ver registro</span>
+                    <ArrowUpRight className="size-3 text-muted-foreground" />
                   </button>
                 </div>
               ))}
@@ -185,32 +205,34 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           )}
         </div>
 
-        <div className="flex flex-col rounded-xl border border-border bg-card p-4 space-y-3">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold">Catálogo y Mostrador</h2>
+        <div className="flex flex-col rounded-xl border border-border bg-card shadow-xs">
+          <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
+            <div className="space-y-0.5">
+              <h2 className="text-sm font-semibold tracking-tight">Catálogo Activo</h2>
               <p className="text-xs text-muted-foreground">
-                Productos listos para SmartCheck 10s y cobro en POS.
+                Productos disponibles para consulta rápida y facturación.
               </p>
             </div>
             <button
               type="button"
               aria-label="Actualizar productos"
               onClick={() => void productsQuery.refetch()}
-              className="h-7 w-7 shrink-0 rounded border border-border text-xs hover:bg-muted"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              ↻
+              <RefreshCw className={`size-3.5 ${productsQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {products.length === 0 ? (
-            <EmptyState size="sm" title="Sin productos" actionLabel="Ir a Catálogo" onAction={() => onNavigate('/catalog')} />
+            <div className="p-4">
+              <EmptyState size="sm" title="Sin productos" actionLabel="Ir a Catálogo" onAction={() => onNavigate('/catalog')} />
+            </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-border/70">
               {products.map((prod) => (
-                <div key={prod.id} className="rounded-lg border border-border bg-background p-3 space-y-1.5">
+                <div key={prod.id} className="space-y-1.5 px-4 py-3.5 transition-colors hover:bg-muted/35">
                   <div className="flex items-baseline justify-between gap-2">
-                    <p className="text-sm font-medium truncate">{prod.name}</p>
+                    <p className="truncate text-sm font-medium">{prod.name}</p>
                     <span className="shrink-0 font-mono text-xs font-semibold tabular-nums">
                       {formatMinorUnits(prod.basePriceMinor, prod.primaryCurrency)}
                     </span>
@@ -219,9 +241,10 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                   <button
                     type="button"
                     onClick={() => onNavigate('/catalog')}
-                    className="text-xs font-medium text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
                   >
-                    Ver registro
+                    <span>Ver registro</span>
+                    <ArrowUpRight className="size-3 text-muted-foreground" />
                   </button>
                 </div>
               ))}

@@ -12,18 +12,15 @@ import {
   useNavigate,
   useRouterState,
 } from '@tanstack/react-router';
-import { AuthBranchGate, ShacAppShell } from '@shac/ui';
-import {
-  clearAuthSession,
-  setAuthSession,
-  useAuthSession,
-  type AuthSession,
-} from './lib/authSession';
+import { LogOut, UserRound } from 'lucide-react';
+import { ShacAppShell } from '@shac/ui';
+import { clearAuthSession, useAuthSession } from './lib/authSession';
 import { listOfflineQueue } from './lib/offlineQueue';
 import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
 import { DEFAULT_BRANCHES, DEFAULT_PROFILE, NAV_ITEMS } from './nav';
 import { AppStoreView } from './views/AppStoreView';
+import { AuthPage } from './views/AuthPage';
 import { AutomationView } from './views/AutomationView';
 import { CasesView } from './views/CasesView';
 import { DashboardView } from './views/DashboardView';
@@ -92,22 +89,28 @@ function RootLayout() {
       onToggleTheme={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
       headerActions={
         session ? (
-          <div className="flex items-center gap-2">
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              {session.actor.fullName}
+          <div className="flex items-center gap-1.5">
+            <span className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
+              <UserRound className="size-3.5" />
+              <span className="max-w-28 truncate">{session.actor.fullName}</span>
             </span>
             <button
               type="button"
               onClick={() => void handleLogout()}
-              className="h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-muted"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
             >
-              Salir
+              <LogOut className="size-3.5" />
+              <span>Salir</span>
             </button>
           </div>
         ) : null
       }
     >
-      {session || pathname === '/auth' ? <Outlet /> : <AuthPage />}
+      {session || pathname === '/auth' ? (
+        <Outlet />
+      ) : (
+        <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />
+      )}
     </ShacAppShell>
   );
 }
@@ -123,159 +126,28 @@ function HomePage() {
   );
 }
 
-function AuthPage() {
+function LoginPage() {
   const navigate = useNavigate();
-  const bootstrapQuery = useQuery({
-    queryKey: ['auth', 'bootstrap'],
-    queryFn: async () => {
-      const res = await rpcClient.api.auth.bootstrap.$get();
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json();
-    },
-  });
-  const branches = bootstrapQuery.data?.branches ?? DEFAULT_BRANCHES;
-  const vocabulary = bootstrapQuery.data?.vocabulary ?? DEFAULT_PROFILE.vocabulary;
-  const [selectedBranchId, setSelectedBranchId] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const effectiveBranchId = selectedBranchId || branches[0]?.id || '';
-
-  async function handleCredentialsSubmit(credentials: {
-    email: string;
-    password: string;
-    branchId: string;
-  }) {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await rpcClient.api.auth.login.$post({ json: credentials });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-        throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
-      }
-      const session = (await res.json()) as AuthSession;
-      setAuthSession(session);
-      void queryClient.invalidateQueries();
-      void navigate({ to: '/' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handlePinSubmit(payload: {
-    pin: string;
-    branchId: string;
-    mode: 'cashier' | 'delegation';
-  }) {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await rpcClient.api.auth.pin.$post({ json: payload });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-        throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
-      }
-      const session = (await res.json()) as AuthSession;
-      setAuthSession(session);
-      void queryClient.invalidateQueries();
-      void navigate({ to: '/' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'PIN inválido');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="p-6">
-      <AuthBranchGate
-        vocabulary={vocabulary}
-        branches={branches}
-        selectedBranchId={effectiveBranchId}
-        onSelectBranch={setSelectedBranchId}
-        onCredentialsSubmit={(creds) => void handleCredentialsSubmit(creds)}
-        onPinSubmit={(payload) => void handlePinSubmit(payload)}
-        loading={loading}
-        error={error}
-      />
-    </div>
-  );
+  return <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />;
 }
 
-function PartiesPage() {
-  return <PartiesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function CatalogPage() {
-  return <CatalogView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function PosPage() {
-  return <PosView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function KioskPriceCheckPage() {
-  return <SmartCheckKioskView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function WmsPage() {
-  return <WmsView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function SpacesPage() {
-  return <SpacesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function LeasesPage() {
-  return <LeasesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function CasesPage() {
-  return <CasesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function FinancePage() {
-  return <FinanceView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function PortalPage() {
-  return <PortalView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function AutomationPage() {
-  return <AutomationView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function PhysicalPage() {
-  return <PhysicalView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
-}
-
-function AppStorePage() {
-  return <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />;
-}
-
+const voc = DEFAULT_PROFILE.vocabulary;
 const rootRoute = createRootRoute({ component: RootLayout });
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: HomePage });
-const authRoute = createRoute({ getParentRoute: () => rootRoute, path: '/auth', component: AuthPage });
-const partiesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/parties', component: PartiesPage });
-const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/catalog', component: CatalogPage });
-const posRoute = createRoute({ getParentRoute: () => rootRoute, path: '/pos', component: PosPage });
-const kioskRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/kiosk/price-check',
-  component: KioskPriceCheckPage,
-});
-const wmsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/wms', component: WmsPage });
-const spacesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/spaces', component: SpacesPage });
-const leasesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/leases', component: LeasesPage });
-const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/cases', component: CasesPage });
-const financeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/finance', component: FinancePage });
-const portalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/portal', component: PortalPage });
-const automationRoute = createRoute({ getParentRoute: () => rootRoute, path: '/automation', component: AutomationPage });
-const physicalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/physical', component: PhysicalPage });
-const appStoreRoute = createRoute({ getParentRoute: () => rootRoute, path: '/app-store', component: AppStorePage });
+const authRoute = createRoute({ getParentRoute: () => rootRoute, path: '/auth', component: LoginPage });
+const partiesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/parties', component: () => <PartiesView vocabulary={voc} rpc={rpcClient} /> });
+const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/catalog', component: () => <CatalogView vocabulary={voc} rpc={rpcClient} /> });
+const posRoute = createRoute({ getParentRoute: () => rootRoute, path: '/pos', component: () => <PosView vocabulary={voc} rpc={rpcClient} /> });
+const kioskRoute = createRoute({ getParentRoute: () => rootRoute, path: '/kiosk/price-check', component: () => <SmartCheckKioskView vocabulary={voc} rpc={rpcClient} /> });
+const wmsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/wms', component: () => <WmsView vocabulary={voc} rpc={rpcClient} /> });
+const spacesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/spaces', component: () => <SpacesView vocabulary={voc} rpc={rpcClient} /> });
+const leasesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/leases', component: () => <LeasesView vocabulary={voc} rpc={rpcClient} /> });
+const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/cases', component: () => <CasesView vocabulary={voc} rpc={rpcClient} /> });
+const financeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/finance', component: () => <FinanceView vocabulary={voc} rpc={rpcClient} /> });
+const portalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/portal', component: () => <PortalView vocabulary={voc} rpc={rpcClient} /> });
+const automationRoute = createRoute({ getParentRoute: () => rootRoute, path: '/automation', component: () => <AutomationView vocabulary={voc} rpc={rpcClient} /> });
+const physicalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/physical', component: () => <PhysicalView vocabulary={voc} rpc={rpcClient} /> });
+const appStoreRoute = createRoute({ getParentRoute: () => rootRoute, path: '/app-store', component: () => <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} /> });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,

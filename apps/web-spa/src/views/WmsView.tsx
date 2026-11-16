@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowRight, PackageCheck, Send, Truck } from 'lucide-react';
+import { DataTable, PageHeader, StatusBadge, type DataTableColumn } from '@shac/ui';
 import { INPUT_CLS, parseNonNegInt, readApiError, type Phase2ViewProps } from './phase2-format';
 
-/** Industrial WMS pickings (-BACKORDER), FEFO lot receipt, GS1-128 dispatch, and fleet e-POD view. */
+/** Open Mercato DS v3 WMS pickings (-BACKORDER), FEFO lot receipt, GS1-128 dispatch, and e-POD view. */
 export function WmsView({ vocabulary, rpc }: Phase2ViewProps) {
   const queryClient = useQueryClient();
   const [sourceLocationId, setSourceLocationId] = useState('loc_bin_main');
@@ -130,88 +132,107 @@ export function WmsView({ vocabulary, rpc }: Phase2ViewProps) {
   }
 
   const items = pickingsQuery.data?.items ?? [];
+  type PickingRow = (typeof items)[number];
+  const columns: DataTableColumn<PickingRow>[] = [
+    {
+      id: 'num',
+      header: 'Picking',
+      sortValue: (p) => p.pickingNumber,
+      cell: (p) => <span className="font-mono text-xs font-medium">{p.pickingNumber}</span>,
+    },
+    {
+      id: 'kind',
+      header: 'Operación',
+      cell: (p) => <span className="font-mono text-xs text-muted-foreground">{p.operationKind}</span>,
+    },
+    {
+      id: 'route',
+      header: 'Ruta Física',
+      cell: (p) => (
+        <span className="inline-flex items-center gap-1.5 text-xs">
+          <span>{p.sourceLocationName ?? p.sourceLocationId}</span>
+          <ArrowRight className="size-3 text-muted-foreground" />
+          <span>{p.destLocationName ?? p.destLocationId}</span>
+        </span>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'Estado',
+      cell: (p) => (
+        <StatusBadge
+          label={p.status}
+          tone={p.status === 'done' ? 'success' : p.status === 'cancelled' ? 'error' : 'warning'}
+          appearance="dot"
+        />
+      ),
+    },
+  ];
 
   return (
-    <section className="space-y-4 p-4" data-slot="wms-view">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">WMS · {vocabulary.branchSingular}</h1>
-        <p className="text-sm text-muted-foreground">
-          Recepción FEFO en sucursal, movimientos doble partida, GS1-128 y entrega e-POD.
-        </p>
-      </div>
+    <section className="space-y-5" data-slot="wms-view">
+      <PageHeader
+        title={`WMS · ${vocabulary.branchSingular}`}
+        description="Recepción de lotes FEFO, movimientos doble partida, GS1-128 y prueba electrónica de entrega (e-POD)."
+        onRefresh={() => void pickingsQuery.refetch()}
+        refreshing={pickingsQuery.isFetching}
+      />
 
-      <div className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-4">
-        <select value={activeProductId} onChange={(e) => setProductId(e.target.value)} className={INPUT_CLS}>
-          {products.length === 0 ? (
-            <option value="">Sin productos en catálogo</option>
-          ) : (
-            products.map((p) => (
-              <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>
-            ))
-          )}
-        </select>
-        <input type="text" value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="Código de lote" className={`${INPUT_CLS} font-mono text-xs`} />
-        <input type="number" min={1} step={1} value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)} placeholder="Cantidad" className={`${INPUT_CLS} font-mono tabular-nums`} />
-        <button type="button" disabled={!activeProductId || receiveLotMutation.isPending} onClick={() => receiveLotMutation.mutate()} className="h-9 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted disabled:opacity-50">
-          {receiveLotMutation.isPending ? 'Recibiendo...' : 'Recibir Lote FEFO'}
-        </button>
-      </div>
-
-      <form onSubmit={handleDispatch} className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-5">
-        <input type="text" value={sourceLocationId} onChange={(e) => setSourceLocationId(e.target.value)} placeholder="Origen" className={`${INPUT_CLS} font-mono text-xs`} />
-        <input type="text" value={destLocationId} onChange={(e) => setDestLocationId(e.target.value)} placeholder="Destino" className={`${INPUT_CLS} font-mono text-xs`} />
-        <input type="text" value={gs1Barcode} onChange={(e) => setGs1Barcode(e.target.value)} placeholder="GS1-128 (opcional)" className={`${INPUT_CLS} font-mono text-xs`} />
-        <div className="flex gap-2">
-          <input type="number" min={1} step={1} value={demandedUnits} onChange={(e) => setDemandedUnits(e.target.value)} placeholder="Dem." className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-          <input type="number" min={0} step={1} value={doneUnits} onChange={(e) => setDoneUnits(e.target.value)} placeholder="Done" className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-        </div>
-        <button type="submit" disabled={dispatchMutation.isPending || !activeProductId} className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
-          Despachar {vocabulary.orderSingular}
-        </button>
-      </form>
-
-      <form onSubmit={handleEpod} className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-3">
-        <input type="text" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} placeholder="Vehicle ID" className={`${INPUT_CLS} font-mono text-xs`} />
-        <input type="text" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Receptor e-POD" className={INPUT_CLS} />
-        <button type="submit" disabled={epodMutation.isPending || !recipientName.trim()} className="h-9 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted disabled:opacity-50">
-          Registrar e-POD
-        </button>
-      </form>
-
-      {feedback ? (
-        <p className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-mono">{feedback}</p>
-      ) : null}
-
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-border bg-muted/50 text-xs text-muted-foreground">
-            <tr>
-              <th className="px-3 py-2">Picking</th>
-              <th className="px-3 py-2">Tipo</th>
-              <th className="px-3 py-2">Ruta</th>
-              <th className="px-3 py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-3 py-4 text-center text-xs text-muted-foreground">
-                  Sin pickings registrados.
-                </td>
-              </tr>
+      <div className="rounded-xl border border-border bg-card shadow-xs divide-y divide-border">
+        <div className="grid grid-cols-1 gap-2.5 p-4 md:grid-cols-4">
+          <select value={activeProductId} onChange={(e) => setProductId(e.target.value)} className={INPUT_CLS}>
+            {products.length === 0 ? (
+              <option value="">Sin productos en catálogo</option>
             ) : (
-              items.map((p) => (
-                <tr key={p.id} className="border-b border-border last:border-0">
-                  <td className="px-3 py-2 font-mono text-xs font-medium">{p.pickingNumber}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{p.operationKind}</td>
-                  <td className="px-3 py-2 text-xs">{p.sourceLocationName ?? p.sourceLocationId} → {p.destLocationName ?? p.destLocationId}</td>
-                  <td className="px-3 py-2 font-mono text-xs">{p.status}</td>
-                </tr>
+              products.map((p) => (
+                <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>
               ))
             )}
-          </tbody>
-        </table>
+          </select>
+          <input type="text" value={lotCode} onChange={(e) => setLotCode(e.target.value)} placeholder="Código de lote" className={`${INPUT_CLS} font-mono text-xs`} />
+          <input type="number" min={1} step={1} value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)} placeholder="Cantidad" className={`${INPUT_CLS} font-mono tabular-nums`} />
+          <button type="button" disabled={!activeProductId || receiveLotMutation.isPending} onClick={() => receiveLotMutation.mutate()} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50">
+            <PackageCheck className="size-3.5 text-muted-foreground" />
+            <span>{receiveLotMutation.isPending ? 'Recibiendo...' : 'Recibir Lote FEFO'}</span>
+          </button>
+        </div>
+
+        <form onSubmit={handleDispatch} className="grid grid-cols-1 gap-2.5 p-4 md:grid-cols-5">
+          <input type="text" value={sourceLocationId} onChange={(e) => setSourceLocationId(e.target.value)} placeholder="Origen" className={`${INPUT_CLS} font-mono text-xs`} />
+          <input type="text" value={destLocationId} onChange={(e) => setDestLocationId(e.target.value)} placeholder="Destino" className={`${INPUT_CLS} font-mono text-xs`} />
+          <input type="text" value={gs1Barcode} onChange={(e) => setGs1Barcode(e.target.value)} placeholder="GS1-128 (opcional)" className={`${INPUT_CLS} font-mono text-xs`} />
+          <div className="flex gap-2">
+            <input type="number" min={1} step={1} value={demandedUnits} onChange={(e) => setDemandedUnits(e.target.value)} placeholder="Dem." className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
+            <input type="number" min={0} step={1} value={doneUnits} onChange={(e) => setDoneUnits(e.target.value)} placeholder="Done" className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
+          </div>
+          <button type="submit" disabled={dispatchMutation.isPending || !activeProductId} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground shadow-xs disabled:opacity-50">
+            <Send className="size-3.5" />
+            <span>Despachar {vocabulary.orderSingular}</span>
+          </button>
+        </form>
+
+        <form onSubmit={handleEpod} className="grid grid-cols-1 gap-2.5 p-4 md:grid-cols-3">
+          <input type="text" value={vehicleId} onChange={(e) => setVehicleId(e.target.value)} placeholder="Vehicle ID" className={`${INPUT_CLS} font-mono text-xs`} />
+          <input type="text" value={recipientName} onChange={(e) => setRecipientName(e.target.value)} placeholder="Receptor e-POD" className={INPUT_CLS} />
+          <button type="submit" disabled={epodMutation.isPending || !recipientName.trim()} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50">
+            <Truck className="size-3.5 text-muted-foreground" />
+            <span>Registrar e-POD</span>
+          </button>
+        </form>
       </div>
+
+      {feedback ? (
+        <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p>
+      ) : null}
+
+      <DataTable
+        columns={columns}
+        data={items}
+        getRowId={(p) => p.id}
+        loading={pickingsQuery.isLoading}
+        emptyTitle="Sin movimientos WMS"
+        emptyDescription="Recibe un lote FEFO o despacha una orden para generar el primer picking."
+      />
     </section>
   );
 }

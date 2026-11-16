@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DataTable, FilterBar, KpiCard, type DataTableColumn } from '@shac/ui';
+import { Building2, CheckCircle2, CreditCard, FileText, Plus, ShieldCheck } from 'lucide-react';
+import { DataTable, FilterBar, KpiCard, PageHeader, StatusBadge, type DataTableColumn } from '@shac/ui';
 import { CrmDealsAndConflictsPanel, type CrmPanelTab } from './CrmDealsAndConflictsPanel';
 import {
   formatMinorUnits,
@@ -22,7 +23,7 @@ const PARTY_ROLE_OPTIONS = [
 
 type PartyRoleOption = (typeof PARTY_ROLE_OPTIONS)[number];
 
-/** Open Mercato-style CRM Workbench: KPI strip, FilterBar, sortable DataTable, and 360° panel. */
+/** Open Mercato DS v3 CRM Workbench: KPI strip, 360° Company Header, FilterBar, and DataTable. */
 export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -105,19 +106,20 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
       header: vocabulary.partySingular,
       sortValue: (p) => p.displayName,
       cell: (p) => (
-        <div>
-          <p className="font-medium">{p.displayName}</p>
-          <p className="font-mono text-[11px] text-muted-foreground">{p.taxIdNumber ?? 'Sin ID fiscal'}</p>
+        <div className="space-y-0.5">
+          <p className="font-medium text-foreground">{p.displayName}</p>
+          <p className="font-mono text-xs text-muted-foreground">{p.taxIdNumber ?? 'Sin ID fiscal'}</p>
         </div>
       ),
     },
     {
       id: 'roles',
-      header: 'Roles',
+      header: 'Estado & Roles',
       cell: (p) => (
-        <div className="flex flex-wrap gap-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <StatusBadge label="Activo" tone="success" appearance="dot" />
           {p.rolesMask.map((r) => (
-            <span key={r} className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px]">{r}</span>
+            <StatusBadge key={r} label={r} tone="neutral" appearance="pill" />
           ))}
         </div>
       ),
@@ -128,58 +130,100 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
       align: 'right',
       sortValue: (p) => p.creditLimitMinor,
       cell: (p) => (
-        <span className="font-mono tabular-nums">{formatMinorUnits(p.creditLimitMinor, p.preferredCurrency)}</span>
+        <span className="font-mono font-medium tabular-nums">
+          {formatMinorUnits(p.creditLimitMinor, p.preferredCurrency)}
+        </span>
       ),
     },
   ];
 
   return (
-    <section className="space-y-4 p-4" data-slot="parties-view">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">CRM · {vocabulary.partyPlural} y Pipeline</h1>
-          <p className="text-sm text-muted-foreground">
-            Directorio multi-rol, oportunidades de negocio, relaciones y conflictos en {vocabulary.branchSingular}.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowCreateForm((prev) => !prev)}
-          className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
-        >
-          {showCreateForm ? 'Cerrar formulario' : `+ Nuevo ${vocabulary.partySingular}`}
-        </button>
-      </div>
+    <section className="space-y-5" data-slot="parties-view">
+      <PageHeader
+        title={vocabulary.partyPlural}
+        description={`Directorio 360°, oportunidades comerciales, relaciones y verificación de conflictos en ${vocabulary.branchSingular}.`}
+        onRefresh={() => void listQuery.refetch()}
+        refreshing={listQuery.isFetching}
+        actions={
+          <button
+            type="button"
+            onClick={() => setShowCreateForm((prev) => !prev)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary-hover"
+          >
+            <Plus className="size-3.5" />
+            <span>{showCreateForm ? 'Cerrar formulario' : `Crear ${vocabulary.partySingular}`}</span>
+          </button>
+        }
+      />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard title={`${vocabulary.partyPlural} visibles`} value={listQuery.data?.total ?? items.length} loading={listQuery.isLoading} />
+      {selectedParty ? (
+        <div className="flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex items-start gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-full border border-border bg-muted/60 text-muted-foreground">
+              <Building2 className="size-5" />
+            </div>
+            <div className="space-y-2">
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">{selectedParty.displayName}</h2>
+                <div className="mt-0.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <FileText className="size-3.5" />
+                    <span className="font-mono">{selectedParty.taxIdNumber ?? 'Sin RIF registrado'}</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <CreditCard className="size-3.5" />
+                    <span>Límite {formatMinorUnits(selectedParty.creditLimitMinor, selectedParty.preferredCurrency)}</span>
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <StatusBadge label="Active" tone="success" icon={<CheckCircle2 className="size-3" />} />
+                {selectedParty.rolesMask.map((r) => (
+                  <StatusBadge key={r} label={r} tone="info" />
+                ))}
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('conflicts')}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-xs transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <ShieldCheck className="size-3.5" />
+            <span>Auditar Conflictos</span>
+          </button>
+        </div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard title={`${vocabulary.partyPlural} Activos`} value={listQuery.data?.total ?? items.length} loading={listQuery.isLoading} />
         <KpiCard title="Pipeline Abierto" value={formatMinorUnits(summary?.openValueMinor ?? 0, 'USD')} loading={dealsSummaryQuery.isLoading} />
-        <KpiCard title="Pipeline Ponderado" value={formatMinorUnits(summary?.weightedValueMinor ?? 0, 'USD')} loading={dealsSummaryQuery.isLoading} />
+        <KpiCard title="Valor Ponderado" value={formatMinorUnits(summary?.weightedValueMinor ?? 0, 'USD')} loading={dealsSummaryQuery.isLoading} />
         <KpiCard title="Crédito Asignado" value={formatMinorUnits(totalCreditMinor, 'USD')} loading={listQuery.isLoading} />
       </div>
 
       {showCreateForm ? (
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 rounded-lg border border-border bg-card p-4 md:grid-cols-5">
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-5">
           <label className="space-y-1 text-xs md:col-span-2">
-            <span>Nombre / Razón Social</span>
+            <span className="font-medium text-muted-foreground">Nombre / Razón Social</span>
             <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`Ej. Comercial ${vocabulary.partySingular}`} className={`${INPUT_CLS} w-full`} />
           </label>
           <label className="space-y-1 text-xs">
-            <span>Rol principal</span>
+            <span className="font-medium text-muted-foreground">Rol principal</span>
             <select value={role} onChange={(e) => setRole(e.target.value as PartyRoleOption)} className={`${INPUT_CLS} w-full`}>
               {PARTY_ROLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
             </select>
           </label>
           <label className="space-y-1 text-xs">
-            <span>RIF / ID Fiscal</span>
+            <span className="font-medium text-muted-foreground">RIF / ID Fiscal</span>
             <input type="text" value={taxIdNumber} onChange={(e) => setTaxIdNumber(e.target.value)} placeholder="J-12345678-9" className={`${INPUT_CLS} w-full`} />
           </label>
           <div className="flex items-end gap-2">
             <label className="flex-1 space-y-1 text-xs">
-              <span>Crédito ($)</span>
+              <span className="font-medium text-muted-foreground">Crédito ($)</span>
               <input type="text" value={creditLimitMajor} onChange={(e) => setCreditLimitMajor(e.target.value)} className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
             </label>
-            <button type="submit" disabled={upsertMutation.isPending || !displayName.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground disabled:opacity-50">
+            <button type="submit" disabled={upsertMutation.isPending || !displayName.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs disabled:opacity-50">
               Guardar
             </button>
           </div>
@@ -187,23 +231,22 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
       ) : null}
 
       {feedback ? (
-        <p className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-mono">{feedback}</p>
+        <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p>
       ) : null}
 
-      <FilterBar
-        searchValue={search}
-        onSearchChange={setSearch}
-        searchPlaceholder={`Buscar ${vocabulary.partySingular.toLowerCase()} por nombre o RIF...`}
-        activeChipId={activeRoleChip}
-        onSelectChip={setActiveRoleChip}
-        chips={[
-          { id: 'all', label: 'Todos' },
-          ...PARTY_ROLE_OPTIONS.map((r) => ({ id: r, label: r })),
-        ]}
-      />
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
+        <div className="space-y-3 lg:col-span-3">
+          <FilterBar
+            searchValue={search}
+            onSearchChange={setSearch}
+            searchPlaceholder={`Buscar ${vocabulary.partySingular.toLowerCase()} por nombre o RIF...`}
+            activeChipId={activeRoleChip}
+            onSelectChip={setActiveRoleChip}
+            chips={[
+              { id: 'all', label: 'Todos' },
+              ...PARTY_ROLE_OPTIONS.map((r) => ({ id: r, label: r })),
+            ]}
+          />
           <DataTable
             columns={columns}
             data={items}
@@ -213,7 +256,7 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
             onRowClick={(p) => setSelectedPartyId(p.id)}
             emptyTitle={`Sin ${vocabulary.partyPlural.toLowerCase()}`}
             emptyDescription="Crea el primer registro o ajusta los filtros de búsqueda."
-            emptyActionLabel={`+ Nuevo ${vocabulary.partySingular}`}
+            emptyActionLabel={`Crear ${vocabulary.partySingular}`}
             onEmptyAction={() => setShowCreateForm(true)}
             rowActions={(p) => [
               { id: 'deals', label: 'Nueva Oportunidad', onSelect: () => { setSelectedPartyId(p.id); setActiveTab('deals'); } },

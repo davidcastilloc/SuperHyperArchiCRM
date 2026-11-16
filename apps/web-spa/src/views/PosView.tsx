@@ -1,42 +1,26 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Lock, Play, RefreshCw, Search } from 'lucide-react';
+import { PageHeader, StatusBadge } from '@shac/ui';
+import { enqueueOfflineMutation, flushOfflineQueue, listOfflineQueue } from '../lib/offlineQueue';
+import { PosReceiptPanel, type PosCartLine } from './PosReceiptPanel';
 import {
-  enqueueOfflineMutation,
-  flushOfflineQueue,
-  listOfflineQueue,
-} from '../lib/offlineQueue';
-import {
-  formatMinorToInput,
-  formatMinorUnits,
-  INPUT_CLS,
-  parseMajorToMinor,
-  parseNonNegInt,
-  readApiError,
-  ShacApiError,
-  type Phase2ViewProps,
+  formatMinorToInput, formatMinorUnits, INPUT_CLS, parseMajorToMinor, readApiError, ShacApiError, type Phase2ViewProps,
 } from './phase2-format';
-
-interface CartLine {
-  productId: string;
-  sku: string;
-  name: string;
-  unitPriceMinor: number;
-  qty: number;
-}
 
 function usdToVesMinor(usdMinor: number, rateMicros: number): number {
   const safeRate = rateMicros > 0 ? rateMicros : 1_000_000;
   return Number((BigInt(Math.max(0, usdMinor)) * BigInt(safeRate) + 500_000n) / 1_000_000n);
 }
 
-/** GeorginaPOS-style 2-column Cash Register: Product Grid (left) + Multi-line Receipt (right). */
+/** Open Mercato DS v3 2-column Cash Register: Product Grid (left) + Multi-line Receipt (right). */
 export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   const queryClient = useQueryClient();
   const [registerId, setRegisterId] = useState('REG-1');
   const [shiftId, setShiftId] = useState('');
   const [cashierName, setCashierName] = useState('Cajero');
   const [search, setSearch] = useState('');
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cart, setCart] = useState<PosCartLine[]>([]);
   const [rateInput, setRateInput] = useState('54.75');
   const [usdInput, setUsdInput] = useState('0.00');
   const [vesInput, setVesInput] = useState('0.00');
@@ -214,76 +198,83 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   );
 
   return (
-    <section className="space-y-4 p-4" data-slot="pos-view">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">POS · Caja Registradora</h1>
-          <p className="text-sm text-muted-foreground">
-            {vocabulary.branchSingular} · Tasa ref. {rateInput} Bs/USD
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {pendingCount > 0 ? (
-            <button type="button" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="h-9 rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-muted">
-              Sincronizar cola ({pendingCount})
-            </button>
-          ) : null}
-          {shiftId ? (
-            <button type="button" onClick={() => closeShiftMutation.mutate()} disabled={closeShiftMutation.isPending} className="h-9 rounded-md border border-border bg-card px-3 text-xs font-medium hover:bg-muted">
-              {closeShiftMutation.isPending ? 'Cerrando...' : 'Cerrar Caja'}
-            </button>
-          ) : null}
-        </div>
-      </div>
+    <section className="space-y-5" data-slot="pos-view">
+      <PageHeader
+        title={`POS · ${vocabulary.orderSingular}`}
+        description={`${vocabulary.branchSingular} · Tasa referencial ${rateInput} Bs/USD`}
+        onRefresh={() => void productsQuery.refetch()}
+        refreshing={productsQuery.isFetching}
+        actions={
+          <>
+            {shiftId ? <StatusBadge label={`Turno ${registerId}`} tone="success" appearance="dot" /> : null}
+            {pendingCount > 0 ? (
+              <button type="button" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted">
+                <RefreshCw className="size-3.5" />
+                <span>Sincronizar ({pendingCount})</span>
+              </button>
+            ) : null}
+            {shiftId ? (
+              <button type="button" onClick={() => closeShiftMutation.mutate()} disabled={closeShiftMutation.isPending} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted">
+                <Lock className="size-3.5 text-muted-foreground" />
+                <span>{closeShiftMutation.isPending ? 'Cerrando...' : 'Cerrar Caja'}</span>
+              </button>
+            ) : null}
+          </>
+        }
+      />
 
       {statusMsg ? (
-        <div className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-mono">{statusMsg}</div>
+        <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{statusMsg}</p>
       ) : null}
 
       {!shiftId ? (
-        <div className="mx-auto max-w-md space-y-4 rounded-xl border border-border bg-card p-6 text-center">
-          <h2 className="text-lg font-semibold">Sesión de Caja Cerrada</h2>
-          <p className="text-sm text-muted-foreground">
-            Abre una sesión en {registerId} para comenzar a facturar.
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-left">
+        <div className="mx-auto max-w-md space-y-4 rounded-xl border border-border bg-card p-6 text-center shadow-xs">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">Sesión de Caja Cerrada</h2>
+            <p className="text-sm text-muted-foreground">Abre turno en {registerId} para comenzar a facturar.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5 text-left">
             <label className="space-y-1 text-xs">
-              <span>Caja</span>
+              <span className="font-medium text-muted-foreground">Caja</span>
               <input className={`${INPUT_CLS} w-full`} value={registerId} onChange={(e) => setRegisterId(e.target.value)} />
             </label>
             <label className="space-y-1 text-xs">
-              <span>Cajero</span>
+              <span className="font-medium text-muted-foreground">Cajero</span>
               <input className={`${INPUT_CLS} w-full`} value={cashierName} onChange={(e) => setCashierName(e.target.value)} />
             </label>
           </div>
-          <button type="button" onClick={() => openShiftMutation.mutate()} disabled={openShiftMutation.isPending} className="h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-foreground">
-            {openShiftMutation.isPending ? 'Abriendo Caja...' : 'Abrir Caja'}
+          <button type="button" onClick={() => openShiftMutation.mutate()} disabled={openShiftMutation.isPending} className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary-hover">
+            <Play className="size-3.5" />
+            <span>{openShiftMutation.isPending ? 'Abriendo Caja...' : 'Abrir Caja'}</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
           <div className="space-y-3 lg:col-span-3">
             <div className="flex gap-2">
-              <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto por nombre o SKU..." className={`${INPUT_CLS} flex-1`} />
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar producto por nombre o SKU..." className={`${INPUT_CLS} w-full pl-9`} />
+              </div>
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span>Tasa Bs</span>
                 <input type="text" value={rateInput} onChange={(e) => setRateInput(e.target.value)} className={`${INPUT_CLS} w-20 font-mono tabular-nums`} />
               </label>
             </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3">
               {filteredProducts.map((prod) => (
                 <button
                   key={prod.id}
                   type="button"
                   onClick={() => addToCart(prod)}
-                  className="flex flex-col justify-between rounded-lg border border-border bg-card p-3 text-left transition hover:border-primary hover:bg-muted/40"
+                  className="flex flex-col justify-between rounded-xl border border-border bg-card p-3.5 text-left shadow-xs transition-colors hover:border-foreground/40 hover:bg-muted/35"
                 >
-                  <div>
+                  <div className="space-y-0.5">
                     <p className="font-mono text-[11px] text-muted-foreground">{prod.sku}</p>
-                    <p className="text-sm font-semibold leading-snug">{prod.name}</p>
+                    <p className="text-sm font-medium leading-snug">{prod.name}</p>
                   </div>
-                  <div className="mt-2 flex items-baseline justify-between font-mono text-xs tabular-nums">
-                    <span className="font-bold text-primary">{formatMinorUnits(prod.basePriceMinor, 'USD')}</span>
+                  <div className="mt-3 flex items-baseline justify-between font-mono text-xs tabular-nums">
+                    <span className="font-semibold text-foreground">{formatMinorUnits(prod.basePriceMinor, 'USD')}</span>
                     <span className="text-muted-foreground">{formatMinorUnits(usdToVesMinor(prod.basePriceMinor, rateMicros), 'VES')}</span>
                   </div>
                 </button>
@@ -291,72 +282,12 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
             </div>
           </div>
 
-          <form onSubmit={handleCheckout} className="flex flex-col justify-between space-y-4 rounded-xl border border-border bg-card p-4 lg:col-span-2">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-border pb-2">
-                <h2 className="text-base font-semibold">Recibo Actual</h2>
-                {cart.length > 0 ? (
-                  <button type="button" onClick={() => setCart([])} className="text-xs text-muted-foreground hover:text-foreground">
-                    Limpiar
-                  </button>
-                ) : null}
-              </div>
-
-              {cart.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                  Toca un producto a la izquierda para agregarlo al ticket.
-                </p>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {cart.map((line) => (
-                    <li key={line.productId} className="flex items-center justify-between gap-2 py-2 text-sm">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{line.name}</p>
-                        <p className="font-mono text-xs text-muted-foreground">
-                          {formatMinorUnits(line.unitPriceMinor, 'USD')} × {line.qty}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => updateQty(line.productId, -1)} className="h-7 w-7 rounded border border-border text-xs hover:bg-muted">-</button>
-                        <span className="w-6 text-center font-mono text-xs tabular-nums">{line.qty}</span>
-                        <button type="button" onClick={() => updateQty(line.productId, 1)} className="h-7 w-7 rounded border border-border text-xs hover:bg-muted">+</button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="space-y-3 border-t border-border pt-3">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm font-medium">Total a Pagar</span>
-                <div className="text-right font-mono tabular-nums">
-                  <p className="text-xl font-bold">{formatMinorUnits(cartTotalMinor, 'USD')}</p>
-                  <p className="text-xs text-muted-foreground">{formatMinorUnits(cartTotalVesMinor, 'VES')}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <label className="space-y-1 text-xs">
-                  <span>Efectivo USD ($)</span>
-                  <input type="text" value={usdInput} onChange={(e) => setUsdInput(e.target.value)} className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-                </label>
-                <label className="space-y-1 text-xs">
-                  <span>Pago Móvil (Bs)</span>
-                  <input type="text" value={vesInput} onChange={(e) => setVesInput(e.target.value)} className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-                </label>
-              </div>
-
-              <div className="flex gap-2">
-                <button type="button" onClick={handleRestante} disabled={cart.length === 0} className="h-10 rounded-md border border-border px-3 text-xs font-medium hover:bg-muted disabled:opacity-50">
-                  Restante Bs
-                </button>
-                <button type="submit" disabled={checkoutMutation.isPending || cart.length === 0} className="h-10 flex-1 rounded-md bg-checkout px-4 text-sm font-semibold text-checkout-foreground disabled:opacity-50">
-                  {checkoutMutation.isPending ? 'Procesando...' : 'Registrar Pago'}
-                </button>
-              </div>
-            </div>
-          </form>
+          <PosReceiptPanel
+            cart={cart} cartTotalMinor={cartTotalMinor} cartTotalVesMinor={cartTotalVesMinor}
+            usdInput={usdInput} vesInput={vesInput} onUsdChange={setUsdInput} onVesChange={setVesInput}
+            onUpdateQty={updateQty} onClearCart={() => setCart([])} onFillRestante={handleRestante}
+            onSubmit={handleCheckout} submitting={checkoutMutation.isPending}
+          />
         </div>
       )}
     </section>
