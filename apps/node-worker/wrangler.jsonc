@@ -1,5 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  "account_id": "aedd0159259bcb5220041dfe0f088976",
   "name": "shac-node-worker",
   "main": "src/index.ts",
   "minify": true,
@@ -14,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "shac-primary",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "e9600aff-1439-4a91-8a12-c5d1d14953bd",
       "migrations_dir": "../../packages/db-d1/migrations"
     }
   ],
@@ -35,11 +36,11 @@
   "kv_namespaces": [
     {
       "binding": "CONFIG_KV",
-      "id": "00000000000000000000000000000001"
+      "id": "14c739e1ee8c49619668446fbe1ca1b4"
     },
     {
       "binding": "SESSION_KV",
-      "id": "00000000000000000000000000000002"
+      "id": "c0a4248c265040db8587431689fe9c69"
     }
   ],
   "vars": {
