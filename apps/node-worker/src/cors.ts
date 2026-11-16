@@ -6,7 +6,7 @@ export interface CorsEnv {
 
 const ALLOW_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const ALLOW_HEADERS =
-  'Content-Type, Authorization, X-API-Key, X-Tenant-Id, X-Org-Id, X-Client-Mutation-Id, If-Match';
+  'Content-Type, Authorization, X-API-Key, X-Delegation-Pin, X-Tenant-Id, X-Org-Id, X-Client-Mutation-Id, If-Match';
 const EXPOSE_HEADERS = 'X-Request-Id, ETag, X-SHAC-Mode';
 
 function isOriginAllowed(origin: string, patterns: string[]): boolean {

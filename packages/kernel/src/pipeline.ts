@@ -77,6 +77,17 @@ const apiKeySessionSchema = z.object({
   expiresAt: z.number().int().optional(),
 });
 
+const interactiveSessionSchema = z.object({
+  userId: z.string().min(1),
+  tenantId: z.string().min(1),
+  orgId: z.string().min(1),
+  orgPath: z.string().min(1),
+  actorType: z.enum(['staff', 'delegated_staff']).default('staff'),
+  perms: z.array(z.string()),
+  delegatedById: z.string().min(1).optional(),
+  expiresAt: z.number().int(),
+});
+
 export interface ProfileLoader {
   load(kv: KvStore): Promise<TenantMarketProfile>;
   invalidate(): void;
@@ -234,6 +245,40 @@ async function authenticateApiKey(
   };
 }
 
+async function authenticateSessionToken(
+  token: string,
+  sessionKv: KvStore,
+): Promise<AuthenticatedActor> {
+  const hash = await sha256Hex(token);
+  const raw = await sessionKv.get(`session:${hash}`, 'text');
+  if (!raw) {
+    throw new AppError('INVALID_SESSION', 401, 'Invalid or expired session');
+  }
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    throw new AppError('INVALID_SESSION', 401, 'Corrupt session payload');
+  }
+
+  const parsed = interactiveSessionSchema.safeParse(parsedJson);
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!parsed.success || parsed.data.expiresAt <= nowSec) {
+    throw new AppError('INVALID_SESSION', 401, 'Session expired or invalid');
+  }
+
+  return {
+    id: parsed.data.userId,
+    type: parsed.data.actorType,
+    perms: parsed.data.perms,
+    ...(parsed.data.delegatedById ? { delegatedById: parsed.data.delegatedById } : {}),
+    tenantId: parsed.data.tenantId,
+    orgId: parsed.data.orgId,
+    orgPath: parsed.data.orgPath,
+  };
+}
+
 export async function authenticateRequest(
   headers: Headers,
   sessionKv: KvStore,
@@ -260,6 +305,10 @@ export async function authenticateRequest(
 
   if (token.startsWith('mk_live_')) {
     return authenticateApiKey(token, sessionKv);
+  }
+
+  if (token.startsWith('shac_sess_')) {
+    return authenticateSessionToken(token, sessionKv);
   }
 
   const claims = await verifyJwtEdDsa(token, publicKeyJwk);

@@ -13,6 +13,12 @@ import {
   useRouterState,
 } from '@tanstack/react-router';
 import { AuthBranchGate, ShacAppShell } from '@shac/ui';
+import {
+  clearAuthSession,
+  setAuthSession,
+  useAuthSession,
+  type AuthSession,
+} from './lib/authSession';
 import { listOfflineQueue } from './lib/offlineQueue';
 import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
@@ -36,16 +42,44 @@ function RootLayout() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const session = useAuthSession();
+  const bootstrapQuery = useQuery({
+    queryKey: ['auth', 'bootstrap'],
+    queryFn: async () => {
+      const res = await rpcClient.api.auth.bootstrap.$get();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+  });
   const queueQuery = useQuery({
     queryKey: ['pos', 'offlineQueue'],
     queryFn: () => listOfflineQueue(),
   });
   const pendingMutations = queueQuery.data?.length ?? 0;
+  const activeProfile = bootstrapQuery.data
+    ? {
+        tenantId: bootstrapQuery.data.tenantId,
+        editionPreset: bootstrapQuery.data.editionPreset,
+        activeModules: bootstrapQuery.data.activeModules,
+        vocabulary: bootstrapQuery.data.vocabulary,
+      }
+    : DEFAULT_PROFILE;
+  const activeBranchName =
+    session?.actor.branchName ??
+    bootstrapQuery.data?.branches[0]?.name ??
+    DEFAULT_BRANCHES[0]?.name ??
+    'Casa Matriz';
+
+  async function handleLogout() {
+    await rpcClient.api.auth.logout.$post().catch(() => undefined);
+    clearAuthSession();
+    void navigate({ to: '/auth' });
+  }
 
   return (
     <ShacAppShell
-      profile={DEFAULT_PROFILE}
-      branchName={DEFAULT_BRANCHES[0]?.name ?? 'Casa Matriz'}
+      profile={activeProfile}
+      branchName={activeBranchName}
       navItems={NAV_ITEMS}
       activeHref={pathname}
       onNavigate={(href) => void navigate({ to: href })}
@@ -55,8 +89,24 @@ function RootLayout() {
       }}
       theme={theme}
       onToggleTheme={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+      headerActions={
+        session ? (
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              {session.actor.fullName}
+            </span>
+            <button
+              type="button"
+              onClick={() => void handleLogout()}
+              className="h-8 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-muted"
+            >
+              Salir
+            </button>
+          </div>
+        ) : null
+      }
     >
-      <Outlet />
+      {session || pathname === '/auth' ? <Outlet /> : <AuthPage />}
     </ShacAppShell>
   );
 }
@@ -73,16 +123,81 @@ function HomePage() {
 }
 
 function AuthPage() {
-  const [selectedBranchId, setSelectedBranchId] = useState(DEFAULT_BRANCHES[0]?.id ?? '');
+  const navigate = useNavigate();
+  const bootstrapQuery = useQuery({
+    queryKey: ['auth', 'bootstrap'],
+    queryFn: async () => {
+      const res = await rpcClient.api.auth.bootstrap.$get();
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+  });
+  const branches = bootstrapQuery.data?.branches ?? DEFAULT_BRANCHES;
+  const vocabulary = bootstrapQuery.data?.vocabulary ?? DEFAULT_PROFILE.vocabulary;
+  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const effectiveBranchId = selectedBranchId || branches[0]?.id || '';
+
+  async function handleCredentialsSubmit(credentials: {
+    email: string;
+    password: string;
+    branchId: string;
+  }) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await rpcClient.api.auth.login.$post({ json: credentials });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      }
+      const session = (await res.json()) as AuthSession;
+      setAuthSession(session);
+      void queryClient.invalidateQueries();
+      void navigate({ to: '/' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePinSubmit(payload: {
+    pin: string;
+    branchId: string;
+    mode: 'cashier' | 'delegation';
+  }) {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await rpcClient.api.auth.pin.$post({ json: payload });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        throw new Error(body?.error?.message ?? `HTTP ${res.status}`);
+      }
+      const session = (await res.json()) as AuthSession;
+      setAuthSession(session);
+      void queryClient.invalidateQueries();
+      void navigate({ to: '/' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'PIN inválido');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="p-6">
       <AuthBranchGate
-        vocabulary={DEFAULT_PROFILE.vocabulary}
-        branches={DEFAULT_BRANCHES}
-        selectedBranchId={selectedBranchId}
+        vocabulary={vocabulary}
+        branches={branches}
+        selectedBranchId={effectiveBranchId}
         onSelectBranch={setSelectedBranchId}
-        onPinSubmit={() => undefined}
+        onCredentialsSubmit={(creds) => void handleCredentialsSubmit(creds)}
+        onPinSubmit={(payload) => void handlePinSubmit(payload)}
+        loading={loading}
+        error={error}
       />
     </div>
   );

@@ -201,5 +201,46 @@ describe('@shac/kernel pipeline guards', () => {
         keys.publicKeyJwk,
       ),
     ).rejects.toMatchObject({ code: 'INVALID_DELEGATION_PIN', status: 401 });
+
+    // 6. Interactive Session Token (shac_sess_*)
+    const sessionToken = 'shac_sess_test_token_123';
+    const expiredSessionToken = 'shac_sess_expired_456';
+    const sessionMem2 = createMemoryKv({
+      [`session:${await sha256Hex(sessionToken)}`]: JSON.stringify({
+        userId: 'usr_cashier',
+        tenantId: 'ten_1',
+        orgId: 'org_1',
+        orgPath: '/org_1',
+        actorType: 'staff',
+        perms: ['customers.read'],
+        expiresAt: Math.floor(Date.now() / 1000) + 600,
+      }),
+      [`session:${await sha256Hex(expiredSessionToken)}`]: JSON.stringify({
+        userId: 'usr_cashier',
+        tenantId: 'ten_1',
+        orgId: 'org_1',
+        orgPath: '/org_1',
+        actorType: 'staff',
+        perms: ['customers.read'],
+        expiresAt: Math.floor(Date.now() / 1000) - 10,
+      }),
+    });
+
+    const sessActor = await authenticateRequest(
+      new Headers({ Authorization: `Bearer ${sessionToken}` }),
+      sessionMem2.kv,
+      keys.publicKeyJwk,
+    );
+    expect(sessActor.id).toBe('usr_cashier');
+    expect(sessActor.type).toBe('staff');
+    expect(sessActor.perms).toEqual(['customers.read']);
+
+    await expect(
+      authenticateRequest(
+        new Headers({ Authorization: `Bearer ${expiredSessionToken}` }),
+        sessionMem2.kv,
+        keys.publicKeyJwk,
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_SESSION', status: 401 });
   });
 });

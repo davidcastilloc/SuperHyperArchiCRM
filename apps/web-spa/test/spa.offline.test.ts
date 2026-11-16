@@ -244,4 +244,48 @@ describe('@shac/web-spa offlineFirst, RPC client & IndexedDB offline queue', () 
     expect(await listOfflineQueue({ queueKey })).toHaveLength(0);
     expect(settledIds).toHaveLength(20);
   });
+
+  it('attaches Bearer token and X-Org-Id from authSession and clears session on 401', async () => {
+    const { setAuthSession, getAuthSession, clearAuthSession } = await import(
+      '../src/lib/authSession'
+    );
+    clearAuthSession();
+
+    const capturedHeaders: Array<{ auth: string | null; orgId: string | null }> = [];
+    const fakeFetch: typeof fetch = async (_input, init) => {
+      const h = new Headers(init?.headers);
+      capturedHeaders.push({
+        auth: h.get('Authorization'),
+        orgId: h.get('X-Org-Id'),
+      });
+      return new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED' } }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    };
+
+    setAuthSession({
+      token: 'shac_sess_demo_123',
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+      actor: {
+        id: 'usr_1',
+        fullName: 'Admin',
+        type: 'staff',
+        tenantId: 'ten_1',
+        orgId: 'org_1',
+        orgPath: '/org_1',
+        branchName: 'Casa Matriz',
+        perms: ['*'],
+      },
+    });
+
+    const rpc = createRpcClient('https://edge.shac.local', { fetchImpl: fakeFetch });
+    const res = await rpc.api.customers.parties.$get({ query: { limit: '10' } });
+    expect(res.status).toBe(401);
+    expect(capturedHeaders[0]).toEqual({
+      auth: 'Bearer shac_sess_demo_123',
+      orgId: 'org_1',
+    });
+    expect(getAuthSession()).toBeNull();
+  });
 });

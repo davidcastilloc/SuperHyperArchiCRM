@@ -21,6 +21,7 @@ import {
 } from '@shac/mod-iam';
 import { createMcpHandler } from 'agents/mcp/server';
 import { Hono } from 'hono';
+import { createAuthRoutes } from './auth-routes.js';
 import {
   createBranchPosRoutes,
   createBranchRoutes,
@@ -77,6 +78,7 @@ function createWorkerApp(
     .get('/api/health', (c) =>
       c.json({ ok: true, service: 'shac-node-worker' }, 200),
     )
+    .route('/api/auth', createAuthRoutes(profileLoader))
     .get('/api/iam/orgs', queryCommandHandler(iamOrgsListCommand, profileLoader))
     .post('/api/iam/orgs', jsonCommandHandler(iamOrgsCreateCommand, profileLoader))
     .post(
