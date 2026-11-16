@@ -4,16 +4,17 @@ import {
   formatMinorUnits,
   INPUT_CLS,
   parseNonNegInt,
+  readApiError,
   type Phase2ViewProps,
 } from './phase2-format';
 
 /** Live Spaces Rack (ADR/RevPAR, reserve, check-in/out) & Waitlist view. */
 export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
   const queryClient = useQueryClient();
-  const [unitId, setUnitId] = useState('unit_101');
-  const [partyId, setPartyId] = useState('party_1');
+  const [unitId, setUnitId] = useState('');
+  const [partyId, setPartyId] = useState('');
   const [slotBucket, setSlotBucket] = useState('2026-12-01..2026-12-02');
-  const [waitlistPartyId, setWaitlistPartyId] = useState('party_1');
+  const [waitlistPartyId, setWaitlistPartyId] = useState('');
   const [waitlistPriority, setWaitlistPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'>('HIGH');
   const [bookingIdInput, setBookingIdInput] = useState('');
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -22,10 +23,25 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
     queryKey: ['spaces', 'rack'],
     queryFn: async () => {
       const res = await rpc.api.spaces.rack.$get({ query: {} });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
   });
+
+  const partiesQuery = useQuery({
+    queryKey: ['customers', 'parties', 'spaces-select'],
+    queryFn: async () => {
+      const res = await rpc.api.customers.parties.$get({ query: { limit: '50' } });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
+
+  const units = rackQuery.data?.units ?? [];
+  const parties = partiesQuery.data?.items ?? [];
+  const activeUnitId = unitId || units[0]?.unitId || 'unit_101';
+  const activePartyId = partyId || parties[0]?.id || 'party_1';
+  const activeWaitlistPartyId = waitlistPartyId || parties[0]?.id || 'party_1';
 
   const reserveMutation = useMutation({
     mutationFn: async () => {
@@ -33,14 +49,14 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
       const res = await rpc.api.spaces.bookings.reserve.$post({
         json: {
           clientMutationId: crypto.randomUUID(),
-          unitId: unitId.trim(),
-          partyId: partyId.trim(),
+          unitId: activeUnitId.trim(),
+          partyId: activePartyId.trim(),
           slotBucket: slotBucket.trim(),
           scheduledStart: nowMs,
           scheduledEnd: nowMs + 86_400_000,
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -60,7 +76,7 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
           action,
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -80,12 +96,12 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
         json: {
           clientMutationId: crypto.randomUUID(),
           action: 'ADD',
-          partyId: waitlistPartyId.trim(),
+          partyId: activeWaitlistPartyId.trim(),
           priority: waitlistPriority,
           preferredDates: [slotBucket.trim()],
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -96,18 +112,17 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
 
   function handleReserve(e: FormEvent) {
     e.preventDefault();
-    if (!unitId.trim() || !partyId.trim() || reserveMutation.isPending) return;
+    if (!activeUnitId.trim() || !activePartyId.trim() || reserveMutation.isPending) return;
     reserveMutation.mutate();
   }
 
   function handleWaitlist(e: FormEvent) {
     e.preventDefault();
-    if (!waitlistPartyId.trim() || waitlistMutation.isPending) return;
+    if (!activeWaitlistPartyId.trim() || waitlistMutation.isPending) return;
     waitlistMutation.mutate();
   }
 
   const metrics = rackQuery.data?.metrics;
-  const units = rackQuery.data?.units ?? [];
   const occupancyPct = metrics ? `${Math.trunc(parseNonNegInt(String(metrics.occupancyBps)) / 100)}%` : '0%';
 
   return (
@@ -129,8 +144,24 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
       </div>
 
       <form onSubmit={handleReserve} className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-4">
-        <input type="text" value={unitId} onChange={(e) => setUnitId(e.target.value)} placeholder="Unit ID" className={`${INPUT_CLS} font-mono text-xs`} />
-        <input type="text" value={partyId} onChange={(e) => setPartyId(e.target.value)} placeholder="Party ID" className={`${INPUT_CLS} font-mono text-xs`} />
+        <select value={activeUnitId} onChange={(e) => setUnitId(e.target.value)} className={INPUT_CLS}>
+          {units.length === 0 ? (
+            <option value="unit_101">unit_101 (demo)</option>
+          ) : (
+            units.map((u) => (
+              <option key={u.unitId} value={u.unitId}>{u.unitNumber} · {u.unitTypeName}</option>
+            ))
+          )}
+        </select>
+        <select value={activePartyId} onChange={(e) => setPartyId(e.target.value)} className={INPUT_CLS}>
+          {parties.length === 0 ? (
+            <option value="party_1">party_1 (demo)</option>
+          ) : (
+            parties.map((p) => (
+              <option key={p.id} value={p.id}>{p.displayName}</option>
+            ))
+          )}
+        </select>
         <input type="text" value={slotBucket} onChange={(e) => setSlotBucket(e.target.value)} placeholder="Slot / Fecha" className={`${INPUT_CLS} font-mono text-xs`} />
         <button type="submit" disabled={reserveMutation.isPending} className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
           Reservar {vocabulary.spaceSingular}
@@ -148,7 +179,15 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
       </div>
 
       <form onSubmit={handleWaitlist} className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-3">
-        <input type="text" value={waitlistPartyId} onChange={(e) => setWaitlistPartyId(e.target.value)} placeholder="Party ID Waitlist" className={`${INPUT_CLS} font-mono text-xs`} />
+        <select value={activeWaitlistPartyId} onChange={(e) => setWaitlistPartyId(e.target.value)} className={INPUT_CLS}>
+          {parties.length === 0 ? (
+            <option value="party_1">party_1 (demo)</option>
+          ) : (
+            parties.map((p) => (
+              <option key={p.id} value={p.id}>{p.displayName}</option>
+            ))
+          )}
+        </select>
         <select value={waitlistPriority} onChange={(e) => setWaitlistPriority(e.target.value as 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT')} className={INPUT_CLS}>
           <option value="LOW">LOW</option>
           <option value="MEDIUM">MEDIUM</option>
@@ -172,12 +211,13 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
               <th className="px-3 py-2">Tipo</th>
               <th className="px-3 py-2">Estado</th>
               <th className="px-3 py-2">Tarifa Base</th>
+              <th className="px-3 py-2">Acción</th>
             </tr>
           </thead>
           <tbody>
             {units.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-3 py-4 text-center text-xs text-muted-foreground">
+                <td colSpan={5} className="px-3 py-4 text-center text-xs text-muted-foreground">
                   Sin unidades cargadas en el rack.
                 </td>
               </tr>
@@ -188,6 +228,11 @@ export function SpacesView({ vocabulary, rpc }: Phase2ViewProps) {
                   <td className="px-3 py-2 text-xs">{u.unitTypeName}</td>
                   <td className="px-3 py-2 font-mono text-xs">{u.currentStatus}</td>
                   <td className="px-3 py-2 font-mono text-xs">{formatMinorUnits(u.baseRateMinor, 'USD')}</td>
+                  <td className="px-3 py-2">
+                    <button type="button" onClick={() => setUnitId(u.unitId)} className="rounded border border-border px-2 py-1 text-xs hover:bg-muted">
+                      Seleccionar
+                    </button>
+                  </td>
                 </tr>
               ))
             )}

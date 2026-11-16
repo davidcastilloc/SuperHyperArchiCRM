@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { INPUT_CLS, type Phase2ViewProps } from './phase2-format';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** Clinical SOAP + Co-Sign, ABA Trial, and Legal Matter/Docket workbench. */
 export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
-  const [patientPartyId, setPatientPartyId] = useState('pty_1');
+  const [patientPartyId, setPatientPartyId] = useState('');
   const [subjective, setSubjective] = useState('Paciente refiere mejoría.');
   const [assessment, setAssessment] = useState('Evolución favorable.');
   const [noteId, setNoteId] = useState('');
@@ -13,12 +13,24 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
   const [matterTitle, setMatterTitle] = useState('Revisión contractual');
   const [feedback, setFeedback] = useState<string | null>(null);
 
+  const partiesQuery = useQuery({
+    queryKey: ['customers', 'parties', 'cases-select'],
+    queryFn: async () => {
+      const res = await rpc.api.customers.parties.$get({ query: { limit: '50' } });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
+
+  const parties = partiesQuery.data?.items ?? [];
+  const activePartyId = patientPartyId || parties[0]?.id || 'pty_1';
+
   const soapMutation = useMutation({
     mutationFn: async (cosign: boolean) => {
       const res = await rpc.api.cases.med['soap-notes'].$post({
         json: {
           clientMutationId: crypto.randomUUID(),
-          patientPartyId: patientPartyId.trim(),
+          patientPartyId: activePartyId.trim(),
           noteFormat: 'SOAP',
           subjective: subjective.trim(),
           assessment: assessment.trim(),
@@ -27,7 +39,7 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
             : {}),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -42,14 +54,14 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
       const res = await rpc.api.cases.med['aba-trials'].$post({
         json: {
           clientMutationId: crypto.randomUUID(),
-          patientPartyId: patientPartyId.trim(),
+          patientPartyId: activePartyId.trim(),
           recordKind: 'aba_trial',
           titleOrBehavior: abaBehavior.trim(),
           isCorrectTrial: true,
           durationSec: 45,
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => setFeedback(`Ensayo ABA ${data.id} registrado (${data.titleOrBehavior}).`),
@@ -62,13 +74,13 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
         json: {
           clientMutationId: crypto.randomUUID(),
           referenceNumber: matterRef.trim(),
-          clientPartyId: patientPartyId.trim(),
+          clientPartyId: activePartyId.trim(),
           practiceArea: 'corporate',
           title: matterTitle.trim(),
           billingMode: 'retainer_trust',
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => setFeedback(`Expediente Legal ${data.referenceNumber} (${data.status}) creado.`),
@@ -77,7 +89,7 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
 
   function handleSoapSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!patientPartyId.trim() || soapMutation.isPending) return;
+    if (!activePartyId.trim() || soapMutation.isPending) return;
     soapMutation.mutate(false);
   }
 
@@ -91,7 +103,7 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
       </div>
 
       {feedback && (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
+        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-mono">
           {feedback}
         </div>
       )}
@@ -99,7 +111,13 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <form onSubmit={handleSoapSubmit} className="space-y-3 rounded-lg border border-border p-4">
           <h2 className="text-sm font-medium">Nota Clínica SOAP & Co-Firma</h2>
-          <input className={INPUT_CLS} value={patientPartyId} onChange={(e) => setPatientPartyId(e.target.value)} placeholder="ID Paciente / Cliente" />
+          <select className={INPUT_CLS} value={activePartyId} onChange={(e) => setPatientPartyId(e.target.value)}>
+            {parties.length === 0 ? (
+              <option value="pty_1">pty_1 (demo)</option>
+            ) : (
+              parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)
+            )}
+          </select>
           <input className={INPUT_CLS} value={subjective} onChange={(e) => setSubjective(e.target.value)} placeholder="Subjetivo" />
           <input className={INPUT_CLS} value={assessment} onChange={(e) => setAssessment(e.target.value)} placeholder="Evaluación" />
           <div className="flex flex-wrap gap-2">
