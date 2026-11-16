@@ -1,4 +1,3 @@
-import { AppError } from '@shac/kernel';
 import { DurableObject } from 'cloudflare:workers';
 import {
   allocateFefoInTx,
@@ -14,6 +13,20 @@ import {
   type ReceiveLotInput,
   type ReceiveLotResult,
 } from './fefo-engine.js';
+import { handleBranchHttpRequest } from './http-router.js';
+import { checkoutPosSaleInTx } from './pos-checkout.js';
+import {
+  approvePhysicalReturnInTx,
+  closePosShiftInTx,
+} from './pos-close-and-return.js';
+import type {
+  ApprovePhysicalReturnInput,
+  ApprovePhysicalReturnResult,
+  CheckoutPosSaleInput,
+  CheckoutPosSaleResult,
+  ClosePosShiftInput,
+  ClosePosShiftResult,
+} from './pos-contracts.js';
 import { ensureHotTables } from './schema.js';
 import {
   acquireSpaceLockInTx,
@@ -49,6 +62,31 @@ export {
   type ReceiveLotInput,
   type ReceiveLotResult,
 } from './fefo-engine.js';
+export { checkoutPosSaleInTx } from './pos-checkout.js';
+export {
+  approvePhysicalReturnInTx,
+  closePosShiftInTx,
+} from './pos-close-and-return.js';
+export {
+  approvePhysicalReturnInputSchema,
+  checkoutPosSaleInputSchema,
+  closePosShiftInputSchema,
+  currencyCodeSchema,
+  posPaymentLineSchema,
+  posReturnItemInputSchema,
+  posSaleLineItemSchema,
+  type ApprovedReturnItemResult,
+  type ApprovePhysicalReturnInput,
+  type ApprovePhysicalReturnResult,
+  type CheckoutPosSaleInput,
+  type CheckoutPosSaleResult,
+  type ClosePosShiftInput,
+  type ClosePosShiftResult,
+  type PosPaymentLine,
+  type PosReturnItemInput,
+  type PosSaleLineAllocation,
+  type PosSaleLineItem,
+} from './pos-contracts.js';
 export { ensureHotTables } from './schema.js';
 export {
   acquireSpaceLockInTx,
@@ -64,80 +102,6 @@ export {
   type SpaceLockRecord,
   type SpaceLockResult,
 } from './space-and-shift.js';
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-function errorResponse(err: unknown): Response {
-  if (err instanceof AppError) {
-    return jsonResponse(
-      {
-        ok: false,
-        error: {
-          code: err.code,
-          status: err.status,
-          message: err.message,
-          ...(err.details !== undefined ? { details: err.details } : {}),
-        },
-      },
-      err.status,
-    );
-  }
-  return jsonResponse(
-    {
-      ok: false,
-      error: {
-        code: 'INTERNAL_ERROR',
-        status: 500,
-        message: 'Internal Server Error',
-      },
-    },
-    500,
-  );
-}
-
-async function readJsonBody(
-  request: Request,
-  allowEmpty = false,
-): Promise<unknown> {
-  const rawText = await request.text();
-  if (rawText.trim() === '') {
-    if (allowEmpty) return {};
-    throw new AppError('BAD_REQUEST', 400, 'Request body is required');
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawText);
-  } catch {
-    throw new AppError('BAD_REQUEST', 400, 'Invalid JSON request body');
-  }
-
-  const headerMutationId = request.headers.get('X-Client-Mutation-Id');
-  if (
-    headerMutationId &&
-    typeof parsed === 'object' &&
-    parsed !== null &&
-    !Array.isArray(parsed) &&
-    !('clientMutationId' in parsed)
-  ) {
-    (parsed as Record<string, unknown>).clientMutationId = headerMutationId;
-  }
-  return parsed;
-}
-
-function parseLimitParam(raw: string | null): number | undefined {
-  if (raw === null || raw.trim() === '') return undefined;
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new AppError('VALIDATION_ERROR', 400, 'Invalid limit query parameter');
-  }
-  return parsed;
-}
 
 /**
  * Per-branch transactional Durable Object owning the 8 hot SQLite tables.
@@ -197,6 +161,28 @@ export class BranchInventoryDO extends DurableObject<unknown> {
     );
   }
 
+  async checkoutPosSale(
+    input: CheckoutPosSaleInput,
+  ): Promise<CheckoutPosSaleResult> {
+    return this.ctx.storage.transactionSync(() =>
+      checkoutPosSaleInTx(this.ctx.storage.sql, input),
+    );
+  }
+
+  async closePosShift(input: ClosePosShiftInput): Promise<ClosePosShiftResult> {
+    return this.ctx.storage.transactionSync(() =>
+      closePosShiftInTx(this.ctx.storage.sql, input),
+    );
+  }
+
+  async approvePhysicalReturn(
+    input: ApprovePhysicalReturnInput,
+  ): Promise<ApprovePhysicalReturnResult> {
+    return this.ctx.storage.transactionSync(() =>
+      approvePhysicalReturnInTx(this.ctx.storage.sql, input),
+    );
+  }
+
   async listOutbox(limit?: number): Promise<OutboxEvent[]> {
     return this.ctx.storage.transactionSync(() =>
       listOutboxInTx(this.ctx.storage.sql, limit),
@@ -210,64 +196,6 @@ export class BranchInventoryDO extends DurableObject<unknown> {
   }
 
   async fetch(request: Request): Promise<Response> {
-    try {
-      const url = new URL(request.url);
-      const path = url.pathname;
-      const method = request.method.toUpperCase();
-
-      if (method === 'GET' && path === '/health') {
-        return jsonResponse({ ok: true, actor: 'BranchInventoryDO' });
-      }
-      if (method === 'POST' && path === '/receive-lot') {
-        const body = (await readJsonBody(request)) as ReceiveLotInput;
-        return jsonResponse(await this.receiveLot(body));
-      }
-      if (method === 'POST' && path === '/allocate-fefo') {
-        const body = (await readJsonBody(request)) as AllocateFefoInput;
-        return jsonResponse(await this.allocateFefo(body));
-      }
-      if (method === 'GET' && path === '/balances') {
-        const productId = url.searchParams.get('productId') ?? undefined;
-        const variantId = url.searchParams.get('variantId') ?? undefined;
-        return jsonResponse(await this.getBalances(productId, variantId));
-      }
-      if (method === 'POST' && path === '/space-lock') {
-        const body = (await readJsonBody(request)) as AcquireSpaceLockInput;
-        return jsonResponse(await this.acquireSpaceLock(body));
-      }
-      if (method === 'GET' && path === '/space-lock') {
-        const spaceId = url.searchParams.get('spaceId') ?? undefined;
-        return jsonResponse({ locks: await this.listSpaceLocks(spaceId) });
-      }
-      if (method === 'POST' && path === '/pos-shift') {
-        const body = (await readJsonBody(request)) as OpenPosShiftInput;
-        return jsonResponse(await this.openPosShift(body));
-      }
-      if (method === 'GET' && path === '/pos-shift') {
-        const registerId = url.searchParams.get('registerId') ?? undefined;
-        return jsonResponse({ shifts: await this.listPosShifts(registerId) });
-      }
-      if (method === 'GET' && path === '/outbox') {
-        const limit = parseLimitParam(url.searchParams.get('limit'));
-        return jsonResponse({ events: await this.listOutbox(limit) });
-      }
-      if (method === 'POST' && path === '/outbox') {
-        const body = (await readJsonBody(request, true)) as DrainOutboxOptions;
-        const events = await this.drainOutbox(body);
-        return jsonResponse({
-          ok: true,
-          events,
-          drainedCount: events.length,
-        });
-      }
-
-      throw new AppError(
-        'NOT_FOUND',
-        404,
-        `Unknown route: ${method} ${path}`,
-      );
-    } catch (err) {
-      return errorResponse(err);
-    }
+    return handleBranchHttpRequest(this, request);
   }
 }

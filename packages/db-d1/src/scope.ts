@@ -1,6 +1,7 @@
 import { AppError, type ExecutionContext } from '@shac/kernel';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import * as catalogSchema from './schema/catalog.js';
+import * as commerceOrdersSchema from './schema/commerce-orders.js';
 import * as crmHrSchema from './schema/crm-hr.js';
 import {
   kernelCustomFieldDefs,
@@ -9,7 +10,10 @@ import {
 } from './schema/custom-fields.js';
 import * as iamSchema from './schema/iam.js';
 import * as partiesSchema from './schema/parties.js';
+import * as posSchema from './schema/pos.js';
 import * as pricingSchema from './schema/pricing.js';
+import * as wmsFleetSchema from './schema/wms-fleet.js';
+import * as wmsWarehouseSchema from './schema/wms-warehouse.js';
 
 const allSchemas = {
   ...iamSchema,
@@ -20,6 +24,10 @@ const allSchemas = {
   ...crmHrSchema,
   ...catalogSchema,
   ...pricingSchema,
+  ...posSchema,
+  ...commerceOrdersSchema,
+  ...wmsWarehouseSchema,
+  ...wmsFleetSchema,
 };
 
 export type ShacD1Database = DrizzleD1Database<typeof allSchemas>;

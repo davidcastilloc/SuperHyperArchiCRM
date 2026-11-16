@@ -15,7 +15,8 @@
     },
     "packages/kernel": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
-      "project": ["src/**/*.ts!", "test/**/*.ts"]
+      "project": ["src/**/*.ts!", "test/**/*.ts"],
+      "ignoreExportsUsedInFile": { "interface": true, "type": true }
     },
     "packages/db-d1": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
@@ -41,6 +42,19 @@
     "packages/modules/catalog": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
       "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/modules/regional": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/modules/pos": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"]
+    },
+    "packages/modules/wms": {
+      "entry": ["src/index.ts!", "test/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "test/**/*.ts"],
+      "ignoreDependencies": ["@shac/actor-branch"]
     }
   }
 }

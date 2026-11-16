@@ -1,9 +1,18 @@
 import {
   allocateFefoInputSchema,
+  approvePhysicalReturnInputSchema,
+  checkoutPosSaleInputSchema,
+  closePosShiftInputSchema,
   receiveLotInputSchema,
   type AllocateFefoInput,
   type AllocateFefoResult,
+  type ApprovePhysicalReturnInput,
+  type ApprovePhysicalReturnResult,
   type BalancesResult,
+  type CheckoutPosSaleInput,
+  type CheckoutPosSaleResult,
+  type ClosePosShiftInput,
+  type ClosePosShiftResult,
   type ReceiveLotInput,
   type ReceiveLotResult,
 } from '@shac/actor-branch';
@@ -53,8 +62,11 @@ function getBranchStub(
 async function postBranchDo<TIn extends z.ZodTypeAny, TOut>(
   c: Context<HonoEnv>,
   profileLoader: ProfileLoader,
+  moduleId: string,
+  requiredPermission: string,
   schema: TIn,
   doPath: string,
+  invalidMessage: string,
 ) {
   const requestId = c.req.header('X-Request-Id') ?? crypto.randomUUID();
   c.header('X-Request-Id', requestId);
@@ -64,8 +76,8 @@ async function postBranchDo<TIn extends z.ZodTypeAny, TOut>(
     c.env,
     c.req.raw.headers,
     profileLoader,
-    'wms',
-    'branch.inventory.write',
+    moduleId,
+    requiredPermission,
   );
 
   const rawInput = await readJsonBodyWithMutationId(c);
@@ -74,7 +86,7 @@ async function postBranchDo<TIn extends z.ZodTypeAny, TOut>(
     throw new AppError(
       'VALIDATION_ERROR',
       400,
-      'Invalid branch inventory input',
+      invalidMessage,
       parsed.error.flatten(),
     );
   }
@@ -113,8 +125,11 @@ export function createBranchRoutes(profileLoader: ProfileLoader) {
         postBranchDo<typeof receiveLotInputSchema, ReceiveLotResult>(
           c,
           profileLoader,
+          'wms',
+          'branch.inventory.write',
           receiveLotInputSchema,
           '/receive-lot',
+          'Invalid branch inventory input',
         ),
     )
     .post(
@@ -129,8 +144,11 @@ export function createBranchRoutes(profileLoader: ProfileLoader) {
         postBranchDo<typeof allocateFefoInputSchema, AllocateFefoResult>(
           c,
           profileLoader,
+          'wms',
+          'branch.inventory.write',
           allocateFefoInputSchema,
           '/allocate-fefo',
+          'Invalid branch inventory input',
         ),
     )
     .get(
@@ -175,5 +193,81 @@ export function createBranchRoutes(profileLoader: ProfileLoader) {
           toBranchErrorStatus(doRes.status),
         );
       },
+    );
+}
+
+/**
+ * Mounts /api/branch/pos/* routes proxying POS shift/checkout/return state to BranchInventoryDO.
+ */
+export function createBranchPosRoutes(profileLoader: ProfileLoader) {
+  return new Hono<HonoEnv>()
+    .post(
+      '/checkout',
+      (
+        c: Context<
+          HonoEnv,
+          string,
+          {
+            in: { json: CheckoutPosSaleInput };
+            out: { json: z.output<typeof checkoutPosSaleInputSchema> };
+          }
+        >,
+      ) =>
+        postBranchDo<typeof checkoutPosSaleInputSchema, CheckoutPosSaleResult>(
+          c,
+          profileLoader,
+          'pos',
+          'pos.sales.write',
+          checkoutPosSaleInputSchema,
+          '/pos-checkout',
+          'Invalid branch POS checkout input',
+        ),
+    )
+    .post(
+      '/close',
+      (
+        c: Context<
+          HonoEnv,
+          string,
+          {
+            in: { json: ClosePosShiftInput };
+            out: { json: z.output<typeof closePosShiftInputSchema> };
+          }
+        >,
+      ) =>
+        postBranchDo<typeof closePosShiftInputSchema, ClosePosShiftResult>(
+          c,
+          profileLoader,
+          'pos',
+          'pos.shifts.write',
+          closePosShiftInputSchema,
+          '/pos-close',
+          'Invalid branch POS shift close input',
+        ),
+    )
+    .post(
+      '/return-approve',
+      (
+        c: Context<
+          HonoEnv,
+          string,
+          {
+            in: { json: ApprovePhysicalReturnInput };
+            out: { json: z.output<typeof approvePhysicalReturnInputSchema> };
+          }
+        >,
+      ) =>
+        postBranchDo<
+          typeof approvePhysicalReturnInputSchema,
+          ApprovePhysicalReturnResult
+        >(
+          c,
+          profileLoader,
+          'pos',
+          'pos.returns.write',
+          approvePhysicalReturnInputSchema,
+          '/pos-return-approve',
+          'Invalid branch POS return approval input',
+        ),
     );
 }

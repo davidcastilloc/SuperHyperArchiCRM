@@ -21,7 +21,10 @@ import {
 } from '@shac/mod-iam';
 import { createMcpHandler } from 'agents/mcp/server';
 import { Hono } from 'hono';
-import { createBranchRoutes } from './branch-routes.js';
+import {
+  createBranchPosRoutes,
+  createBranchRoutes,
+} from './branch-routes.js';
 import {
   jsonCommandHandler,
   onWorkerError,
@@ -30,6 +33,11 @@ import {
 } from './command-registry.js';
 import { createAdaptiveCorsMiddleware } from './cors.js';
 import { buildMcpServerForRequest } from './mcp-server.js';
+import {
+  createPosRoutes,
+  createRegionalRoutes,
+  createWmsRoutes,
+} from './pos-wms-registry.js';
 
 export type { WorkerEnv } from './command-registry.js';
 
@@ -98,7 +106,11 @@ function createWorkerApp(
       '/api/catalog/labels/batches',
       jsonCommandHandler(catalogLabelsBatchCommand, profileLoader),
     )
+    .route('/api/regional', createRegionalRoutes(profileLoader))
+    .route('/api/pos', createPosRoutes(profileLoader))
+    .route('/api/wms', createWmsRoutes(profileLoader))
     .route('/api/branch/inventory', createBranchRoutes(profileLoader))
+    .route('/api/branch/pos', createBranchPosRoutes(profileLoader))
     .all('/mcp', async (c) => {
       const requestId = c.req.header('X-Request-Id') ?? crypto.randomUUID();
       const handler = createMcpHandler(

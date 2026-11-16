@@ -73,6 +73,14 @@ export interface KvStore {
   get(key: string, type: 'text'): Promise<string | null>;
 }
 
+export interface BranchActorStub {
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+}
+
+export interface BranchActorResolver {
+  getByBranchKey(key: string): BranchActorStub;
+}
+
 export interface ExecutionContext<TDb = unknown> {
   tenantId: string;
   orgId: string;
@@ -82,6 +90,7 @@ export interface ExecutionContext<TDb = unknown> {
   db: TDb;
   sessionKv?: KvStore;
   configKv?: KvStore;
+  branchDo?: BranchActorResolver;
   requestId?: string;
 }
 

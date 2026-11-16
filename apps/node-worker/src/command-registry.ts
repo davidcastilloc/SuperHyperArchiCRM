@@ -16,6 +16,7 @@ import type { Context } from 'hono';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import type { z } from 'zod';
 import type { CorsEnv } from './cors.js';
+import { PHASE3_COMMANDS } from './pos-wms-registry.js';
 
 export interface WorkerEnv extends CorsEnv {
   DB: D1Database;
@@ -36,6 +37,7 @@ export const ALL_COMMANDS: readonly CommandSpec<any, any, ShacD1Database>[] = [
   ...iamModule.commands,
   ...modCustomersManifest.commands,
   ...modCatalogManifest.commands,
+  ...PHASE3_COMMANDS,
 ];
 
 function normalizeAuthHeaders(rawHeaders: Headers): Headers {
@@ -164,6 +166,10 @@ export async function executeCommand<TIn extends z.ZodTypeAny, TOut>(
     db: createD1Client(env.DB),
     sessionKv: env.SESSION_KV,
     configKv: env.CONFIG_KV,
+    branchDo: {
+      getByBranchKey: (key: string) =>
+        env.BRANCH_DO.get(env.BRANCH_DO.idFromName(key)),
+    },
     requestId,
   };
 

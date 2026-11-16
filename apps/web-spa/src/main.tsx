@@ -2,7 +2,7 @@ import '@shac/ui/globals.css';
 
 import { StrictMode, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   Outlet,
   RouterProvider,
@@ -14,9 +14,11 @@ import {
 } from '@tanstack/react-router';
 import type { TenantMarketProfile } from '@shac/kernel';
 import { AuthBranchGate, ShacAppShell, type BranchOption, type ShacNavItem } from '@shac/ui';
+import { listOfflineQueue } from './lib/offlineQueue';
 import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
 import { CatalogView, PartiesView } from './views/Phase2Views';
+import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
 
 const DEFAULT_PROFILE: Pick<
   TenantMarketProfile,
@@ -54,6 +56,27 @@ const NAV_ITEMS: ShacNavItem[] = [
     href: '/catalog',
     moduleId: 'catalog',
   },
+  {
+    id: 'pos',
+    label: `POS · ${DEFAULT_PROFILE.vocabulary.orderSingular}`,
+    href: '/pos',
+    moduleId: 'pos',
+    shortcut: 'F2',
+  },
+  {
+    id: 'kiosk',
+    label: 'SmartCheck 10s',
+    href: '/kiosk/price-check',
+    moduleId: 'pos',
+    shortcut: 'F4',
+  },
+  {
+    id: 'wms',
+    label: `WMS · ${DEFAULT_PROFILE.vocabulary.branchSingular}`,
+    href: '/wms',
+    moduleId: 'wms',
+    shortcut: 'F6',
+  },
 ];
 
 const queryClient = createShacQueryClient();
@@ -65,6 +88,11 @@ function RootLayout() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const queueQuery = useQuery({
+    queryKey: ['pos', 'offlineQueue'],
+    queryFn: () => listOfflineQueue(),
+  });
+  const pendingMutations = queueQuery.data?.length ?? 0;
 
   return (
     <ShacAppShell
@@ -73,7 +101,10 @@ function RootLayout() {
       navItems={NAV_ITEMS}
       activeHref={pathname}
       onNavigate={(href) => void navigate({ to: href })}
-      syncState={{ status: 'online', pendingMutations: 0 }}
+      syncState={{
+        status: pendingMutations > 0 ? 'offline' : 'online',
+        pendingMutations,
+      }}
       theme={theme}
       onToggleTheme={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
     >
@@ -117,6 +148,18 @@ function CatalogPage() {
   return <CatalogView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
 }
 
+function PosPage() {
+  return <PosView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
+function KioskPriceCheckPage() {
+  return <SmartCheckKioskView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
+function WmsPage() {
+  return <WmsView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
 const rootRoute = createRootRoute({ component: RootLayout });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -138,12 +181,30 @@ const catalogRoute = createRoute({
   path: '/catalog',
   component: CatalogPage,
 });
+const posRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/pos',
+  component: PosPage,
+});
+const kioskRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/kiosk/price-check',
+  component: KioskPriceCheckPage,
+});
+const wmsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/wms',
+  component: WmsPage,
+});
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   authRoute,
   partiesRoute,
   catalogRoute,
+  posRoute,
+  kioskRoute,
+  wmsRoute,
 ]);
 const router = createRouter({ routeTree });
 

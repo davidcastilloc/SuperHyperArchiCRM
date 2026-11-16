@@ -101,10 +101,10 @@ export interface BalancesResult {
 
 export type JsonScalar = string | number | boolean | null;
 
-export type JsonValue =
-  | JsonScalar
-  | Record<string, JsonScalar>
-  | Array<JsonScalar | Record<string, JsonScalar>>;
+type JsonLevel1 = JsonScalar | Record<string, JsonScalar> | JsonScalar[];
+type JsonLevel2 = JsonLevel1 | Record<string, JsonLevel1> | JsonLevel1[];
+
+export type JsonValue = JsonLevel2 | Record<string, JsonLevel2> | JsonLevel2[];
 
 export interface OutboxEvent {
   seqId: number;
@@ -201,6 +201,8 @@ export interface PosShiftRecord {
   cashierName: string;
   status: string;
   initialBalancesMinor: Record<string, number>;
+  salesByCurrencyMinor: Record<string, number>;
+  salesByMethodMinor: Record<string, number>;
   nextTicketSeq: number;
   openedAt: number;
   closedAt: number | null;
