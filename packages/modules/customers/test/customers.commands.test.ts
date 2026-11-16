@@ -14,13 +14,17 @@ describe('@shac/mod-customers manifest, parties.upsert & parties.list', () => {
     await setupCustomersD1(env.DB);
   });
 
-  it('registers modCustomersManifest with 5 MCP-exposed commands and strict integer Zod contracts', () => {
+  it('registers modCustomersManifest with 9 MCP-exposed commands and strict integer Zod contracts', () => {
     expect(modCustomersManifest.id).toBe('customers');
     expect(modCustomersManifest.commands.map((c) => c.id)).toEqual([
       'customers.parties.upsert',
       'customers.parties.list',
       'customers.links.create',
       'customers.deals.create',
+      'customers.deals.list',
+      'customers.deals.stage',
+      'customers.interactions.list',
+      'customers.interactions.upsert',
       'customers.conflicts.check',
     ]);
 
@@ -193,5 +197,87 @@ describe('@shac/mod-customers manifest, parties.upsert & parties.list', () => {
         }),
       ),
     ).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+  });
+
+  it('creates and lists CRM tasks/interactions in <= 2 D1 queries and transitions deal stages idempotently', async () => {
+    const custMod = await import('../src/index.js');
+    expect('customersInteractionsListCommand' in custMod).toBe(true);
+    expect('customersInteractionsUpsertCommand' in custMod).toBe(true);
+    expect('customersDealsStageCommand' in custMod).toBe(true);
+    const {
+      customersInteractionsListCommand,
+      customersInteractionsUpsertCommand,
+      customersDealsStageCommand,
+    } = custMod as typeof import('../src/index.js') & {
+      customersInteractionsListCommand: typeof customersPartiesListCommand;
+      customersInteractionsUpsertCommand: typeof customersPartiesUpsertCommand;
+      customersDealsStageCommand: typeof customersDealsCreateCommand;
+    };
+
+    const { ctx, counted } = makeCustomersCtx(env.DB, {
+      tenantId: 'ten_1',
+      orgId: 'org_1_north',
+      orgPath: '/org_1/north',
+    });
+
+    const party = await customersPartiesUpsertCommand.handler(
+      ctx,
+      customersPartiesUpsertCommand.inputSchema.parse({
+        clientMutationId: 'mut_task_party_1',
+        rolesMask: ['customer'],
+        displayName: 'Bica do Sol',
+      }),
+    );
+
+    const taskInput = customersInteractionsUpsertCommand.inputSchema.parse({
+      clientMutationId: 'mut_task_1',
+      partyId: party.id,
+      kind: 'task',
+      title: 'Enviar lista de precios 2026',
+      priority: 'high',
+      status: 'open',
+    });
+    const createdTask = (await customersInteractionsUpsertCommand.handler(ctx, taskInput)) as unknown as {
+      id: string;
+      title: string;
+      status: string;
+    };
+    expect(createdTask.title).toBe('Enviar lista de precios 2026');
+
+    counted.resetQueryCount();
+    const listRes = (await customersInteractionsListCommand.handler(
+      ctx,
+      customersInteractionsListCommand.inputSchema.parse({ partyId: party.id }),
+    )) as unknown as { items: Array<{ id: string }>; summary: { openCount: number } };
+    expect(counted.getQueryCount()).toBeLessThanOrEqual(2);
+    expect(listRes.items.some((t) => t.id === createdTask.id)).toBe(true);
+    expect(listRes.summary.openCount).toBeGreaterThanOrEqual(1);
+
+    const deal = await customersDealsCreateCommand.handler(
+      ctx,
+      customersDealsCreateCommand.inputSchema.parse({
+        clientMutationId: 'mut_kanban_deal_1',
+        pipelineId: 'pipe_default',
+        stageId: 'stage_qualified',
+        partyId: party.id,
+        title: 'Suministro Semanal',
+        valueMinor: 320_000,
+        probabilityBps: 2500,
+      }),
+    );
+
+    const moved = (await customersDealsStageCommand.handler(
+      ctx,
+      customersDealsStageCommand.inputSchema.parse({
+        clientMutationId: 'mut_kanban_move_1',
+        dealId: deal.id,
+        stageId: 'stage_commit',
+        probabilityBps: 9000,
+        outcome: 'won',
+      }),
+    )) as unknown as { stageId: string; probabilityBps: number; outcome: string };
+    expect(moved.stageId).toBe('stage_commit');
+    expect(moved.probabilityBps).toBe(9000);
+    expect(moved.outcome).toBe('won');
   });
 });

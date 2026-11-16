@@ -10,6 +10,9 @@ import {
   customersConflictsCheckCommand,
   customersDealsCreateCommand,
   customersDealsListCommand,
+  customersDealsStageCommand,
+  customersInteractionsListCommand,
+  customersInteractionsUpsertCommand,
   customersLinksCreateCommand,
   customersPartiesListCommand,
   customersPartiesUpsertCommand,
@@ -109,6 +112,18 @@ function createWorkerApp(
     .post(
       '/api/customers/deals',
       jsonCommandHandler(customersDealsCreateCommand, profileLoader),
+    )
+    .post(
+      '/api/customers/deals/stage',
+      jsonCommandHandler(customersDealsStageCommand, profileLoader),
+    )
+    .get(
+      '/api/customers/interactions',
+      queryCommandHandler(customersInteractionsListCommand, profileLoader),
+    )
+    .post(
+      '/api/customers/interactions',
+      jsonCommandHandler(customersInteractionsUpsertCommand, profileLoader),
     )
     .post(
       '/api/customers/conflict-checks',
