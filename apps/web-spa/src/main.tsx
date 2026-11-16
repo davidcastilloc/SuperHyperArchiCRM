@@ -26,6 +26,7 @@ import { DEFAULT_BRANCHES, DEFAULT_PROFILE, NAV_ITEMS } from './nav';
 import { AppStoreView } from './views/AppStoreView';
 import { AutomationView } from './views/AutomationView';
 import { CasesView } from './views/CasesView';
+import { DashboardView } from './views/DashboardView';
 import { FinanceView } from './views/FinanceView';
 import { CatalogView, PartiesView } from './views/Phase2Views';
 import { PhysicalView } from './views/PhysicalView';
@@ -112,13 +113,13 @@ function RootLayout() {
 }
 
 function HomePage() {
+  const navigate = useNavigate();
   return (
-    <section className="space-y-2 p-6">
-      <h1 className="text-xl font-semibold tracking-tight">SuperHyperArchiCRM</h1>
-      <p className="text-sm text-muted-foreground">
-        Motor Único All-in-One listo para operar en modo offline-first.
-      </p>
-    </section>
+    <DashboardView
+      vocabulary={DEFAULT_PROFILE.vocabulary}
+      rpc={rpcClient}
+      onNavigate={(href) => void navigate({ to: href })}
+    />
   );
 }
 
