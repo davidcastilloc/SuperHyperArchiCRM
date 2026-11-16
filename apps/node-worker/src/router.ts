@@ -9,6 +9,7 @@ import {
 import {
   customersConflictsCheckCommand,
   customersDealsCreateCommand,
+  customersDealsListCommand,
   customersLinksCreateCommand,
   customersPartiesListCommand,
   customersPartiesUpsertCommand,
@@ -100,6 +101,10 @@ function createWorkerApp(
     .post(
       '/api/customers/links',
       jsonCommandHandler(customersLinksCreateCommand, profileLoader),
+    )
+    .get(
+      '/api/customers/deals',
+      queryCommandHandler(customersDealsListCommand, profileLoader),
     )
     .post(
       '/api/customers/deals',

@@ -267,4 +267,69 @@ describe('@shac/node-worker Phase 2 core workerd integration', () => {
     expect(ten2Balances.status).toBe(200);
     expect(ten2Balances.data.totalOnHandQty).toBe(0);
   });
+
+  it('lists CRM deals via GET /api/customers/deals with KPI summary in <= 2 D1 queries and tenant isolation', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['iam', 'customers'])),
+    );
+    const counted = wrapD1WithCounter(env.DB);
+    const testEnv: WorkerEnv = {
+      ...env,
+      DB: counted.db,
+      JWT_PUBLIC_KEY_JWK: publicKeyJwkJson,
+    };
+
+    const party = await callWorkerJson<{ id: string }>(
+      workerApp,
+      testEnv,
+      '/api/customers/parties',
+      tokenTen1,
+      {
+        clientMutationId: 'mut-deal-party-1',
+        rolesMask: ['customer'],
+        displayName: 'Distribuidora Alfa',
+      },
+    );
+    expect(party.status).toBe(200);
+
+    const deal = await callWorkerJson<{ id: string }>(
+      workerApp,
+      testEnv,
+      '/api/customers/deals',
+      tokenTen1,
+      {
+        clientMutationId: 'mut-deal-create-1',
+        pipelineId: 'pipe_default',
+        stageId: 'stage_qualified',
+        partyId: party.data.id,
+        title: 'Contrato Anual POS',
+        valueMinor: 100_000,
+        probabilityBps: 5000,
+      },
+    );
+    expect(deal.status).toBe(200);
+
+    counted.resetQueryCount();
+    const listRes = await callWorkerJson<{
+      items: Array<{ id: string; title: string; partyName: string | null; valueMinor: number }>;
+      summary: { totalCount: number; openValueMinor: number; wonValueMinor: number; weightedValueMinor: number };
+    }>(workerApp, testEnv, '/api/customers/deals', tokenTen1);
+
+    expect(listRes.status).toBe(200);
+    expect(counted.getQueryCount()).toBeLessThanOrEqual(2);
+    expect(listRes.data.items.some((d) => d.title === 'Contrato Anual POS' && d.partyName === 'Distribuidora Alfa')).toBe(true);
+    expect(listRes.data.summary.openValueMinor).toBeGreaterThanOrEqual(100_000);
+    expect(listRes.data.summary.weightedValueMinor).toBeGreaterThanOrEqual(50_000);
+
+    const ten2List = await callWorkerJson<{ items: unknown[]; summary: { totalCount: number } }>(
+      workerApp,
+      testEnv,
+      '/api/customers/deals',
+      tokenTen2,
+    );
+    expect(ten2List.status).toBe(200);
+    expect(ten2List.data.items).toHaveLength(0);
+    expect(ten2List.data.summary.totalCount).toBe(0);
+  });
 });

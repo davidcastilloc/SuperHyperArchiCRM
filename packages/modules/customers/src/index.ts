@@ -3,6 +3,7 @@ import {
   customersConflictsCheckCommand,
   customersDealsCreateCommand,
 } from './commands/deals-and-conflicts.js';
+import { customersDealsListCommand } from './commands/deals-list.js';
 import { customersPartiesListCommand } from './commands/parties-list.js';
 import { customersPartiesUpsertCommand } from './commands/parties-upsert.js';
 import { customersLinksCreateCommand } from './commands/party-links.js';
@@ -11,6 +12,7 @@ export {
   customersDealsCreateCommand,
   customersConflictsCheckCommand,
 } from './commands/deals-and-conflicts.js';
+export { customersDealsListCommand } from './commands/deals-list.js';
 export { customersPartiesListCommand } from './commands/parties-list.js';
 export { customersPartiesUpsertCommand } from './commands/parties-upsert.js';
 export { customersLinksCreateCommand } from './commands/party-links.js';
@@ -23,6 +25,7 @@ export const modCustomersManifest: ModuleManifest = defineModule({
     customersPartiesListCommand,
     customersLinksCreateCommand,
     customersDealsCreateCommand,
+    customersDealsListCommand,
     customersConflictsCheckCommand,
   ],
 });

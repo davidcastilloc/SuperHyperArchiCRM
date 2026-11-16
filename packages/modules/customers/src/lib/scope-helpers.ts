@@ -5,7 +5,7 @@ import {
   type ShacD1Database,
 } from '@shac/db-d1';
 import { AppError, type ExecutionContext } from '@shac/kernel';
-import { and, eq, inArray, isNull, like, or, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNull, like, or, type AnyColumn, type SQL } from 'drizzle-orm';
 import { normalizeOrgPath } from './identity.js';
 
 export type CustomersCtx = Pick<
@@ -101,7 +101,10 @@ export async function assertPartyInScope(
   return verifyScopedPartyRow(ctx, rows[0], label);
 }
 
-export function buildOrgSubtreeFilter(ctx: CustomersCtx): SQL {
+export function buildOrgSubtreeFilter(
+  ctx: CustomersCtx,
+  orgIdCol: AnyColumn = crmParties.orgId,
+): SQL {
   const normalizedPath = normalizeOrgPath(ctx.orgPath);
   const pathCondition =
     normalizedPath === '/'
@@ -126,8 +129,8 @@ export function buildOrgSubtreeFilter(ctx: CustomersCtx): SQL {
     );
 
   return or(
-    eq(crmParties.orgId, ctx.orgId),
-    inArray(crmParties.orgId, allowedOrgIds),
+    eq(orgIdCol, ctx.orgId),
+    inArray(orgIdCol, allowedOrgIds),
   )!;
 }
 
