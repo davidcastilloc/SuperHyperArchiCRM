@@ -1,11 +1,17 @@
 import { useState, type FormEvent } from 'react';
-import { useMutation } from '@tanstack/react-query';
-import { formatMinorUnits, INPUT_CLS, parseNonNegInt, type Phase2ViewProps } from './phase2-format';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import {
+  formatMinorUnits,
+  INPUT_CLS,
+  parseNonNegInt,
+  readApiError,
+  type Phase2ViewProps,
+} from './phase2-format';
 
 /** Trust/IOLTA Escrow (strict overdraft guard) & GAAP Balanced Journal view. */
 export function FinanceView({ rpc }: Phase2ViewProps) {
   const [ledgerId, setLedgerId] = useState('');
-  const [partyId, setPartyId] = useState('pty_1');
+  const [partyId, setPartyId] = useState('');
   const [matterId, setMatterId] = useState('mat_1');
   const [bankId, setBankId] = useState('bank_iolta_1');
   const [amountInput, setAmountInput] = useState('10000');
@@ -13,6 +19,18 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
   const [entryNumber, setEntryNumber] = useState('JE-2026-001');
   const [journalMinorInput, setJournalMinorInput] = useState('25000');
   const [feedback, setFeedback] = useState<string | null>(null);
+
+  const partiesQuery = useQuery({
+    queryKey: ['customers', 'parties', 'finance-select'],
+    queryFn: async () => {
+      const res = await rpc.api.customers.parties.$get({ query: { limit: '50' } });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
+
+  const parties = partiesQuery.data?.items ?? [];
+  const activePartyId = partyId || parties[0]?.id || 'pty_1';
 
   const trustMutation = useMutation({
     mutationFn: async () => {
@@ -22,7 +40,7 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
           clientMutationId: crypto.randomUUID(),
           ...(ledgerId.trim() ? { ledgerId: ledgerId.trim() } : {}),
           ledgerKind: 'legal_iolta_trust',
-          partyId: partyId.trim(),
+          partyId: activePartyId.trim(),
           matterOrLeaseId: matterId.trim(),
           bankAccountId: bankId.trim(),
           currency: 'USD',
@@ -31,10 +49,7 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
           description: `${txKind} Trust/IOLTA`,
         },
       });
-      if (!res.ok) {
-        const errBody = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errBody}`);
-      }
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -64,7 +79,7 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
           ],
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -89,7 +104,7 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
       </div>
 
       {feedback && (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
+        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-mono">
           {feedback}
         </div>
       )}
@@ -99,7 +114,13 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
           <h2 className="text-sm font-medium">Trust / IOLTA Escrow</h2>
           <input className={INPUT_CLS} value={ledgerId} onChange={(e) => setLedgerId(e.target.value)} placeholder="Ledger ID (vacío = crear nuevo)" />
           <div className="grid grid-cols-2 gap-2">
-            <input className={INPUT_CLS} value={partyId} onChange={(e) => setPartyId(e.target.value)} placeholder="Party ID" />
+            <select className={INPUT_CLS} value={activePartyId} onChange={(e) => setPartyId(e.target.value)}>
+              {parties.length === 0 ? (
+                <option value="pty_1">pty_1 (demo)</option>
+              ) : (
+                parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)
+              )}
+            </select>
             <input className={INPUT_CLS} value={matterId} onChange={(e) => setMatterId(e.target.value)} placeholder="Matter/Lease ID" />
           </div>
           <div className="grid grid-cols-2 gap-2">

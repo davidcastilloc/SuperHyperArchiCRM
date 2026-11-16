@@ -1,10 +1,19 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { INPUT_CLS, type Phase2ViewProps } from './phase2-format';
+import { INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** Client Portal view enforcing SQL is_confidential = 0 filtering. */
 export function PortalView({ rpc }: Phase2ViewProps) {
   const [partyFilter, setPartyFilter] = useState('');
+
+  const partiesQuery = useQuery({
+    queryKey: ['customers', 'parties', 'portal-select'],
+    queryFn: async () => {
+      const res = await rpc.api.customers.parties.$get({ query: { limit: '50' } });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
 
   const portalQuery = useQuery({
     queryKey: ['portal', 'records', partyFilter],
@@ -12,11 +21,12 @@ export function PortalView({ rpc }: Phase2ViewProps) {
       const res = await rpc.api.portal.records.$get({
         query: partyFilter.trim() ? { partyId: partyFilter.trim() } : {},
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
   });
 
+  const parties = partiesQuery.data?.items ?? [];
   const attachments = portalQuery.data?.attachments ?? [];
   const messages = portalQuery.data?.messages ?? [];
 
@@ -35,12 +45,16 @@ export function PortalView({ rpc }: Phase2ViewProps) {
       </div>
 
       <div className="max-w-xs">
-        <input
+        <select
           className={INPUT_CLS}
           value={partyFilter}
           onChange={(e) => setPartyFilter(e.target.value)}
-          placeholder="Filtrar por Party ID (opcional)"
-        />
+        >
+          <option value="">Todos los clientes</option>
+          {parties.map((p) => (
+            <option key={p.id} value={p.id}>{p.displayName}</option>
+          ))}
+        </select>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">

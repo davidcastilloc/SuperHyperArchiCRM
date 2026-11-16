@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { INPUT_CLS, type Phase2ViewProps } from './phase2-format';
+import { INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** Business Rules evaluator & InboxOps Proposal Cards (1-click human approval). */
 export function AutomationView({ rpc }: Phase2ViewProps) {
@@ -18,7 +18,7 @@ export function AutomationView({ rpc }: Phase2ViewProps) {
           payload: { priority: 'URGENT' },
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -37,7 +37,7 @@ export function AutomationView({ rpc }: Phase2ViewProps) {
           humanConfirmed: decision === 'APPROVED',
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -70,8 +70,17 @@ export function AutomationView({ rpc }: Phase2ViewProps) {
       <div className="grid gap-4 md:grid-cols-2">
         <form onSubmit={handleEvaluate} className="space-y-3 rounded-lg border border-border p-4">
           <h2 className="text-sm font-medium">Evaluar Reglas de Negocio</h2>
-          <input className={INPUT_CLS} value={entityType} onChange={(e) => setEntityType(e.target.value)} placeholder="Tipo de entidad" />
-          <input className={INPUT_CLS} value={lifecycleEvent} onChange={(e) => setLifecycleEvent(e.target.value)} placeholder="Evento de ciclo de vida" />
+          <select className={INPUT_CLS} value={entityType} onChange={(e) => setEntityType(e.target.value)}>
+            <option value="work_order">work_order</option>
+            <option value="pos_order">pos_order</option>
+            <option value="lease_contract">lease_contract</option>
+            <option value="clinical_note">clinical_note</option>
+          </select>
+          <select className={INPUT_CLS} value={lifecycleEvent} onChange={(e) => setLifecycleEvent(e.target.value)}>
+            <option value="on_create">on_create</option>
+            <option value="on_status_change">on_status_change</option>
+            <option value="on_overdue">on_overdue</option>
+          </select>
           <button type="submit" disabled={evaluateMutation.isPending} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
             {evaluateMutation.isPending ? 'Evaluando...' : 'Evaluar Reglas'}
           </button>

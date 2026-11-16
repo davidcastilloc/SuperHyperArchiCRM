@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TenantMarketProfile } from '@shac/kernel';
 import type { createRpcClient } from '../lib/rpc';
-import { INPUT_CLS } from './phase2-format';
+import { INPUT_CLS, readApiError } from './phase2-format';
 
 interface AppStoreViewProps {
   fallbackProfile: Pick<
@@ -38,7 +38,7 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
       const res = await rpc.api.system['app-store'].toggle.$post({
         json: payload as Parameters<typeof rpc.api.system['app-store']['toggle']['$post']>[0]['json'],
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -46,6 +46,7 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
         `App Store KV 0 ms actualizado · preset=${data.profile.editionPreset} (${data.profile.activeModules.length} módulos)`,
       );
       void queryClient.invalidateQueries({ queryKey: ['system', 'profile'] });
+      void queryClient.invalidateQueries({ queryKey: ['auth', 'bootstrap'] });
     },
     onError: (err) => {
       setFeedback(`Error al actualizar App Store: ${err instanceof Error ? err.message : 'unknown'}`);

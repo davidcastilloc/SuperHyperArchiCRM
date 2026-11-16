@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { INPUT_CLS, type Phase2ViewProps } from './phase2-format';
+import { INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** Physical IoT console: PIN/QR passes, LPR gate scan, R2 clips, and tamper alerts. */
 export function PhysicalView({ rpc }: Phase2ViewProps) {
@@ -29,7 +29,7 @@ export function PhysicalView({ rpc }: Phase2ViewProps) {
           validUntil: nowSec + 86_400,
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -46,7 +46,7 @@ export function PhysicalView({ rpc }: Phase2ViewProps) {
           pinOrQrSecret: pinSecret.trim(),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -65,7 +65,7 @@ export function PhysicalView({ rpc }: Phase2ViewProps) {
           confidenceBps: 9850,
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -87,7 +87,7 @@ export function PhysicalView({ rpc }: Phase2ViewProps) {
           sizeBytes: 1_048_576,
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
@@ -107,7 +107,7 @@ export function PhysicalView({ rpc }: Phase2ViewProps) {
           description: tamperDesc.trim(),
         },
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (data) => {
