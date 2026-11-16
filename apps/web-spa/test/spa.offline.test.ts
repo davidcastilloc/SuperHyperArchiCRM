@@ -324,6 +324,15 @@ describe('@shac/web-spa offlineFirst, RPC client & IndexedDB offline queue', () 
     expect(rpc.api.catalog.rates.$url().toString()).toBe(
       'https://edge.shac.local/api/catalog/rates',
     );
+    expect(rpc.api.customers.deals.$url().toString()).toBe(
+      'https://edge.shac.local/api/customers/deals',
+    );
+    expect(rpc.api.customers.links.$url().toString()).toBe(
+      'https://edge.shac.local/api/customers/links',
+    );
+    expect(rpc.api.customers['conflict-checks'].$url().toString()).toBe(
+      'https://edge.shac.local/api/customers/conflict-checks',
+    );
   });
 
   it('parses decimal currency strings to integer minor units without floating-point drift', async () => {
