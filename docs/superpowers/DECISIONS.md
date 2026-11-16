@@ -85,3 +85,11 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
 - **Decisión:**
   1. Serializar cada reserva en `spaces.bookings.reserve` adquiriendo primero el lock en `BranchInventoryDO` (`/space-lock` sobre `hot_space_locks` dentro de `ctx.storage.transactionSync`) antes de persistir `spc_bookings_and_appointments` y `spc_folios` en D1 (`30` reservas concurrentes -> `1` exitosa, `29` `409 SPACE_ALREADY_LOCKED`).
   2. Implementar `computeAdrAndRevParMinor` (`@shac/mod-spaces`) y `computeSplitRentShares` (`@shac/mod-leases`, `sum(shareBps) === 10_000` con distribución determinista del residuo) íntegramente en `BigInt`.
+
+## ADR-013 (2026-11-16): Fase 7 — 101 Tablas D1, Custodia IOLTA (`CHECK balance_minor >= 0`), Co-Firma Clínica y Proposal Cards
+
+- **Contexto:** Completar las verticales de Servicios de Campo & RMA (`@shac/mod-services`), Casos Clínicos/ABA & Legales (`@shac/mod-cases`), Finanzas GAAP & Fideicomisos Trust/IOLTA (`@shac/mod-finance`), Portal Externo (`@shac/mod-portal`) y Automatización (`@shac/mod-automation`) alcanzando los 101 esquemas en `@shac/db-d1` sin romper el presupuesto de tamaño del Worker All-in-One (`< 1024 KiB` gzip).
+- **Decisión:**
+  1. Garantizar en SQL (`CHECK (balance_minor >= 0)` en `fin_trust_escrow_ledgers`) y en dominio (`422 TRUST_OVERDRAFT_BLOCKED` y `UNBALANCED_JOURNAL_ENTRY` en `BigInt`) la imposibilidad de sobregiros Trust/IOLTA o asientos desbalanceados.
+  2. Aislar datos confidenciales en `@shac/mod-portal` mediante filtro SQL obligatorio `is_confidential = 0` (`eq(isConfidential, false)`) en D1, y exigir aprobación humana explícita en *Proposal Cards* (`automation.proposals.decide`) antes de ejecutar acciones sugeridas por reglas.
+  3. Desplegar los 5 módulos en `@shac/node-worker` (REST + `/mcp`) y `@shac/web-spa` (`/cases`, `/finance`, `/portal`, `/automation`) manteniendo todos los archivos `<= 300` líneas y el bundle del Worker en `230.41 KiB` gzip.

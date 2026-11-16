@@ -41,6 +41,13 @@ import {
   createWmsRoutes,
 } from './pos-wms-registry.js';
 import {
+  createAutomationRoutes,
+  createCasesRoutes,
+  createFinanceRoutes,
+  createPortalRoutes,
+  createServicesRoutes,
+} from './phase7-registry.js';
+import {
   createLeasesRoutes,
   createSpacesRoutes,
 } from './spaces-leases-registry.js';
@@ -124,6 +131,11 @@ function createWorkerApp(
     .route('/api/wms', createWmsRoutes(profileLoader))
     .route('/api/spaces', createSpacesRoutes(profileLoader))
     .route('/api/leases', createLeasesRoutes(profileLoader))
+    .route('/api/services', createServicesRoutes(profileLoader))
+    .route('/api/cases', createCasesRoutes(profileLoader))
+    .route('/api/finance', createFinanceRoutes(profileLoader))
+    .route('/api/portal', createPortalRoutes(profileLoader))
+    .route('/api/automation', createAutomationRoutes(profileLoader))
     .route('/api/branch/inventory', createBranchRoutes(profileLoader))
     .route('/api/branch/pos', createBranchPosRoutes(profileLoader))
     .route('/api/federation', createFederationRoutes(profileLoader))

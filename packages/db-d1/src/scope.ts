@@ -1,5 +1,7 @@
 import { AppError, type ExecutionContext } from '@shac/kernel';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
+import * as casesLegalSchema from './schema/cases-legal.js';
+import * as casesMedSchema from './schema/cases-med.js';
 import * as catalogSchema from './schema/catalog.js';
 import * as commerceOrdersSchema from './schema/commerce-orders.js';
 import * as crmHrSchema from './schema/crm-hr.js';
@@ -8,11 +10,14 @@ import {
   kernelCustomRecords,
   kernelRecordLocks,
 } from './schema/custom-fields.js';
+import * as docsAutomationSchema from './schema/docs-automation.js';
+import * as financeSchema from './schema/finance.js';
 import * as iamSchema from './schema/iam.js';
 import * as leasesSchema from './schema/leases.js';
 import * as partiesSchema from './schema/parties.js';
 import * as posSchema from './schema/pos.js';
 import * as pricingSchema from './schema/pricing.js';
+import * as servicesSchema from './schema/services.js';
 import * as spacesSchema from './schema/spaces.js';
 import * as wmsFleetSchema from './schema/wms-fleet.js';
 import * as wmsWarehouseSchema from './schema/wms-warehouse.js';
@@ -32,6 +37,11 @@ const allSchemas = {
   ...wmsFleetSchema,
   ...spacesSchema,
   ...leasesSchema,
+  ...servicesSchema,
+  ...casesLegalSchema,
+  ...casesMedSchema,
+  ...financeSchema,
+  ...docsAutomationSchema,
 };
 
 export type ShacD1Database = DrizzleD1Database<typeof allSchemas>;

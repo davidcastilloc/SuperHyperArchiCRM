@@ -12,92 +12,19 @@ import {
   useNavigate,
   useRouterState,
 } from '@tanstack/react-router';
-import type { TenantMarketProfile } from '@shac/kernel';
-import { AuthBranchGate, ShacAppShell, type BranchOption, type ShacNavItem } from '@shac/ui';
+import { AuthBranchGate, ShacAppShell } from '@shac/ui';
 import { listOfflineQueue } from './lib/offlineQueue';
 import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
+import { DEFAULT_BRANCHES, DEFAULT_PROFILE, NAV_ITEMS } from './nav';
+import { AppStoreView } from './views/AppStoreView';
+import { AutomationView } from './views/AutomationView';
+import { CasesView } from './views/CasesView';
+import { FinanceView } from './views/FinanceView';
 import { CatalogView, PartiesView } from './views/Phase2Views';
+import { PortalView } from './views/PortalView';
 import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
 import { LeasesView, SpacesView } from './views/SpacesLeasesViews';
-import { AppStoreView } from './views/AppStoreView';
-
-const DEFAULT_PROFILE: Pick<
-  TenantMarketProfile,
-  'tenantId' | 'editionPreset' | 'activeModules' | 'vocabulary'
-> = {
-  tenantId: 'tenant-demo',
-  editionPreset: 'omni-enterprise',
-  activeModules: ['core', 'iam', 'customers', 'catalog', 'pos', 'wms', 'spaces', 'leases', 'crm'],
-  vocabulary: {
-    partySingular: 'Cliente',
-    partyPlural: 'Clientes',
-    orderSingular: 'Pedido',
-    branchSingular: 'Sucursal',
-    spaceSingular: 'Espacio',
-    caseSingular: 'Expediente',
-  },
-};
-
-const DEFAULT_BRANCHES: BranchOption[] = [
-  { id: 'branch-hq', name: 'Casa Matriz', orgPath: '/hq' },
-];
-
-const NAV_ITEMS: ShacNavItem[] = [
-  { id: 'home', label: 'Inicio', href: '/' },
-  { id: 'auth', label: 'Acceso Sucursal', href: '/auth' },
-  {
-    id: 'parties',
-    label: DEFAULT_PROFILE.vocabulary.partyPlural,
-    href: '/parties',
-    moduleId: 'customers',
-  },
-  {
-    id: 'catalog',
-    label: 'Catálogo',
-    href: '/catalog',
-    moduleId: 'catalog',
-  },
-  {
-    id: 'pos',
-    label: `POS · ${DEFAULT_PROFILE.vocabulary.orderSingular}`,
-    href: '/pos',
-    moduleId: 'pos',
-    shortcut: 'F2',
-  },
-  {
-    id: 'kiosk',
-    label: 'SmartCheck 10s',
-    href: '/kiosk/price-check',
-    moduleId: 'pos',
-    shortcut: 'F4',
-  },
-  {
-    id: 'wms',
-    label: `WMS · ${DEFAULT_PROFILE.vocabulary.branchSingular}`,
-    href: '/wms',
-    moduleId: 'wms',
-    shortcut: 'F6',
-  },
-  {
-    id: 'spaces',
-    label: `${DEFAULT_PROFILE.vocabulary.spaceSingular}s · Rack`,
-    href: '/spaces',
-    moduleId: 'spaces',
-  },
-  {
-    id: 'leases',
-    label: 'Leases · Hub',
-    href: '/leases',
-    moduleId: 'leases',
-  },
-  {
-    id: 'app-store',
-    label: 'App Store',
-    href: '/app-store',
-    moduleId: 'core',
-  },
-];
 
 const queryClient = createShacQueryClient();
 export const rpcClient = createRpcClient(
@@ -188,61 +115,45 @@ function LeasesPage() {
   return <LeasesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
 }
 
+function CasesPage() {
+  return <CasesView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
+function FinancePage() {
+  return <FinanceView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
+function PortalPage() {
+  return <PortalView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
+function AutomationPage() {
+  return <AutomationView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
 function AppStorePage() {
   return <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />;
 }
 
 const rootRoute = createRootRoute({ component: RootLayout });
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: HomePage,
-});
-const authRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/auth',
-  component: AuthPage,
-});
-const partiesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/parties',
-  component: PartiesPage,
-});
-const catalogRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/catalog',
-  component: CatalogPage,
-});
-const posRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/pos',
-  component: PosPage,
-});
+const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', component: HomePage });
+const authRoute = createRoute({ getParentRoute: () => rootRoute, path: '/auth', component: AuthPage });
+const partiesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/parties', component: PartiesPage });
+const catalogRoute = createRoute({ getParentRoute: () => rootRoute, path: '/catalog', component: CatalogPage });
+const posRoute = createRoute({ getParentRoute: () => rootRoute, path: '/pos', component: PosPage });
 const kioskRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/kiosk/price-check',
   component: KioskPriceCheckPage,
 });
-const wmsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/wms',
-  component: WmsPage,
-});
-const spacesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/spaces',
-  component: SpacesPage,
-});
-const leasesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/leases',
-  component: LeasesPage,
-});
-const appStoreRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/app-store',
-  component: AppStorePage,
-});
+const wmsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/wms', component: WmsPage });
+const spacesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/spaces', component: SpacesPage });
+const leasesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/leases', component: LeasesPage });
+const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/cases', component: CasesPage });
+const financeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/finance', component: FinancePage });
+const portalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/portal', component: PortalPage });
+const automationRoute = createRoute({ getParentRoute: () => rootRoute, path: '/automation', component: AutomationPage });
+const appStoreRoute = createRoute({ getParentRoute: () => rootRoute, path: '/app-store', component: AppStorePage });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -254,6 +165,10 @@ const routeTree = rootRoute.addChildren([
   wmsRoute,
   spacesRoute,
   leasesRoute,
+  casesRoute,
+  financeRoute,
+  portalRoute,
+  automationRoute,
   appStoreRoute,
 ]);
 const router = createRouter({ routeTree });
