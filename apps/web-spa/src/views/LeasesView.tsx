@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { FileSignature, Megaphone } from 'lucide-react';
+import { KpiCard, PageHeader, StatusBadge } from '@shac/ui';
 import {
   formatMinorUnits,
   INPUT_CLS,
@@ -17,7 +19,7 @@ type CommunityKind =
   | 'community_event'
   | 'marketplace_listing';
 
-/** Leases Split Rent contract activation & Condo Community Hub view. */
+/** Open Mercato DS v3 Leases Split Rent contract activation & Condo Community Hub view. */
 export function LeasesView({ vocabulary, rpc }: Phase2ViewProps) {
   const [leaseNumber, setLeaseNumber] = useState('LSE-2026-001');
   const [unitId, setUnitId] = useState('');
@@ -124,64 +126,65 @@ export function LeasesView({ vocabulary, rpc }: Phase2ViewProps) {
   }
 
   return (
-    <section className="space-y-4 p-4" data-slot="leases-view">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Leases · Split Rent & Community Hub</h1>
-        <p className="text-sm text-muted-foreground">
-          Contratos de {vocabulary.spaceSingular.toLowerCase()}, depósito en garantía, Split Rent exacto ({(p1Bps / 100).toFixed(2)}% / {(p2Bps / 100).toFixed(2)}%) y tablero comunitario.
-        </p>
+    <section className="space-y-5" data-slot="leases-view">
+      <PageHeader
+        title="Leases · Contratos Split Rent & Hub Comunitario"
+        description={`Activación de contratos de ${vocabulary.spaceSingular.toLowerCase()} con prorrateo exacto por puntos básicos y custodia escrow.`}
+        actions={<StatusBadge label={`Split ${(p1Bps / 100).toFixed(1)}% / ${(p2Bps / 100).toFixed(1)}%`} tone="info" />}
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard title="Canon Mensual" value={formatMinorUnits(parseNonNegInt(monthlyRentMinor, 0), 'USD')} />
+        <KpiCard title="Depósito en Custodia" value={formatMinorUnits(parseNonNegInt(escrowMinor, 0), 'USD')} />
+        <KpiCard title="Cuota Titular" value={`${(p1Bps / 100).toFixed(2)}%`} />
       </div>
 
-      <form onSubmit={handleActivate} className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-4">
-        <input type="text" value={leaseNumber} onChange={(e) => setLeaseNumber(e.target.value)} placeholder="Nro Contrato" className={`${INPUT_CLS} font-mono text-xs`} />
-        <select value={activeUnitId} onChange={(e) => setUnitId(e.target.value)} className={INPUT_CLS}>
-          {units.length === 0 ? (
-            <option value="unit_101">unit_101 (demo)</option>
-          ) : (
-            units.map((u) => <option key={u.unitId} value={u.unitId}>{u.unitNumber}</option>)
-          )}
-        </select>
-        <select value={activePrimaryId} onChange={(e) => setPrimaryPartyId(e.target.value)} className={INPUT_CLS}>
-          {parties.length === 0 ? (
-            <option value="party_1">party_1 (demo)</option>
-          ) : (
-            parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)
-          )}
-        </select>
-        <select value={activeCoId} onChange={(e) => setCoPartyId(e.target.value)} className={INPUT_CLS}>
-          {parties.length === 0 ? (
-            <option value="party_2">party_2 (demo)</option>
-          ) : (
-            parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)
-          )}
-        </select>
-        <input type="number" min={0} step={1} value={monthlyRentMinor} onChange={(e) => setMonthlyRentMinor(e.target.value)} placeholder="Renta (minor)" className={`${INPUT_CLS} font-mono tabular-nums`} />
-        <input type="number" min={0} step={1} value={escrowMinor} onChange={(e) => setEscrowMinor(e.target.value)} placeholder="Escrow (minor)" className={`${INPUT_CLS} font-mono tabular-nums`} />
-        <input type="number" min={0} max={10000} step={1} value={primaryShareBps} onChange={(e) => setPrimaryShareBps(e.target.value)} placeholder="Share bps (0..10000)" className={`${INPUT_CLS} font-mono tabular-nums`} />
-        <button type="submit" disabled={activateMutation.isPending} className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground">
-          Activar Contrato
-        </button>
-      </form>
+      {feedback ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p> : null}
 
-      <form onSubmit={handleCommunity} className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-card p-3 md:grid-cols-3">
-        <select value={itemKind} onChange={(e) => setItemKind(e.target.value as CommunityKind)} className={INPUT_CLS}>
-          <option value="announcement">Anuncio</option>
-          <option value="pet_registration">Registro de Mascota</option>
-          <option value="lost_pet_alert">Alerta Mascota Perdida</option>
-          <option value="resident_vehicle">Vehículo Residente</option>
-          <option value="community_poll">Encuesta</option>
-          <option value="community_event">Evento</option>
-          <option value="marketplace_listing">Marketplace</option>
-        </select>
-        <input type="text" value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Título en Community Hub" className={INPUT_CLS} />
-        <button type="submit" disabled={communityMutation.isPending || !postTitle.trim()} className="h-9 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted disabled:opacity-50">
-          Publicar en Hub
-        </button>
-      </form>
+      <div className="rounded-xl border border-border bg-card shadow-xs divide-y divide-border">
+        <form onSubmit={handleActivate} className="space-y-3 p-5">
+          <h2 className="text-sm font-semibold tracking-tight">Activar Contrato de Arrendamiento</h2>
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-4">
+            <input type="text" value={leaseNumber} onChange={(e) => setLeaseNumber(e.target.value)} placeholder="Nro Contrato" className={`${INPUT_CLS} font-mono text-xs`} />
+            <select value={activeUnitId} onChange={(e) => setUnitId(e.target.value)} className={INPUT_CLS}>
+              {units.length === 0 ? <option value="unit_101">unit_101 (demo)</option> : units.map((u) => <option key={u.unitId} value={u.unitId}>{u.unitNumber}</option>)}
+            </select>
+            <select value={activePrimaryId} onChange={(e) => setPrimaryPartyId(e.target.value)} className={INPUT_CLS}>
+              {parties.length === 0 ? <option value="party_1">party_1 (demo)</option> : parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}
+            </select>
+            <select value={activeCoId} onChange={(e) => setCoPartyId(e.target.value)} className={INPUT_CLS}>
+              {parties.length === 0 ? <option value="party_2">party_2 (demo)</option> : parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}
+            </select>
+            <input type="number" min={0} step={1} value={monthlyRentMinor} onChange={(e) => setMonthlyRentMinor(e.target.value)} placeholder="Renta (minor)" className={`${INPUT_CLS} font-mono tabular-nums`} />
+            <input type="number" min={0} step={1} value={escrowMinor} onChange={(e) => setEscrowMinor(e.target.value)} placeholder="Escrow (minor)" className={`${INPUT_CLS} font-mono tabular-nums`} />
+            <input type="number" min={0} max={10000} step={1} value={primaryShareBps} onChange={(e) => setPrimaryShareBps(e.target.value)} placeholder="Share bps (0..10000)" className={`${INPUT_CLS} font-mono tabular-nums`} />
+            <button type="submit" disabled={activateMutation.isPending} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground shadow-xs">
+              <FileSignature className="size-3.5" />
+              <span>Activar Contrato</span>
+            </button>
+          </div>
+        </form>
 
-      {feedback ? (
-        <p className="rounded-md border border-border bg-muted/60 px-3 py-2 text-xs font-mono">{feedback}</p>
-      ) : null}
+        <form onSubmit={handleCommunity} className="space-y-3 p-5">
+          <h2 className="text-sm font-semibold tracking-tight">Tablero Comunitario & Residentes</h2>
+          <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
+            <select value={itemKind} onChange={(e) => setItemKind(e.target.value as CommunityKind)} className={INPUT_CLS}>
+              <option value="announcement">Anuncio</option>
+              <option value="pet_registration">Registro de Mascota</option>
+              <option value="lost_pet_alert">Alerta Mascota Perdida</option>
+              <option value="resident_vehicle">Vehículo Residente</option>
+              <option value="community_poll">Encuesta</option>
+              <option value="community_event">Evento</option>
+              <option value="marketplace_listing">Marketplace</option>
+            </select>
+            <input type="text" value={postTitle} onChange={(e) => setPostTitle(e.target.value)} placeholder="Título en Community Hub" className={INPUT_CLS} />
+            <button type="submit" disabled={communityMutation.isPending || !postTitle.trim()} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50">
+              <Megaphone className="size-3.5 text-muted-foreground" />
+              <span>Publicar en Hub</span>
+            </button>
+          </div>
+        </form>
+      </div>
     </section>
   );
 }

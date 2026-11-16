@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { CheckCheck, ClipboardPlus, Scale, Stethoscope } from 'lucide-react';
+import { PageHeader, StatusBadge } from '@shac/ui';
 import { INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
-/** Clinical SOAP + Co-Sign, ABA Trial, and Legal Matter/Docket workbench. */
+/** Open Mercato DS v3 Clinical SOAP + Co-Sign, ABA Trial, and Legal Matter/Docket workbench. */
 export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
   const [patientPartyId, setPatientPartyId] = useState('');
   const [subjective, setSubjective] = useState('Paciente refiere mejoría.');
@@ -94,55 +96,66 @@ export function CasesView({ vocabulary, rpc }: Phase2ViewProps) {
   }
 
   return (
-    <section className="space-y-4 p-4" data-slot="cases-view">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">{vocabulary.caseSingular}s · Salud (SOAP/ABA) & Legal</h1>
-        <p className="text-sm text-muted-foreground">
-          Notas clínicas SOAP con cola de co-firma, ensayos ABA y expedientes legales.
-        </p>
-      </div>
+    <section className="space-y-5" data-slot="cases-view">
+      <PageHeader
+        title={`${vocabulary.caseSingular}s · Clínico (SOAP/ABA) & Legal`}
+        description="Notas clínicas estructuradas con co-firma supervisora, ensayos ABA y expedientes jurídicos."
+        onRefresh={() => void partiesQuery.refetch()}
+        refreshing={partiesQuery.isFetching}
+        actions={noteId ? <StatusBadge label={`Nota activa: ${noteId.slice(0, 8)}`} tone="info" /> : null}
+      />
 
-      {feedback && (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-mono">
-          {feedback}
-        </div>
-      )}
+      {feedback ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p> : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <form onSubmit={handleSoapSubmit} className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="text-sm font-medium">Nota Clínica SOAP & Co-Firma</h2>
-          <select className={INPUT_CLS} value={activePartyId} onChange={(e) => setPatientPartyId(e.target.value)}>
-            {parties.length === 0 ? (
-              <option value="pty_1">pty_1 (demo)</option>
-            ) : (
-              parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)
-            )}
+      <div className="grid gap-5 md:grid-cols-2">
+        <form onSubmit={handleSoapSubmit} className="space-y-3.5 rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
+              <Stethoscope className="size-4 text-muted-foreground" />
+              <span>Nota Clínica SOAP & Co-Firma</span>
+            </h2>
+            <StatusBadge label="HIPAA Audit" tone="neutral" />
+          </div>
+          <select className={`${INPUT_CLS} w-full`} value={activePartyId} onChange={(e) => setPatientPartyId(e.target.value)}>
+            {parties.length === 0 ? <option value="pty_1">pty_1 (demo)</option> : parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}
           </select>
-          <input className={INPUT_CLS} value={subjective} onChange={(e) => setSubjective(e.target.value)} placeholder="Subjetivo" />
-          <input className={INPUT_CLS} value={assessment} onChange={(e) => setAssessment(e.target.value)} placeholder="Evaluación" />
+          <input className={`${INPUT_CLS} w-full`} value={subjective} onChange={(e) => setSubjective(e.target.value)} placeholder="Subjetivo" />
+          <input className={`${INPUT_CLS} w-full`} value={assessment} onChange={(e) => setAssessment(e.target.value)} placeholder="Evaluación" />
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={soapMutation.isPending} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
-              {soapMutation.isPending ? 'Guardando...' : 'Crear Nota SOAP'}
+            <button type="submit" disabled={soapMutation.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs">
+              <ClipboardPlus className="size-3.5" />
+              <span>{soapMutation.isPending ? 'Guardando...' : 'Crear Nota SOAP'}</span>
             </button>
-            <button type="button" disabled={!noteId.trim() || soapMutation.isPending} onClick={() => soapMutation.mutate(true)} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium">
-              Co-Firmar ({noteId || 'sin ID'})
+            <button type="button" disabled={!noteId.trim() || soapMutation.isPending} onClick={() => soapMutation.mutate(true)} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50">
+              <CheckCheck className="size-3.5 text-muted-foreground" />
+              <span>Co-Firmar Supervisor</span>
             </button>
           </div>
         </form>
 
-        <div className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="text-sm font-medium">Ensayo ABA & Expediente Legal</h2>
-          <div className="flex gap-2">
-            <input className={INPUT_CLS} value={abaBehavior} onChange={(e) => setAbaBehavior(e.target.value)} placeholder="Conducta ABA" />
-            <button type="button" disabled={abaMutation.isPending} onClick={() => abaMutation.mutate()} className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium">
-              Registrar ABA
-            </button>
+        <div className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-xs divide-y divide-border">
+          <div className="space-y-2.5 pb-4">
+            <h2 className="text-sm font-semibold">Registro de Ensayo Conductual (ABA)</h2>
+            <div className="flex gap-2">
+              <input className={`${INPUT_CLS} flex-1`} value={abaBehavior} onChange={(e) => setAbaBehavior(e.target.value)} placeholder="Conducta ABA" />
+              <button type="button" disabled={abaMutation.isPending} onClick={() => abaMutation.mutate()} className="h-9 shrink-0 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted">
+                Registrar ABA
+              </button>
+            </div>
           </div>
-          <div className="flex gap-2">
-            <input className={INPUT_CLS} value={matterRef} onChange={(e) => setMatterRef(e.target.value)} placeholder="Ref. Legal" />
-            <input className={INPUT_CLS} value={matterTitle} onChange={(e) => setMatterTitle(e.target.value)} placeholder="Título" />
-            <button type="button" disabled={matterMutation.isPending} onClick={() => matterMutation.mutate()} className="shrink-0 rounded-md border border-border px-3 py-1.5 text-xs font-medium">
-              Crear Matter
+
+          <div className="space-y-2.5 pt-4">
+            <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
+              <Scale className="size-4 text-muted-foreground" />
+              <span>Expediente Jurídico (Matter / Docket)</span>
+            </h2>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <input className={`${INPUT_CLS} font-mono text-xs`} value={matterRef} onChange={(e) => setMatterRef(e.target.value)} placeholder="Ref. Legal" />
+              <input className={INPUT_CLS} value={matterTitle} onChange={(e) => setMatterTitle(e.target.value)} placeholder="Título del asunto" />
+            </div>
+            <button type="button" disabled={matterMutation.isPending} onClick={() => matterMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs">
+              <Scale className="size-3.5" />
+              <span>Abrir Expediente</span>
             </button>
           </div>
         </div>

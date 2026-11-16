@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { BookOpenCheck, Landmark, ShieldCheck } from 'lucide-react';
+import { KpiCard, PageHeader, StatusBadge } from '@shac/ui';
 import {
   formatMinorUnits,
   INPUT_CLS,
@@ -8,7 +10,7 @@ import {
   type Phase2ViewProps,
 } from './phase2-format';
 
-/** Trust/IOLTA Escrow (strict overdraft guard) & GAAP Balanced Journal view. */
+/** Open Mercato DS v3 Trust/IOLTA Escrow (strict overdraft guard) & GAAP Balanced Journal view. */
 export function FinanceView({ rpc }: Phase2ViewProps) {
   const [ledgerId, setLedgerId] = useState('');
   const [partyId, setPartyId] = useState('');
@@ -18,6 +20,7 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
   const [txKind, setTxKind] = useState<'DEPOSIT' | 'DISBURSEMENT'>('DEPOSIT');
   const [entryNumber, setEntryNumber] = useState('JE-2026-001');
   const [journalMinorInput, setJournalMinorInput] = useState('25000');
+  const [lastBalanceMinor, setLastBalanceMinor] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const partiesQuery = useQuery({
@@ -54,6 +57,7 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
     },
     onSuccess: (data) => {
       setLedgerId(data.ledgerId);
+      setLastBalanceMinor(data.balanceMinor);
       setFeedback(
         `Ledger ${data.ledgerId} · ${data.txKind} ${formatMinorUnits(data.amountMinor, data.currency)} · Saldo: ${formatMinorUnits(data.balanceMinor, data.currency)}`,
       );
@@ -95,52 +99,64 @@ export function FinanceView({ rpc }: Phase2ViewProps) {
   }
 
   return (
-    <section className="space-y-4 p-4" data-slot="finance-view">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Finanzas · Trust/IOLTA & Libro Diario GAAP</h1>
-        <p className="text-sm text-muted-foreground">
-          Cuentas fiduciarias con bloqueo estricto de sobregiro (422) y asientos contables balanceados en BigInt.
-        </p>
+    <section className="space-y-5" data-slot="finance-view">
+      <PageHeader
+        title="Finanzas · Custodia Trust/IOLTA & Libro Diario GAAP"
+        description="Aislamiento fiduciario con guarda anti-sobregiro y contabilidad de partida doble en enteros exactos."
+        actions={<StatusBadge label="Sobregiro bloqueado (>= 0)" tone="success" icon={<ShieldCheck className="size-3" />} />}
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <KpiCard title="Saldo Ledger Activo" value={lastBalanceMinor !== null ? formatMinorUnits(lastBalanceMinor, 'USD') : '—'} />
+        <KpiCard title="Movimiento Trust" value={formatMinorUnits(parseNonNegInt(amountInput, 0), 'USD')} />
+        <KpiCard title="Partida Doble GAAP" value={formatMinorUnits(parseNonNegInt(journalMinorInput, 0), 'USD')} />
       </div>
 
-      {feedback && (
-        <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs font-mono">
-          {feedback}
-        </div>
-      )}
+      {feedback ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p> : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <form onSubmit={handleTrustSubmit} className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="text-sm font-medium">Trust / IOLTA Escrow</h2>
-          <input className={INPUT_CLS} value={ledgerId} onChange={(e) => setLedgerId(e.target.value)} placeholder="Ledger ID (vacío = crear nuevo)" />
-          <div className="grid grid-cols-2 gap-2">
+      <div className="grid gap-5 md:grid-cols-2">
+        <form onSubmit={handleTrustSubmit} className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
+              <Landmark className="size-4 text-muted-foreground" />
+              <span>Movimiento Fiduciario Trust / IOLTA</span>
+            </h2>
+            <StatusBadge label={txKind} tone={txKind === 'DEPOSIT' ? 'success' : 'warning'} appearance="dot" />
+          </div>
+          <input className={`${INPUT_CLS} w-full font-mono text-xs`} value={ledgerId} onChange={(e) => setLedgerId(e.target.value)} placeholder="Ledger ID (vacío = crear nuevo)" />
+          <div className="grid grid-cols-2 gap-2.5">
             <select className={INPUT_CLS} value={activePartyId} onChange={(e) => setPartyId(e.target.value)}>
-              {parties.length === 0 ? (
-                <option value="pty_1">pty_1 (demo)</option>
-              ) : (
-                parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)
-              )}
+              {parties.length === 0 ? <option value="pty_1">pty_1 (demo)</option> : parties.map((p) => <option key={p.id} value={p.id}>{p.displayName}</option>)}
             </select>
-            <input className={INPUT_CLS} value={matterId} onChange={(e) => setMatterId(e.target.value)} placeholder="Matter/Lease ID" />
+            <input className={`${INPUT_CLS} font-mono text-xs`} value={matterId} onChange={(e) => setMatterId(e.target.value)} placeholder="Matter/Lease ID" />
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2.5">
+            <select className={INPUT_CLS} value={bankId} onChange={(e) => setBankId(e.target.value)}>
+              <option value="bank_iolta_1">bank_iolta_1</option>
+              <option value="bank_escrow_2">bank_escrow_2</option>
+            </select>
             <select className={INPUT_CLS} value={txKind} onChange={(e) => setTxKind(e.target.value as 'DEPOSIT' | 'DISBURSEMENT')}>
-              <option value="DEPOSIT">DEPOSIT</option>
-              <option value="DISBURSEMENT">DISBURSEMENT</option>
+              <option value="DEPOSIT">Depósito (DEPOSIT)</option>
+              <option value="DISBURSEMENT">Desembolso (DISBURSEMENT)</option>
             </select>
-            <input className={INPUT_CLS} value={amountInput} onChange={(e) => setAmountInput(e.target.value)} placeholder="Monto (centavos)" />
           </div>
-          <button type="submit" disabled={trustMutation.isPending} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground">
-            {trustMutation.isPending ? 'Procesando...' : 'Ejecutar Movimiento Trust'}
+          <input className={`${INPUT_CLS} w-full font-mono tabular-nums`} value={amountInput} onChange={(e) => setAmountInput(e.target.value)} placeholder="Monto en centavos" />
+          <button type="submit" disabled={trustMutation.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs">
+            <Landmark className="size-3.5" />
+            <span>{trustMutation.isPending ? 'Procesando...' : 'Ejecutar Movimiento Trust'}</span>
           </button>
         </form>
 
-        <div className="space-y-3 rounded-lg border border-border p-4">
-          <h2 className="text-sm font-medium">Asiento Diario GAAP (Partida Doble)</h2>
-          <input className={INPUT_CLS} value={entryNumber} onChange={(e) => setEntryNumber(e.target.value)} placeholder="Número de asiento" />
-          <input className={INPUT_CLS} value={journalMinorInput} onChange={(e) => setJournalMinorInput(e.target.value)} placeholder="Monto balanceado (centavos)" />
-          <button type="button" disabled={journalMutation.isPending} onClick={() => journalMutation.mutate()} className="rounded-md border border-border px-3 py-1.5 text-xs font-medium">
-            {journalMutation.isPending ? 'Contabilizando...' : 'Contabilizar Asiento GAAP'}
+        <div className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-xs">
+          <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
+            <BookOpenCheck className="size-4 text-muted-foreground" />
+            <span>Asiento Diario GAAP (Partida Doble)</span>
+          </h2>
+          <input className={`${INPUT_CLS} w-full font-mono text-xs`} value={entryNumber} onChange={(e) => setEntryNumber(e.target.value)} placeholder="Número de asiento" />
+          <input className={`${INPUT_CLS} w-full font-mono tabular-nums`} value={journalMinorInput} onChange={(e) => setJournalMinorInput(e.target.value)} placeholder="Monto balanceado en centavos" />
+          <button type="button" disabled={journalMutation.isPending} onClick={() => journalMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3.5 text-xs font-medium shadow-xs hover:bg-muted">
+            <BookOpenCheck className="size-3.5 text-muted-foreground" />
+            <span>{journalMutation.isPending ? 'Contabilizando...' : 'Contabilizar Asiento GAAP'}</span>
           </button>
         </div>
       </div>

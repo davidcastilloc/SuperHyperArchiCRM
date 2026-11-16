@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TenantMarketProfile } from '@shac/kernel';
+import { Blocks, Check, Languages, Zap } from 'lucide-react';
+import { PageHeader, StatusBadge } from '@shac/ui';
 import type { createRpcClient } from '../lib/rpc';
 import { INPUT_CLS, readApiError } from './phase2-format';
 
@@ -12,7 +14,7 @@ interface AppStoreViewProps {
   rpc: ReturnType<typeof createRpcClient>;
 }
 
-/** App Store live market preset switcher & 0 ms KV module toggle view. */
+/** Open Mercato DS v3 App Store live market preset switcher & 0 ms KV module toggle view. */
 export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
   const queryClient = useQueryClient();
   const [partyPlural, setPartyPlural] = useState(fallbackProfile.vocabulary.partyPlural);
@@ -43,14 +45,12 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
     },
     onSuccess: (data) => {
       setFeedback(
-        `App Store KV 0 ms actualizado · preset=${data.profile.editionPreset} (${data.profile.activeModules.length} módulos)`,
+        `Perfil actualizado en CONFIG_KV (0 ms) · preset=${data.profile.editionPreset} (${data.profile.activeModules.length} módulos)`,
       );
       void queryClient.invalidateQueries({ queryKey: ['system', 'profile'] });
       void queryClient.invalidateQueries({ queryKey: ['auth', 'bootstrap'] });
     },
-    onError: (err) => {
-      setFeedback(`Error al actualizar App Store: ${err instanceof Error ? err.message : 'unknown'}`);
-    },
+    onError: (err) => setFeedback(err instanceof Error ? err.message : 'Error al actualizar App Store'),
   });
 
   const activeProfile = profileQuery.data?.profile ?? fallbackProfile;
@@ -65,6 +65,7 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
       'finance',
       'portal',
       'automation',
+      'services',
     ]),
   );
 
@@ -79,26 +80,22 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
   }
 
   return (
-    <section className="space-y-6 p-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">SHAC App Store · KV 0 ms</h1>
-          <p className="text-sm text-muted-foreground">
-            Preset activo: <strong>{activeProfile.editionPreset}</strong> ·{' '}
-            {activeProfile.activeModules.length} módulos activos
-          </p>
-        </div>
-        <span className="rounded-full border px-3 py-1 text-xs font-medium">
-          Hot-Switch · Sin Reinicio
-        </span>
-      </header>
+    <section className="space-y-6" data-slot="app-store-view">
+      <PageHeader
+        title="App Store & Perspectivas de Industria"
+        description={`Preset activo: ${activeProfile.editionPreset} · ${activeProfile.activeModules.length} dominios encendidos en CONFIG_KV sin recompilación.`}
+        onRefresh={() => void profileQuery.refetch()}
+        refreshing={profileQuery.isFetching}
+        actions={<StatusBadge label="Hot-Switch 0 ms" tone="success" icon={<Zap className="size-3" />} />}
+      />
 
-      {feedback && (
-        <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs">{feedback}</div>
-      )}
+      {feedback ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p> : null}
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold">9 Presets de Industria</h2>
+      <div className="space-y-3">
+        <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
+          <Blocks className="size-4 text-muted-foreground" />
+          <span>9 Presets Verticales Canónicos</span>
+        </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {presets.map((preset) => {
             const isCurrent = preset.id === activeProfile.editionPreset;
@@ -108,76 +105,62 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
                 type="button"
                 disabled={toggleMutation.isPending}
                 onClick={() => toggleMutation.mutate({ switchPreset: preset.id })}
-                className={`rounded-lg border p-3 text-left transition ${
-                  isCurrent ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'
+                className={`rounded-xl border p-4 text-left shadow-xs transition-colors ${
+                  isCurrent ? 'border-foreground bg-muted/40' : 'border-border bg-card hover:bg-muted/35'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{preset.label}</span>
-                  {isCurrent && <span className="text-xs font-semibold">Activo</span>}
+                  <span className="text-sm font-semibold">{preset.label}</span>
+                  {isCurrent ? <StatusBadge label="Activo" tone="success" icon={<Check className="size-3" />} /> : null}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{preset.targetMarket}</p>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  {preset.activeModules.length} módulos
-                </p>
+                <p className="mt-2 font-mono text-[11px] text-muted-foreground">{preset.activeModules.length} módulos</p>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="space-y-2">
-        <h2 className="text-sm font-semibold">Módulos en Vivo (CONFIG_KV)</h2>
-        <div className="flex flex-wrap gap-2">
-          {allModuleIds.map((modId) => {
-            const enabled = activeProfile.activeModules.includes(modId);
-            const isProtected = protectedSet.has(modId);
-            return (
-              <button
-                key={modId}
-                type="button"
-                disabled={isProtected || toggleMutation.isPending}
-                onClick={() =>
-                  toggleMutation.mutate(
-                    enabled ? { disableModules: [modId] } : { enableModules: [modId] },
-                  )
-                }
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
-                  enabled ? 'border-primary bg-primary/10' : 'opacity-60'
-                }`}
-              >
-                {modId} {isProtected ? '· fijo' : enabled ? '· ON' : '· OFF'}
-              </button>
-            );
-          })}
+      <div className="rounded-xl border border-border bg-card shadow-xs divide-y divide-border">
+        <div className="p-5 space-y-3">
+          <h2 className="text-sm font-semibold">Interruptores de Dominio (`CONFIG_KV`)</h2>
+          <div className="flex flex-wrap gap-2">
+            {allModuleIds.map((modId) => {
+              const enabled = activeProfile.activeModules.includes(modId);
+              const isProtected = protectedSet.has(modId);
+              return (
+                <button
+                  key={modId}
+                  type="button"
+                  disabled={isProtected || toggleMutation.isPending}
+                  onClick={() => toggleMutation.mutate(enabled ? { disableModules: [modId] } : { enableModules: [modId] })}
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-md border px-3 text-xs font-medium transition-colors ${
+                    enabled ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-background text-muted-foreground hover:bg-muted'
+                  }`}
+                >
+                  <span className="font-mono">{modId}</span>
+                  <span className="text-[10px] opacity-80">{isProtected ? 'fijo' : enabled ? 'ON' : 'OFF'}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
-      <form onSubmit={handleVocabularySubmit} className="flex flex-wrap items-end gap-3">
-        <label className="space-y-1 text-xs">
-          <span>Vocabulario Clientes (plural)</span>
-          <input
-            className={INPUT_CLS}
-            value={partyPlural}
-            onChange={(e) => setPartyPlural(e.target.value)}
-          />
-        </label>
-        <label className="space-y-1 text-xs">
-          <span>Vocabulario Pedido (singular)</span>
-          <input
-            className={INPUT_CLS}
-            value={orderSingular}
-            onChange={(e) => setOrderSingular(e.target.value)}
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={toggleMutation.isPending}
-          className="rounded-md border px-3 py-2 text-xs font-medium"
-        >
-          Aplicar Vocabulario
-        </button>
-      </form>
+        <form onSubmit={handleVocabularySubmit} className="flex flex-wrap items-end gap-3 p-5">
+          <label className="space-y-1 text-xs">
+            <span className="font-medium text-muted-foreground">Vocabulario Clientes (plural)</span>
+            <input className={INPUT_CLS} value={partyPlural} onChange={(e) => setPartyPlural(e.target.value)} />
+          </label>
+          <label className="space-y-1 text-xs">
+            <span className="font-medium text-muted-foreground">Vocabulario Pedido (singular)</span>
+            <input className={INPUT_CLS} value={orderSingular} onChange={(e) => setOrderSingular(e.target.value)} />
+          </label>
+          <button type="submit" disabled={toggleMutation.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3.5 text-xs font-medium shadow-xs hover:bg-muted">
+            <Languages className="size-3.5 text-muted-foreground" />
+            <span>Aplicar Vocabulario</span>
+          </button>
+        </form>
+      </div>
     </section>
   );
 }
