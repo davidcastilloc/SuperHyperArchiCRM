@@ -22,6 +22,7 @@ import { AutomationView } from './views/AutomationView';
 import { CasesView } from './views/CasesView';
 import { FinanceView } from './views/FinanceView';
 import { CatalogView, PartiesView } from './views/Phase2Views';
+import { PhysicalView } from './views/PhysicalView';
 import { PortalView } from './views/PortalView';
 import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
 import { LeasesView, SpacesView } from './views/SpacesLeasesViews';
@@ -131,6 +132,10 @@ function AutomationPage() {
   return <AutomationView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
 }
 
+function PhysicalPage() {
+  return <PhysicalView vocabulary={DEFAULT_PROFILE.vocabulary} rpc={rpcClient} />;
+}
+
 function AppStorePage() {
   return <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />;
 }
@@ -153,6 +158,7 @@ const casesRoute = createRoute({ getParentRoute: () => rootRoute, path: '/cases'
 const financeRoute = createRoute({ getParentRoute: () => rootRoute, path: '/finance', component: FinancePage });
 const portalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/portal', component: PortalPage });
 const automationRoute = createRoute({ getParentRoute: () => rootRoute, path: '/automation', component: AutomationPage });
+const physicalRoute = createRoute({ getParentRoute: () => rootRoute, path: '/physical', component: PhysicalPage });
 const appStoreRoute = createRoute({ getParentRoute: () => rootRoute, path: '/app-store', component: AppStorePage });
 
 const routeTree = rootRoute.addChildren([
@@ -169,6 +175,7 @@ const routeTree = rootRoute.addChildren([
   financeRoute,
   portalRoute,
   automationRoute,
+  physicalRoute,
   appStoreRoute,
 ]);
 const router = createRouter({ routeTree });

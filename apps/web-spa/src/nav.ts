@@ -21,6 +21,7 @@ export const DEFAULT_PROFILE: Pick<
     'finance',
     'portal',
     'automation',
+    'physical',
     'crm',
   ],
   vocabulary: {
@@ -84,5 +85,6 @@ export const NAV_ITEMS: ShacNavItem[] = [
   { id: 'finance', label: 'Finanzas · Trust/GAAP', href: '/finance', moduleId: 'finance' },
   { id: 'portal', label: 'Portal Cliente', href: '/portal', moduleId: 'portal' },
   { id: 'automation', label: 'Automatización IA', href: '/automation', moduleId: 'automation' },
+  { id: 'physical', label: 'IoT · Accesos & LPR', href: '/physical', moduleId: 'physical' },
   { id: 'app-store', label: 'App Store', href: '/app-store', moduleId: 'core' },
 ];

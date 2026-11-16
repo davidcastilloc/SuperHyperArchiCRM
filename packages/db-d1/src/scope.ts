@@ -15,6 +15,7 @@ import * as financeSchema from './schema/finance.js';
 import * as iamSchema from './schema/iam.js';
 import * as leasesSchema from './schema/leases.js';
 import * as partiesSchema from './schema/parties.js';
+import * as physicalSchema from './schema/physical.js';
 import * as posSchema from './schema/pos.js';
 import * as pricingSchema from './schema/pricing.js';
 import * as servicesSchema from './schema/services.js';
@@ -42,6 +43,7 @@ const allSchemas = {
   ...casesMedSchema,
   ...financeSchema,
   ...docsAutomationSchema,
+  ...physicalSchema,
 };
 
 export type ShacD1Database = DrizzleD1Database<typeof allSchemas>;

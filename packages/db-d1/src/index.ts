@@ -15,5 +15,6 @@ export * from './schema/cases-legal.js';
 export * from './schema/cases-med.js';
 export * from './schema/finance.js';
 export * from './schema/docs-automation.js';
+export * from './schema/physical.js';
 export * from './idempotency.js';
 export * from './scope.js';

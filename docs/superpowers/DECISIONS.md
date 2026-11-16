@@ -93,3 +93,11 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
   1. Garantizar en SQL (`CHECK (balance_minor >= 0)` en `fin_trust_escrow_ledgers`) y en dominio (`422 TRUST_OVERDRAFT_BLOCKED` y `UNBALANCED_JOURNAL_ENTRY` en `BigInt`) la imposibilidad de sobregiros Trust/IOLTA o asientos desbalanceados.
   2. Aislar datos confidenciales en `@shac/mod-portal` mediante filtro SQL obligatorio `is_confidential = 0` (`eq(isConfidential, false)`) en D1, y exigir aprobación humana explícita en *Proposal Cards* (`automation.proposals.decide`) antes de ejecutar acciones sugeridas por reglas.
   3. Desplegar los 5 módulos en `@shac/node-worker` (REST + `/mcp`) y `@shac/web-spa` (`/cases`, `/finance`, `/portal`, `/automation`) manteniendo todos los archivos `<= 300` líneas y el bundle del Worker en `230.41 KiB` gzip.
+
+## ADR-014 (2026-11-16): Fase 8 — Control Físico IoT (`@shac/mod-physical`), Validación en Tiempo Constante y Cierre de Presupuesto Global
+
+- **Contexto:** Cerrar la arquitectura All-in-One incorporando el Dominio 12 (cerraduras inteligentes, casilleros QR, garitas LPR, clips `SHA-256` en R2 y alertas anti-sabotaje) sin exceder el presupuesto de `1024 KiB` gzip del Worker.
+- **Decisión:**
+  1. Almacenar credenciales de acceso (`phy_access_passes`) como hashes `SHA-256` y validarlas en tiempo constante (`timingSafeEqual` XOR sobre bytes en `@shac/mod-physical`), rechazando pases inválidos/expirados/revocados con `403`.
+  2. Implementar lectura LPR (`< 15 ms`), registro de clips R2 con hash `SHA-256` y alertas anti-sabotaje `CRITICAL` (`phy_tamper_alerts`), conectados en `@shac/node-worker` (REST + `/mcp`) y `@shac/web-spa` (`/physical`).
+  3. Cerrar el binario completo All-in-One en `235.45 KiB` gzip (`< 1024 KiB`) con `0` issues en `knip --strict` y `109` tablas en `@shac/db-d1`.

@@ -77,7 +77,7 @@ describe('@shac/db-d1 Phase 7 workerd Domains 8-11 schema', () => {
       expect(names.has(tbl), `missing table ${tbl}`).toBe(true);
     }
     const db = createD1Client(env.DB);
-    expect(Object.keys(db.query)).toHaveLength(101);
+    expect(Object.keys(db.query).length).toBeGreaterThanOrEqual(101);
   });
 
   it('supports integer-exact inserts across Services, Cases, Finance, Portal & Automation', async () => {

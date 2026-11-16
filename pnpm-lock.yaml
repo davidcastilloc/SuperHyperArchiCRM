@@ -121,6 +121,9 @@ importers:
       '@shac/mod-leases':
         specifier: workspace:*
         version: link:../../packages/modules/leases
+      '@shac/mod-physical':
+        specifier: workspace:*
+        version: link:../../packages/modules/physical
       '@shac/mod-portal':
         specifier: workspace:*
         version: link:../../packages/modules/portal
@@ -496,6 +499,34 @@ importers:
         version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/modules/leases:
+    dependencies:
+      '@shac/db-d1':
+        specifier: workspace:*
+        version: link:../../db-d1
+      '@shac/kernel':
+        specifier: workspace:*
+        version: link:../../kernel
+      drizzle-orm:
+        specifier: ^0.41.0
+        version: 0.41.0(@cloudflare/workers-types@4.20260702.1)(@opentelemetry/api@1.10.0)
+      zod:
+        specifier: ^3.24.2
+        version: 3.25.76
+    devDependencies:
+      '@cloudflare/vitest-plugin':
+        specifier: ^1.8.3
+        version: 1.8.3(@cloudflare/workers-types@4.20260702.1)(vitest@4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1)))
+      '@cloudflare/workers-types':
+        specifier: ^4.20250401.0
+        version: 4.20260702.1
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.12(@opentelemetry/api@1.10.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.8(esbuild@0.28.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/modules/physical:
     dependencies:
       '@shac/db-d1':
         specifier: workspace:*

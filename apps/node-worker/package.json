@@ -28,6 +28,7 @@
     "@shac/mod-finance": "workspace:*",
     "@shac/mod-iam": "workspace:*",
     "@shac/mod-leases": "workspace:*",
+    "@shac/mod-physical": "workspace:*",
     "@shac/mod-portal": "workspace:*",
     "@shac/mod-pos": "workspace:*",
     "@shac/mod-regional": "workspace:*",

@@ -47,6 +47,7 @@ import {
   createPortalRoutes,
   createServicesRoutes,
 } from './phase7-registry.js';
+import { createPhysicalRoutes } from './phase8-registry.js';
 import {
   createLeasesRoutes,
   createSpacesRoutes,
@@ -136,6 +137,7 @@ function createWorkerApp(
     .route('/api/finance', createFinanceRoutes(profileLoader))
     .route('/api/portal', createPortalRoutes(profileLoader))
     .route('/api/automation', createAutomationRoutes(profileLoader))
+    .route('/api/physical', createPhysicalRoutes(profileLoader))
     .route('/api/branch/inventory', createBranchRoutes(profileLoader))
     .route('/api/branch/pos', createBranchPosRoutes(profileLoader))
     .route('/api/federation', createFederationRoutes(profileLoader))
