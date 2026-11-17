@@ -109,4 +109,18 @@ describe('POS Omni-Turbo scanner & integer math', () => {
     });
     expect(loadPersistedPosState('ten_1:org_1')?.shiftId).toBe('sh_1');
   });
+
+  it('matches gtin/barcode in findProductByScanCode and computes integer cartTotalMinor with coupon', async () => {
+    const gtinCatalog = [
+      { id: 'p3', sku: 'SKU-3', gtin: '7590001112223', name: 'Harina', basePriceMinor: 200 },
+    ];
+    expect(findProductByScanCode(gtinCatalog, '7590001112223')?.id).toBe('p3');
+
+    const { computeCartTotalWithCouponMinor } = await import('../src/views/PosReceiptPanel.js');
+    const total = computeCartTotalWithCouponMinor(
+      [{ productId: 'p3', sku: 'SKU-3', name: 'Harina', unitPriceMinor: 1000, qty: 2, discountBps: 1000 }],
+      500, // 5% coupon on top of 1800 -> 1710
+    );
+    expect(total).toBe(1710);
+  });
 });

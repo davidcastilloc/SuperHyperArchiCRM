@@ -3,18 +3,27 @@ import { useEffect, useRef, useState } from 'react';
 export interface ScannableProduct {
   id: string;
   sku: string;
+  gtin?: string | null;
+  barcode?: string | null;
   name: string;
   basePriceMinor: number;
 }
 
-/** Case-insensitive exact SKU/barcode matcher for instant POS scan-to-cart. */
+/** Case-insensitive exact SKU/GTIN/barcode matcher for instant POS scan-to-cart. */
 export function findProductByScanCode<T extends ScannableProduct>(
   products: readonly T[],
   rawCode: string,
 ): T | null {
   const normalized = rawCode.trim().toLowerCase();
   if (!normalized) return null;
-  return products.find((p) => p.sku.trim().toLowerCase() === normalized) ?? null;
+  return (
+    products.find(
+      (p) =>
+        p.sku.trim().toLowerCase() === normalized ||
+        (p.gtin ? p.gtin.trim().toLowerCase() === normalized : false) ||
+        (p.barcode ? p.barcode.trim().toLowerCase() === normalized : false),
+    ) ?? null
+  );
 }
 
 /** Integer basis-point discount calculation (0..10000 bps -> 0%..100%). */
