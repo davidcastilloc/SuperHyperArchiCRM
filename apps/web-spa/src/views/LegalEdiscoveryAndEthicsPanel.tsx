@@ -7,11 +7,19 @@ import { INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 interface LegalEdiscoveryAndEthicsPanelProps {
   rpc: Phase2ViewProps['rpc'];
   tab: 'ediscovery' | 'briefs' | 'ethics';
+  activeMatterId: string;
   onStatus: (msg: string) => void;
+  onError: (msg: string) => void;
 }
 
-/** Sub-panel for Legal e-Discovery (Bates), AI Briefs Generator, Citations & Bar/CLE Ethics. */
-export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdiscoveryAndEthicsPanelProps) {
+/** Sub-panel for Legal e-Discovery (Bates + SHA-256), AI Briefs Generator, Citations & Bar/CLE Ethics. */
+export function LegalEdiscoveryAndEthicsPanel({
+  rpc,
+  tab,
+  activeMatterId,
+  onStatus,
+  onError,
+}: LegalEdiscoveryAndEthicsPanelProps) {
   const queryClient = useQueryClient();
   const [holdTitle, setHoldTitle] = useState('');
   const [custodian, setCustodian] = useState('Dirección Financiera');
@@ -37,7 +45,7 @@ export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdisc
   const holdMutation = useMutation({
     mutationFn: async () => {
       const res = await rpc.api.legal['ediscovery-hold'].$post({
-        json: { matterId: 'EXP-2026-01', title: holdTitle.trim(), custodian, privilegeTag: privTag, snippetText: snippet.trim() || holdTitle.trim() },
+        json: { matterId: activeMatterId, title: holdTitle.trim(), custodian, privilegeTag: privTag, snippetText: snippet.trim() || holdTitle.trim() },
       });
       if (!res.ok) throw await readApiError(res);
       return res.json();
@@ -48,12 +56,13 @@ export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdisc
       setSnippet('');
       onStatus(`Evidencia sellada con Bates ${d.batesNumber}`);
     },
+    onError: (err: Error) => onError(err.message),
   });
 
   const briefMutation = useMutation({
     mutationFn: async () => {
       const res = await rpc.api.legal['ai-brief'].$post({
-        json: { matterId: 'EXP-2026-01', title: briefTitle.trim(), courtName, keyArguments: keyArgs.trim() },
+        json: { matterId: activeMatterId, title: briefTitle.trim(), courtName, keyArguments: keyArgs.trim() },
       });
       if (!res.ok) throw await readApiError(res);
       return res.json();
@@ -64,12 +73,16 @@ export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdisc
       setKeyArgs('');
       onStatus('Escrito judicial generado con IA y guardado.');
     },
+    onError: (err: Error) => onError(err.message),
   });
 
   const ethMutation = useMutation({
     mutationFn: async () => {
+      const completed = Number(cleDone) || 0;
+      const required = 20;
+      const statusTag = completed >= required ? 'COMPLIANT' : 'DEFICIENT';
       const res = await rpc.api.legal['citations-and-ethics'].$post({
-        json: { recordKind: ethKind, title: ethTitle.trim(), jurisdiction: ethJuris, statusTag: 'COMPLIANT', cleCompletedHours: Number(cleDone) || 0, cleRequiredHours: 20 },
+        json: { recordKind: ethKind, title: ethTitle.trim(), jurisdiction: ethJuris, statusTag, cleCompletedHours: completed, cleRequiredHours: required },
       });
       if (!res.ok) throw await readApiError(res);
       return res.json();
@@ -79,6 +92,7 @@ export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdisc
       setEthTitle('');
       onStatus('Registro de citación / ética CLE guardado.');
     },
+    onError: (err: Error) => onError(err.message),
   });
 
   const holds = (query.data?.ediscoveryHolds ?? []) as Array<{ id: string; title: string; meta: { batesNumber?: string; custodian?: string; privilegeTag?: string; sha256Hash?: string } }>;
@@ -101,14 +115,15 @@ export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdisc
         </form>
         <DataTable
           columns={[
-            { id: 'bates', header: 'Bates Stamp', cell: (r) => <span className="font-mono text-xs font-semibold">{r.meta.batesNumber ?? '—'}</span> },
+            { id: 'bates', header: 'Bates ID', cell: (r) => <span className="font-mono text-xs font-semibold text-primary">{r.meta?.batesNumber ?? '—'}</span> },
             { id: 'tit', header: 'Evidencia', cell: (r) => r.title },
-            { id: 'cust', header: 'Custodio', cell: (r) => r.meta.custodian ?? '—' },
-            { id: 'tag', header: 'Privilegio', cell: (r) => <StatusBadge label={r.meta.privilegeTag ?? 'RESPONSIVE'} tone={r.meta.privilegeTag === 'PRIVILEGED' ? 'warning' : 'info'} /> },
+            { id: 'cust', header: 'Custodio', cell: (r) => r.meta?.custodian ?? '—' },
+            { id: 'sha', header: 'SHA-256', cell: (r) => <span className="font-mono text-[11px] text-muted-foreground">{r.meta?.sha256Hash ? `${r.meta.sha256Hash.slice(0, 12)}…` : '—'}</span> },
+            { id: 'priv', header: 'Privilegio', cell: (r) => <StatusBadge label={r.meta?.privilegeTag ?? 'RESPONSIVE'} tone={r.meta?.privilegeTag === 'PRIVILEGED' ? 'warning' : 'info'} /> },
           ]}
           data={holds}
           getRowId={(r) => r.id}
-          emptyTitle="Sin evidencias en e-Discovery"
+          emptyTitle="Sin piezas de e-Discovery"
         />
       </div>
     );
@@ -117,27 +132,24 @@ export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdisc
   if (tab === 'briefs') {
     return (
       <div className="space-y-4">
-        <form className="space-y-2 rounded-xl border border-border bg-card p-4" onSubmit={(e) => { e.preventDefault(); briefMutation.mutate(); }}>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            <input placeholder="Título del Escrito / Moción" value={briefTitle} onChange={(e) => setBriefTitle(e.target.value)} className={INPUT_CLS} required />
-            <input placeholder="Tribunal" value={courtName} onChange={(e) => setCourtName(e.target.value)} className={INPUT_CLS} required />
-          </div>
-          <textarea rows={3} placeholder="Hechos clave y fundamentos jurídicos..." value={keyArgs} onChange={(e) => setKeyArgs(e.target.value)} className="w-full rounded-md border border-input bg-background p-2.5 text-xs" required />
-          <button type="submit" disabled={briefMutation.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground">
-            <Sparkles className="size-3.5" /><span>{briefMutation.isPending ? 'Redactando...' : 'Generar Escrito con IA'}</span>
+        <form className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-3" onSubmit={(e) => { e.preventDefault(); briefMutation.mutate(); }}>
+          <input placeholder="Título del Escrito / Demanda" value={briefTitle} onChange={(e) => setBriefTitle(e.target.value)} className={INPUT_CLS} required />
+          <input placeholder="Tribunal competente" value={courtName} onChange={(e) => setCourtName(e.target.value)} className={INPUT_CLS} required />
+          <button type="submit" disabled={briefMutation.isPending} className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground">
+            <Sparkles className="size-3.5" /><span>{briefMutation.isPending ? 'Redactando...' : 'Generar Escrito IA'}</span>
           </button>
+          <textarea rows={2} placeholder="Argumentos y hechos clave..." value={keyArgs} onChange={(e) => setKeyArgs(e.target.value)} className={`${INPUT_CLS} h-auto py-2 sm:col-span-3`} required />
         </form>
-        <div className="space-y-2.5">
-          {briefs.map((b) => (
-            <div key={b.id} className="rounded-xl border border-border bg-card p-4 shadow-xs">
-              <div className="mb-1 flex items-center justify-between">
-                <h4 className="text-sm font-semibold">{b.title}</h4>
-                <StatusBadge label={b.meta.courtName ?? 'Tribunal'} tone="info" />
-              </div>
-              <pre className="whitespace-pre-wrap font-sans text-xs text-muted-foreground">{b.content}</pre>
-            </div>
-          ))}
-        </div>
+        <DataTable
+          columns={[
+            { id: 'tit', header: 'Escrito', cell: (r) => <span className="font-medium">{r.title}</span> },
+            { id: 'crt', header: 'Tribunal', cell: (r) => r.meta?.courtName ?? '—' },
+            { id: 'cnt', header: 'Extracto Generado', cell: (r) => <span className="line-clamp-2 text-xs text-muted-foreground">{r.content}</span> },
+          ]}
+          data={briefs}
+          getRowId={(r) => r.id}
+          emptyTitle="Sin escritos generados aún"
+        />
       </div>
     );
   }
@@ -146,24 +158,23 @@ export function LegalEdiscoveryAndEthicsPanel({ rpc, tab, onStatus }: LegalEdisc
     <div className="space-y-4">
       <form className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-5" onSubmit={(e) => { e.preventDefault(); ethMutation.mutate(); }}>
         <select value={ethKind} onChange={(e) => setEthKind(e.target.value as typeof ethKind)} className={INPUT_CLS}>
-          <option value="ethics_license">Licencia / Ética CLE</option>
-          <option value="legal_citation">Citación Jurisprudencial</option>
+          <option value="ethics_license">Licencia / CLE</option><option value="legal_citation">Citación / Jurisprudencia</option>
         </select>
-        <input placeholder="Abogado / N° Sentencia" value={ethTitle} onChange={(e) => setEthTitle(e.target.value)} className={INPUT_CLS} required />
-        <input placeholder="Jurisdicción" value={ethJuris} onChange={(e) => setEthJuris(e.target.value)} className={INPUT_CLS} required />
-        <input type="number" placeholder="Horas CLE" value={cleDone} onChange={(e) => setCleDone(e.target.value)} className={`${INPUT_CLS} font-mono`} />
-        <button type="submit" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground">Registrar</button>
+        <input placeholder="Título o Inpreabogado / Sentencia" value={ethTitle} onChange={(e) => setEthTitle(e.target.value)} className={INPUT_CLS} required />
+        <input placeholder="Jurisdicción" value={ethJuris} onChange={(e) => setEthJuris(e.target.value)} className={INPUT_CLS} />
+        <input type="number" placeholder="Horas CLE (req: 20)" value={cleDone} onChange={(e) => setCleDone(e.target.value)} className={`${INPUT_CLS} font-mono`} />
+        <button type="submit" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground">Guardar</button>
       </form>
       <DataTable
         columns={[
           { id: 'tit', header: 'Registro', cell: (r) => <span className="font-medium">{r.title}</span> },
-          { id: 'jur', header: 'Jurisdicción', cell: (r) => r.meta.jurisdiction ?? '—' },
-          { id: 'cle', header: 'CLE / Tipo', cell: (r) => r.folderId === 'ethics_license' ? <span className="font-mono text-xs tabular-nums">{r.meta.cleCompletedHours ?? 0}/{r.meta.cleRequiredHours ?? 20}h CLE</span> : 'Jurisprudencia' },
-          { id: 'st', header: 'Estado', cell: (r) => <StatusBadge label={r.meta.statusTag ?? 'COMPLIANT'} tone="success" /> },
+          { id: 'jur', header: 'Jurisdicción', cell: (r) => r.meta?.jurisdiction ?? '—' },
+          { id: 'cle', header: 'Créditos CLE', cell: (r) => <span className="font-mono text-xs">{r.meta?.cleCompletedHours ?? 0}/{r.meta?.cleRequiredHours ?? 20}h</span> },
+          { id: 'st', header: 'Estado', cell: (r) => <StatusBadge label={r.meta?.statusTag ?? 'COMPLIANT'} tone={r.meta?.statusTag === 'DEFICIENT' ? 'warning' : 'success'} /> },
         ]}
         data={ethics}
         getRowId={(r) => r.id}
-        emptyTitle="Sin citaciones ni licencias registradas"
+        emptyTitle="Sin registros de ética o citaciones"
       />
     </div>
   );

@@ -696,4 +696,61 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
     const signBody = (await signRes.json()) as { status: string };
     expect(signBody.status).toBe('SIGNED');
   });
+
+  it('detects legal conflicts on crm_parties.display_name and creates court dockets', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['core', 'iam', 'customers', 'cases', 'finance', 'portal', 'automation'])),
+    );
+    invalidateProfileCache();
+    const testEnv = makeTestEnv();
+
+    const ptyRes = await workerApp.request(
+      'http://localhost/api/customers/parties',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientMutationId: crypto.randomUUID(),
+          displayName: 'Inversiones Orinoco',
+          partyKind: 'company',
+          rolesMask: ['customer'],
+        }),
+      },
+      testEnv,
+    );
+    expect([200, 201]).toContain(ptyRes.status);
+
+    const revRes = await workerApp.request(
+      'http://localhost/api/legal/ai-contract-review',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          opposingPartyName: 'Orinoco',
+          contractText: 'Contrato de suministro con penalidad del 30% y terminación unilateral.',
+        }),
+      },
+      testEnv,
+    );
+    expect(revRes.status).toBe(200);
+    const revBody = (await revRes.json()) as { conflictsFound: Array<{ display_name?: string }> };
+    expect(revBody.conflictsFound.length).toBeGreaterThanOrEqual(1);
+
+    const docketRes = await workerApp.request(
+      'http://localhost/api/legal/dockets',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          matterId: 'mat_demo_1',
+          courtName: 'Juzgado Superior Mercantil',
+          docketNumber: 'DKT-2026-88',
+          summary: 'Audiencia preliminar de conciliación',
+        }),
+      },
+      testEnv,
+    );
+    expect(docketRes.status).toBe(201);
+  });
 });
