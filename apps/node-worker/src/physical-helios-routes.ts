@@ -8,10 +8,10 @@ const UpsertDeviceSchema = z.object({
   name: z.string().min(1).max(120),
   deviceKind: z.enum(['SMART_DOOR_LOCK', 'IP_CAMERA', 'LPR_GATE', 'SMART_LOCKER', 'LAN_SENSOR']).default('SMART_DOOR_LOCK'),
   lockState: z.enum(['LOCKED', 'UNLOCKED']).default('LOCKED'),
-  batteryPct: z.number().int().min(0).max(100).default(100),
+  batteryPct: z.number().int().min(0).max(100).optional(),
 });
 
-/** Mounts Helios Physical Security Console: Devices/Locks, Video Wall Clips, LPR Gates, Passes, Lockers & Tamper Alerts. */
+/** Mounts Helios Physical Security Console: Devices/Locks, Lockdown, Video Wall Clips, LPR Gates, Passes, Lockers & Tamper. */
 export function createPhysicalHeliosRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
     .get('/physical/overview', async (c) => {
@@ -61,10 +61,23 @@ export function createPhysicalHeliosRoutes(profileLoader: ProfileLoader) {
       await c.env.DB.prepare(
         `INSERT INTO phy_devices_and_locks
           (id, tenant_id, org_id, device_code, name, device_kind, battery_pct, lock_state, last_heartbeat_at, watchdog_status, is_active, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'ONLINE', 1, ?9, ?9)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, 100), ?8, ?9, 'ONLINE', 1, ?9, ?9)
          ON CONFLICT(tenant_id, device_code) DO UPDATE SET
-           lock_state = excluded.lock_state, battery_pct = excluded.battery_pct, last_heartbeat_at = excluded.last_heartbeat_at, updated_at = excluded.updated_at`,
-      ).bind(id, auth.actor.tenantId, auth.actor.orgId, d.deviceCode.trim().toUpperCase(), d.name.trim(), d.deviceKind, d.batteryPct, d.lockState, nowSec).run();
+           lock_state = excluded.lock_state,
+           battery_pct = COALESCE(?7, phy_devices_and_locks.battery_pct, 100),
+           last_heartbeat_at = excluded.last_heartbeat_at,
+           updated_at = excluded.updated_at`,
+      ).bind(id, auth.actor.tenantId, auth.actor.orgId, d.deviceCode.trim().toUpperCase(), d.name.trim(), d.deviceKind, d.batteryPct ?? null, d.lockState, nowSec).run();
       return c.json({ ok: true, id, ...d }, 201);
+    })
+    .post('/physical/devices/lockdown', async (c) => {
+      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'physical', 'physical.passes.write');
+      const nowSec = Math.floor(Date.now() / 1000);
+      const res = await c.env.DB.prepare(
+        `UPDATE phy_devices_and_locks
+         SET lock_state = 'LOCKED', updated_at = ?1
+         WHERE tenant_id = ?2 AND org_id = ?3 AND deleted_at IS NULL`,
+      ).bind(nowSec, auth.actor.tenantId, auth.actor.orgId).run();
+      return c.json({ ok: true, lockedCount: res.meta?.changes ?? 0 }, 200);
     });
 }

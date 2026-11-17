@@ -24,4 +24,13 @@ describe('Condo Split Rent, Helios QR/PIN & Demo Playbooks UX', () => {
     expect(invalid.valid).toBe(false);
     expect(invalid.totalBps).toBe(9_000);
   });
+
+  it('builds encoded WhatsApp pass share URL with visitor, PIN, and branch', async () => {
+    const { buildWhatsAppPassUrl } = await import('../src/views/HeliosPassAndLprModal.js');
+    const url = buildWhatsAppPassUrl('Juan Pérez', 'A9F3K2P1', 'Parque Norte');
+    expect(url).toMatch(/^https:\/\/wa\.me\/\?text=/);
+    const decoded = decodeURIComponent(url.replace('https://wa.me/?text=', ''));
+    expect(decoded).toContain('A9F3K2P1');
+    expect(decoded).toContain('Parque Norte');
+  });
 });
