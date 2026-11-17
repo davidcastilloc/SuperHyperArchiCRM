@@ -1,6 +1,6 @@
 import { catProducts, type ShacD1Database } from '@shac/db-d1';
-import { defineCommand } from '@shac/kernel';
-import { and, asc, eq, isNull, like, or, sql } from 'drizzle-orm';
+import { buildCursorPage, decodeKeysetCursor, defineCommand } from '@shac/kernel';
+import { and, asc, eq, gt, isNull, like, or, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import {
   listProductsInputSchema,
@@ -45,6 +45,11 @@ export const catalogProductsListCommand = defineCommand<
       if (searchCond) conditions.push(searchCond);
     }
 
+    const decodedCursor = decodeKeysetCursor(input.cursor);
+    if (decodedCursor && typeof decodedCursor.sortValue === 'string') {
+      conditions.push(gt(catProducts.sku, decodedCursor.sortValue));
+    }
+
     const whereClause = and(...conditions);
 
     const itemsQuery = ctx.db
@@ -78,21 +83,27 @@ export const catalogProductsListCommand = defineCommand<
       .from(catProducts)
       .where(whereClause)
       .orderBy(asc(catProducts.sku))
-      .limit(input.limit)
-      .offset(input.offset);
+      .limit(input.limit + 1)
+      .offset(decodedCursor ? 0 : input.offset);
 
     const countQuery = ctx.db
       .select({ count: sql<number>`count(*)` })
       .from(catProducts)
       .where(whereClause);
 
-    const [items, countRows] = await ctx.db.batch([itemsQuery, countQuery]);
+    const [rowsPlusOne, countRows] = await ctx.db.batch([itemsQuery, countQuery]);
+    const page = buildCursorPage(rowsPlusOne, input.limit, (row) => ({
+      sortValue: row.sku,
+      id: row.id,
+    }));
 
     return {
-      items,
-      total: Number(countRows[0]?.count ?? 0),
+      items: [...page.items],
+      total: Number(countRows[0]?.count ?? page.items.length),
       limit: input.limit,
       offset: input.offset,
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
     };
   },
 });

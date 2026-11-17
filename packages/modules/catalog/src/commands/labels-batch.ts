@@ -6,6 +6,7 @@ import {
   catLabelPrintBatches,
   catProducts,
   checkIdempotency,
+  chunkIdsForD1InClause,
   type ShacD1Database,
 } from '@shac/db-d1';
 import { AppError, defineCommand, sha256Hex } from '@shac/kernel';
@@ -98,27 +99,7 @@ export const catalogLabelsBatchCommand = defineCommand<
     const productIds = Array.from(
       new Set(input.items.map((i) => i.productId).filter((v): v is string => !!v)),
     );
-    const matchCond =
-      productIds.length > 0
-        ? or(inArray(catProducts.sku, skus), inArray(catProducts.id, productIds))
-        : inArray(catProducts.sku, skus);
-
-    const productsQuery = ctx.db
-      .select({
-        id: catProducts.id,
-        sku: catProducts.sku,
-        name: catProducts.name,
-        basePriceMinor: catProducts.basePriceMinor,
-        primaryCurrency: catProducts.primaryCurrency,
-      })
-      .from(catProducts)
-      .where(
-        and(
-          eq(catProducts.tenantId, ctx.tenantId),
-          matchCond,
-          isNull(catProducts.deletedAt),
-        ),
-      );
+    const skuChunks = chunkIdsForD1InClause(skus, 4, 80);
 
     const fxQuery = ctx.db
       .select()
@@ -134,7 +115,37 @@ export const catalogLabelsBatchCommand = defineCommand<
       .orderBy(desc(catCurrenciesAndRates.effectiveAt))
       .limit(1);
 
-    const [productRows, fxRows] = await ctx.db.batch([productsQuery, fxQuery]);
+    const productSelect = (skuChunk: string[], idChunk: string[]) => {
+      const cond =
+        idChunk.length > 0
+          ? or(inArray(catProducts.sku, skuChunk), inArray(catProducts.id, idChunk))
+          : inArray(catProducts.sku, skuChunk);
+      return ctx.db
+        .select({
+          id: catProducts.id,
+          sku: catProducts.sku,
+          name: catProducts.name,
+          basePriceMinor: catProducts.basePriceMinor,
+          primaryCurrency: catProducts.primaryCurrency,
+        })
+        .from(catProducts)
+        .where(
+          and(
+            eq(catProducts.tenantId, ctx.tenantId),
+            cond,
+            isNull(catProducts.deletedAt),
+          ),
+        );
+    };
+
+    const productRows = (
+      await Promise.all(
+        skuChunks.map((chunk, idx) =>
+          productSelect(chunk, idx === 0 && productIds.length <= 40 ? productIds : []),
+        ),
+      )
+    ).flat();
+    const fxRows = await fxQuery;
 
     const bySku = new Map(productRows.map((p) => [p.sku, p]));
     const byId = new Map(productRows.map((p) => [p.id, p]));

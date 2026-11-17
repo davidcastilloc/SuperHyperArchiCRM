@@ -5,7 +5,11 @@ import {
   phyTamperAlerts,
   type ShacD1Database,
 } from '@shac/db-d1';
-import { defineCommand } from '@shac/kernel';
+import {
+  computeAuditEntryHashHex,
+  defineCommand,
+  GENESIS_AUDIT_HASH,
+} from '@shac/kernel';
 import { z } from 'zod';
 import { sha256DigestHex } from '../lib/crypto.js';
 import { parseJsonRecord, resolveScopedTargetOrg } from '../lib/scope-helpers.js';
@@ -108,6 +112,17 @@ export const physicalTamperReportCommand = defineCommand<
     };
 
     const responseJson = JSON.stringify(created);
+    await computeAuditEntryHashHex({
+      orgId: targetOrgId,
+      streamKey: 'physical:tamper',
+      seqNo: nowSec,
+      actorId: ctx.actor.id,
+      action: input.alertKind,
+      targetId: alertId,
+      occurredAtMs: occurredAt * 1000,
+      prevHashHex: GENESIS_AUDIT_HASH,
+      payload: created,
+    });
 
     await ctx.db.batch([
       ctx.db.insert(phyTamperAlerts).values({
