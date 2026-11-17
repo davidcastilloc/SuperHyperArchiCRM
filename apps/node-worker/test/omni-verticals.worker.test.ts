@@ -753,4 +753,102 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
     );
     expect(docketRes.status).toBe(201);
   });
+
+  it('creates PMS rooms, runs reserve->checkin->folio charge/settle->checkout, and sets PENDING on DIRTY housekeeping', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['core', 'iam', 'customers', 'spaces', 'leases', 'finance'])),
+    );
+    invalidateProfileCache();
+    const testEnv = makeTestEnv();
+
+    const unitRes = await workerApp.request(
+      'http://localhost/api/hospitality/units',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ unitNumber: '101', floorLabel: 'Piso 1', typeName: 'Suite Ejecutiva', baseRateMinor: 12_000, capacity: 2 }),
+      },
+      testEnv,
+    );
+    expect(unitRes.status).toBe(201);
+    const unitBody = (await unitRes.json()) as { id: string };
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const resvRes = await workerApp.request(
+      'http://localhost/api/spaces/bookings/reserve',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientMutationId: crypto.randomUUID(),
+          partyId: 'pty_guest_1',
+          unitId: unitBody.id,
+          slotBucket: new Date(nowSec * 1000).toISOString().slice(0, 10),
+          scheduledStart: nowSec + 60,
+          scheduledEnd: nowSec + 86_400,
+        }),
+      },
+      testEnv,
+    );
+    expect(resvRes.status).toBe(200);
+    const resvBody = (await resvRes.json()) as { bookingId: string; folioId?: string };
+
+    const checkinRes = await workerApp.request(
+      'http://localhost/api/spaces/bookings/transition',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ clientMutationId: crypto.randomUUID(), bookingId: resvBody.bookingId, action: 'CHECK_IN' }),
+      },
+      testEnv,
+    );
+    expect(checkinRes.status).toBe(200);
+
+    const ov1 = await workerApp.request(
+      'http://localhost/api/hospitality/overview',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    const ov1Data = (await ov1.json()) as { folios: Array<{ id: string }> };
+    const folioId = resvBody.folioId ?? ov1Data.folios[0]!.id;
+
+    const chargeRes = await workerApp.request(
+      `http://localhost/api/hospitality/folios/${folioId}/charge-or-settle`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'charge', description: 'Minibar Agua + Café', amountMinor: 1500 }),
+      },
+      testEnv,
+    );
+    expect(chargeRes.status).toBe(200);
+
+    const settleRes = await workerApp.request(
+      `http://localhost/api/hospitality/folios/${folioId}/charge-or-settle`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'settle' }),
+      },
+      testEnv,
+    );
+    expect(settleRes.status).toBe(200);
+    const settleData = (await settleRes.json()) as { balanceMinor: number; status: string };
+    expect(settleData.balanceMinor).toBe(0);
+    expect(settleData.status).toBe('CLOSED');
+
+    const hkDirty = await workerApp.request(
+      'http://localhost/api/hospitality/housekeeping',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ unitId: unitBody.id, taskKind: 'TURNOVER', targetUnitStatus: 'DIRTY', priority: 'HIGH' }),
+      },
+      testEnv,
+    );
+    expect(hkDirty.status).toBe(201);
+    const hkDirtyData = (await hkDirty.json()) as { taskStatus: string };
+    expect(hkDirtyData.taskStatus).toBe('PENDING');
+  });
 });
