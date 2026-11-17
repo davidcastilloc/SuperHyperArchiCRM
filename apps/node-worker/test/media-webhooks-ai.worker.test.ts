@@ -148,6 +148,15 @@ describe('Media R2/D1 storage, HMAC-SHA256 webhook dispatcher, and Workers AI fa
         },
       },
     });
+    const baseProfile = makeProfile(['core', 'iam', 'customers', 'catalog', 'pos', 'finance', 'portal', 'automation']);
+    await testEnv.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify({
+        ...baseProfile,
+        entitlements: { ...baseProfile.entitlements, aiCopilotEnabled: true },
+      }),
+    );
+    invalidateProfileCache();
     const aiRes = await workerApp.request(
       'http://localhost/api/automation/ai-chat',
       {

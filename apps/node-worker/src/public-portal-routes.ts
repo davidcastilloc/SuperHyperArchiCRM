@@ -4,24 +4,40 @@ import { z } from 'zod';
 import type { HonoEnv } from './command-registry.js';
 
 const PublicFormSubmitSchema = z.object({
-  tenantId: z.string().min(1).default('ten_1'),
+  tenantId: z.string().min(1).optional(),
   answers: z.record(z.unknown()),
 });
 
 const PublicQuoteDecisionSchema = z.object({
-  tenantId: z.string().min(1).default('ten_1'),
+  tenantId: z.string().min(1).optional(),
   decision: z.enum(['ACCEPTED', 'REJECTED']),
   acceptedByName: z.string().min(1).max(120),
   acceptedByEmail: z.string().email().optional(),
   comment: z.string().max(400).optional(),
 });
 
+async function resolvePublicTenantId(
+  kv: KVNamespace | undefined,
+  explicitTenantId?: string,
+): Promise<string> {
+  if (explicitTenantId && explicitTenantId.trim().length > 0) {
+    return explicitTenantId.trim();
+  }
+  if (kv) {
+    const profile = await kv.get<{ tenantId?: string }>('profile:current', 'json').catch(() => null);
+    if (profile?.tenantId && profile.tenantId.trim().length > 0) {
+      return profile.tenantId.trim();
+    }
+  }
+  return 'ten_1';
+}
+
 /** Mounts unauthenticated public routes for external forms (/api/public/forms/:slug) and quotes (/api/public/quotes/:orderNumber). */
 export function createPublicPortalRoutes() {
   return new Hono<HonoEnv>()
     .get('/public/forms/:slug', async (c) => {
       const slug = c.req.param('slug').trim();
-      const tenantId = c.req.query('tenantId') ?? 'ten_1';
+      const tenantId = await resolvePublicTenantId(c.env.CONFIG_KV, c.req.query('tenantId'));
       const row = await c.env.DB.prepare(
         `SELECT id, form_slug, schema_json, status, created_at
          FROM doc_forms_and_submissions
@@ -56,7 +72,8 @@ export function createPublicPortalRoutes() {
       if (!parsed.success) {
         throw new AppError('VALIDATION_ERROR', 400, 'Invalid form submission', parsed.error.flatten());
       }
-      const { tenantId, answers } = parsed.data;
+      const { answers } = parsed.data;
+      const tenantId = await resolvePublicTenantId(c.env.CONFIG_KV, parsed.data.tenantId);
       const def = await c.env.DB.prepare(
         `SELECT id, org_id FROM doc_forms_and_submissions
          WHERE tenant_id = ?1 AND form_slug = ?2 AND record_kind = 'form_definition' AND status = 'ACTIVE' AND deleted_at IS NULL
@@ -83,7 +100,7 @@ export function createPublicPortalRoutes() {
     })
     .get('/public/quotes/:orderNumber', async (c) => {
       const orderNumber = c.req.param('orderNumber').trim();
-      const tenantId = c.req.query('tenantId') ?? 'ten_1';
+      const tenantId = await resolvePublicTenantId(c.env.CONFIG_KV, c.req.query('tenantId'));
       const quote = await c.env.DB.prepare(
         `SELECT id, order_number, currency, grand_total_minor, status, custom_fields, created_at
          FROM com_orders
@@ -121,16 +138,20 @@ export function createPublicPortalRoutes() {
       if (!parsed.success) {
         throw new AppError('VALIDATION_ERROR', 400, 'Invalid quote decision', parsed.error.flatten());
       }
-      const { tenantId, decision, acceptedByName, acceptedByEmail, comment } = parsed.data;
+      const { decision, acceptedByName, acceptedByEmail, comment } = parsed.data;
+      const tenantId = await resolvePublicTenantId(c.env.CONFIG_KV, parsed.data.tenantId);
       const existing = await c.env.DB.prepare(
-        `SELECT id, custom_fields FROM com_orders
+        `SELECT id, status, custom_fields FROM com_orders
          WHERE tenant_id = ?1 AND order_number = ?2 AND order_kind = 'quote' AND deleted_at IS NULL LIMIT 1`,
       )
         .bind(tenantId, orderNumber)
-        .first<{ id: string; custom_fields: string }>();
+        .first<{ id: string; status: string; custom_fields: string }>();
 
       if (!existing) {
         throw new AppError('NOT_FOUND', 404, `Quote '${orderNumber}' not found`);
+      }
+      if (existing.status === 'fulfilled' || existing.status === 'cancelled') {
+        throw new AppError('QUOTE_ALREADY_DECIDED', 409, `Quote '${orderNumber}' was already decided (${existing.status})`);
       }
 
       const nextStatus = decision === 'ACCEPTED' ? 'fulfilled' : 'cancelled';
