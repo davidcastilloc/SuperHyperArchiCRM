@@ -427,4 +427,39 @@ describe('@shac/ui smoke tests', () => {
     expect(container.querySelector('[data-slot="app-shell-sidebar"]')).toBeNull();
     expect(container.querySelector('[data-slot="segmented-tabs"]')?.className).toContain('no-scrollbar');
   });
+
+  it('filters navItems by allowedPresets, collapses desktop sidebar to 64px rail, and switches branches inline', () => {
+    const onSwitchBranch = vi.fn();
+    const { container } = render(
+      <ShacAppShell
+        profile={PROFILE}
+        branchName="Sede Centro"
+        activeBranchId="br_1"
+        branches={[
+          { id: 'br_1', name: 'Sede Centro', orgPath: '/org_1' },
+          { id: 'br_2', name: 'Sucursal Norte', orgPath: '/org_1/norte' },
+        ]}
+        onSwitchBranch={onSwitchBranch}
+        syncState={{ status: 'online' }}
+        navItems={[
+          { id: 'pos', label: 'POS Táctil', href: '/pos', moduleId: 'pos', allowedPresets: ['retail-pos'] },
+          { id: 'legal', label: 'Suite Legal', href: '/legal-hub', moduleId: 'iam', allowedPresets: ['legal-psa'] },
+        ]}
+      >
+        <div>Workspace</div>
+      </ShacAppShell>,
+    );
+
+    expect(screen.getByText('POS Táctil')).toBeInTheDocument();
+    expect(screen.queryByText('Suite Legal')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
+    const sidebar = container.querySelector('[data-slot="app-shell-sidebar"]');
+    expect(sidebar).toBeInTheDocument();
+    expect(sidebar).toHaveAttribute('data-collapsed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /Sede Centro/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Sucursal Norte/i }));
+    expect(onSwitchBranch).toHaveBeenCalledWith('br_2');
+  });
 });
