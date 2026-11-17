@@ -274,6 +274,7 @@ export function usePosShiftAndCheckout({
       void queryClient.invalidateQueries({ queryKey: ['pos', 'offlineQueue'] });
       setStatusMsg(`Cola sincronizada: ${res.settled} liquidados, ${res.retained} pendientes`);
     },
+    onError: (err) => setStatusMsg(err.message),
   });
 
   return {

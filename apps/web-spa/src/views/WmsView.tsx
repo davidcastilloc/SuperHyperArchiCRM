@@ -229,26 +229,13 @@ export function WmsView({ vocabulary, rpc }: Phase2ViewProps) {
                 {locations.map((loc) => <option key={loc.id} value={loc.code}>{loc.code} · {loc.name}</option>)}
               </select>
             </label>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Código de Lote</span>
-              <input value={lotCode} onChange={(e) => setLotCode(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono`} />
-            </label>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Cantidad</span>
-              <input type="number" min={1} value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} />
-            </label>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Costo Unitario (USD)</span>
-              <input value={unitCostMajor} onChange={(e) => setUnitCostMajor(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} />
-            </label>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Fecha de Vencimiento (FEFO)</span>
-              <input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono`} />
-            </label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Código de Lote</span><input value={lotCode} onChange={(e) => setLotCode(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono`} /></label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Cantidad</span><input type="number" min={1} value={receiveQty} onChange={(e) => setReceiveQty(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} /></label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Costo Unitario (USD)</span><input value={unitCostMajor} onChange={(e) => setUnitCostMajor(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} /></label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Fecha de Vencimiento (FEFO)</span><input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono`} /></label>
           </div>
           <button type="submit" disabled={receiveLotMutation.isPending || !activeProductId} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
-            <PackageCheck className="size-4" />
-            <span>{receiveLotMutation.isPending ? 'Registrando...' : 'Recibir Lote en Almacén'}</span>
+            <PackageCheck className="size-4" /><span>{receiveLotMutation.isPending ? 'Registrando...' : 'Recibir Lote en Almacén'}</span>
           </button>
         </form>
       ) : null}
@@ -283,22 +270,12 @@ export function WmsView({ vocabulary, rpc }: Phase2ViewProps) {
                   {locations.map((loc) => <option key={loc.id} value={loc.id}>{loc.code} · {loc.name}</option>)}
                 </select>
               </label>
-              <label className="space-y-1 text-xs">
-                <span className="font-medium text-muted-foreground">Solicitado</span>
-                <input type="number" min={1} value={demandedUnits} onChange={(e) => setDemandedUnits(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} />
-              </label>
-              <label className="space-y-1 text-xs">
-                <span className="font-medium text-muted-foreground">Despachado (menor = Backorder)</span>
-                <input type="number" min={0} value={doneUnits} onChange={(e) => setDoneUnits(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} />
-              </label>
+              <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Solicitado</span><input type="number" min={1} value={demandedUnits} onChange={(e) => setDemandedUnits(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} /></label>
+              <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Despachado (menor = Backorder)</span><input type="number" min={0} value={doneUnits} onChange={(e) => setDoneUnits(e.target.value)} className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} /></label>
             </div>
-            <label className="block space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">GS1-128 / Barcode (opcional)</span>
-              <input value={gs1Barcode} onChange={(e) => setGs1Barcode(e.target.value)} placeholder="(01)0759123...(10)LOT..." className={`${INPUT_CLS} h-11 w-full font-mono`} />
-            </label>
+            <label className="block space-y-1 text-xs"><span className="font-medium text-muted-foreground">GS1-128 / Barcode (opcional)</span><input value={gs1Barcode} onChange={(e) => setGs1Barcode(e.target.value)} placeholder="(01)0759123...(10)LOT..." className={`${INPUT_CLS} h-11 w-full font-mono`} /></label>
             <button type="submit" disabled={dispatchMutation.isPending || !activeProductId} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
-              <Send className="size-4" />
-              <span>{dispatchMutation.isPending ? 'Procesando...' : 'Procesar Picking Doble Partida'}</span>
+              <Send className="size-4" /><span>{dispatchMutation.isPending ? 'Procesando...' : 'Procesar Picking Doble Partida'}</span>
             </button>
           </form>
           <DataTable columns={pickingCols} data={pickings} getRowId={(p) => p.id} loading={pickingsQuery.isLoading} emptyTitle="Sin pickings registrados" />

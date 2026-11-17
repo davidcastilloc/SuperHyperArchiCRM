@@ -236,63 +236,37 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
 
       {showCreateForm ? (
         <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-5">
-          <label className="space-y-1 text-xs md:col-span-2">
-            <span className="font-medium text-muted-foreground">Nombre / Razón Social</span>
-            <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`Ej. Comercial ${vocabulary.partySingular}`} className={`${INPUT_CLS} w-full`} />
-          </label>
+          <label className="space-y-1 text-xs md:col-span-2"><span className="font-medium text-muted-foreground">Nombre / Razón Social</span><input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`Ej. Comercial ${vocabulary.partySingular}`} className={`${INPUT_CLS} w-full`} /></label>
           <label className="space-y-1 text-xs">
             <span className="font-medium text-muted-foreground">Rol principal</span>
             <select value={role} onChange={(e) => setRole(e.target.value as PartyRoleOption)} className={`${INPUT_CLS} w-full`}>
               {PARTY_ROLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{ROLE_LABELS_ES[opt]}</option>)}
             </select>
           </label>
-          <label className="space-y-1 text-xs">
-            <span className="font-medium text-muted-foreground">Documento / ID Fiscal</span>
-            <input type="text" value={taxIdNumber} onChange={(e) => setTaxIdNumber(e.target.value)} placeholder="V-12345678 / J-12345678-9" className={`${INPUT_CLS} w-full`} />
-          </label>
+          <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Documento / ID Fiscal</span><input type="text" value={taxIdNumber} onChange={(e) => setTaxIdNumber(e.target.value)} placeholder="V-12345678 / J-12345678-9" className={`${INPUT_CLS} w-full`} /></label>
           <div className="flex items-end gap-2">
-            <label className="flex-1 space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Crédito ($)</span>
-              <input type="text" value={creditLimitMajor} onChange={(e) => setCreditLimitMajor(e.target.value)} className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-            </label>
-            <button type="submit" disabled={upsertMutation.isPending || !displayName.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs disabled:opacity-50">
-              Guardar
-            </button>
+            <label className="flex-1 space-y-1 text-xs"><span className="font-medium text-muted-foreground">Crédito ($)</span><input type="text" value={creditLimitMajor} onChange={(e) => setCreditLimitMajor(e.target.value)} className={`${INPUT_CLS} w-full font-mono tabular-nums`} /></label>
+            <button type="submit" disabled={upsertMutation.isPending || !displayName.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs disabled:opacity-50">Guardar</button>
           </div>
-          <div className="md:col-span-5">
-            <CustomFieldsSection rpc={rpc} targetEntity="crm_parties" values={customFields} onChange={setCustomFields} />
-          </div>
+          <div className="md:col-span-5"><CustomFieldsSection rpc={rpc} targetEntity="crm_parties" values={customFields} onChange={setCustomFields} /></div>
         </form>
       ) : null}
 
-      {feedback ? (
-        <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p>
-      ) : null}
+      {feedback ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p> : null}
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
         <div className="space-y-3 lg:col-span-3">
           <FilterBar
-            searchValue={search}
-            onSearchChange={setSearch}
+            searchValue={search} onSearchChange={setSearch}
             searchPlaceholder={`Buscar ${vocabulary.partySingular.toLowerCase()} por nombre o RIF...`}
-            activeChipId={activeRoleChip}
-            onSelectChip={setActiveRoleChip}
-            chips={[
-              { id: 'all', label: 'Todos' },
-              ...PARTY_ROLE_OPTIONS.map((r) => ({ id: r, label: ROLE_LABELS_ES[r] })),
-            ]}
+            activeChipId={activeRoleChip} onSelectChip={setActiveRoleChip}
+            chips={[{ id: 'all', label: 'Todos' }, ...PARTY_ROLE_OPTIONS.map((r) => ({ id: r, label: ROLE_LABELS_ES[r] }))]}
           />
           <DataTable
-            columns={columns}
-            data={items}
-            getRowId={(p) => p.id}
-            loading={listQuery.isLoading}
-            selectedRowId={selectedParty?.id ?? null}
-            onRowClick={(p) => setSelectedPartyId(p.id)}
-            emptyTitle={`Sin ${vocabulary.partyPlural.toLowerCase()}`}
-            emptyDescription="Crea el primer registro o ajusta los filtros de búsqueda."
-            emptyActionLabel={`Crear ${vocabulary.partySingular}`}
-            onEmptyAction={() => setShowCreateForm(true)}
+            columns={columns} data={items} getRowId={(p) => p.id} loading={listQuery.isLoading}
+            selectedRowId={selectedParty?.id ?? null} onRowClick={(p) => setSelectedPartyId(p.id)}
+            emptyTitle={`Sin ${vocabulary.partyPlural.toLowerCase()}`} emptyDescription="Crea el primer registro o ajusta los filtros de búsqueda."
+            emptyActionLabel={`Crear ${vocabulary.partySingular}`} onEmptyAction={() => setShowCreateForm(true)}
             rowActions={(p) => [
               { id: 'deals', label: 'Nueva Oportunidad', onSelect: () => { setSelectedPartyId(p.id); setActiveTab('deals'); } },
               { id: 'links', label: 'Vincular Relación', onSelect: () => { setSelectedPartyId(p.id); setActiveTab('links'); } },
@@ -301,14 +275,7 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
           />
         </div>
         <div className="lg:col-span-2">
-          <CrmDealsAndConflictsPanel
-            vocabulary={vocabulary}
-            rpc={rpc}
-            selectedParty={selectedParty}
-            parties={items}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
+          <CrmDealsAndConflictsPanel vocabulary={vocabulary} rpc={rpc} selectedParty={selectedParty} parties={items} activeTab={activeTab} onTabChange={setActiveTab} />
         </div>
       </div>
     </section>

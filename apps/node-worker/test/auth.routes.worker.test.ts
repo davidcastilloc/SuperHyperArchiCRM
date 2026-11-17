@@ -408,4 +408,113 @@ describe('Interactive Auth Routes (/api/auth/*)', () => {
     );
     expect(failClosedBoot.status).toBe(503);
   });
+
+  it('rejects cross-tenant defaultOrgId and wildcard escalation in POST /api/iam/users', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify({
+        deploymentId: 'dep_test',
+        tenantId: 'ten_1',
+        editionPreset: 'omni-enterprise',
+        regionPack: 've',
+        activeModules: ['core', 'iam', 'customers'],
+        vocabulary: {
+          partySingular: 'Cliente',
+          partyPlural: 'Clientes',
+          orderSingular: 'Pedido',
+          branchSingular: 'Sucursal',
+          spaceSingular: 'Espacio',
+          caseSingular: 'Expediente',
+        },
+        currency: {
+          baseCurrency: 'USD',
+          operatingCurrencies: ['USD', 'VES'],
+          rateSource: 'bcv',
+          enforceAccountCurrencyMatch: true,
+        },
+        entitlements: {
+          maxBranches: 10,
+          maxPosRegisters: 20,
+          maxSpacesOrUnits: 50,
+          aiCopilotEnabled: true,
+          customEntitiesLimit: 50,
+        },
+        federation: {
+          enabled: false,
+          nodeDid: 'did:web:edge.shac.local',
+          publishPublicCatalog: false,
+          acceptPeerB2BOrders: false,
+          consolidateLowStockHours: 24,
+          allowedSupplierDids: [],
+        },
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    invalidateProfileCache();
+    const { createD1Client } = await import('@shac/db-d1');
+    const db = createD1Client(env.DB);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const mgrEmail = 'limited.mgr@shac.test';
+    const mgrPw = 'Manager!2026';
+    await db.insert(iamUsers).values({
+      id: 'usr_limited_mgr',
+      tenantId: 'ten_1',
+      defaultOrgId: 'org_1',
+      realm: 'staff',
+      email: mgrEmail,
+      emailHash: await sha256Hex(mgrEmail),
+      fullName: 'Limited Manager',
+      passwordHashWebcrypto: await hashPasswordPbkdf2(mgrPw),
+      isVerified: true,
+      preferencesJson: JSON.stringify({ perms: ['iam.orgs.write'] }),
+      isActive: true,
+      createdAt: nowSec,
+      updatedAt: nowSec,
+    });
+    const loginRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mgrEmail, password: mgrPw, branchId: 'org_1' }),
+      }),
+      testEnv,
+    );
+    expect(loginRes.status).toBe(200);
+    const { token: limitedToken } = (await loginRes.json()) as { token: string };
+
+    const wildcardRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/iam/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${limitedToken}`,
+        },
+        body: JSON.stringify({
+          email: 'esc@shac.test',
+          fullName: 'Esc User',
+          perms: ['*'],
+        }),
+      }),
+      testEnv,
+    );
+    expect(wildcardRes.status).toBe(403);
+
+    const crossOrgRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/iam/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${limitedToken}`,
+        },
+        body: JSON.stringify({
+          email: 'cross@shac.test',
+          fullName: 'Cross Org',
+          defaultOrgId: 'org_other_tenant',
+          perms: ['customers.read'],
+        }),
+      }),
+      testEnv,
+    );
+    expect(crossOrgRes.status).toBe(403);
+  });
 });

@@ -214,77 +214,36 @@ export function ShacAppShell({
       />
 
       <div className="flex-1 min-w-0 flex flex-col bg-background">
-        <header
-          data-slot="app-shell-header"
-          className="h-14 shrink-0 px-3 sm:px-4 border-b border-border bg-card flex items-center justify-between gap-2"
-        >
+        <header data-slot="app-shell-header" className="h-14 shrink-0 px-3 sm:px-4 border-b border-border bg-card flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <button
-              type="button"
-              aria-label="Abrir menú"
-              onClick={() => setMobileMenuOpen(true)}
-              className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground lg:hidden"
-            >
+            <button type="button" aria-label="Abrir menú" onClick={() => setMobileMenuOpen(true)} className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground lg:hidden">
               <Menu className="size-4" />
             </button>
-            <button
-              type="button"
-              aria-label="Alternar barra lateral"
-              onClick={() => setDesktopRailCollapsed((prev) => !prev)}
-              className="hidden lg:inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground"
-            >
+            <button type="button" aria-label="Alternar barra lateral" onClick={() => setDesktopRailCollapsed((prev) => !prev)} className="hidden lg:inline-flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground">
               {desktopRailCollapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeftClose className="size-4" />}
             </button>
-            <button
-              type="button"
-              aria-label="Inicio"
-              onClick={() => onNavigate?.('/')}
-              className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
+            <button type="button" aria-label="Inicio" onClick={() => onNavigate?.('/')} className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
               <Home className="size-4" />
             </button>
             {activeNavItem && activeNavItem.href !== '/' ? (
-              <>
-                <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70" />
-                <span className="truncate text-xs font-medium text-foreground">{activeNavItem.label}</span>
-              </>
+              <><ChevronRight className="size-3.5 shrink-0 text-muted-foreground/70" /><span className="truncate text-xs font-medium text-foreground">{activeNavItem.label}</span></>
             ) : null}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => setPaletteOpen(true)}
-              className="hidden md:inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Search className="size-3.5" />
-              <span className="hidden xl:inline">Buscar</span>
+            <button type="button" onClick={() => setPaletteOpen(true)} className="hidden md:inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground">
+              <Search className="size-3.5" /><span className="hidden xl:inline">Buscar</span>
               <kbd className="rounded border border-border bg-muted/60 px-1 py-0.5 font-mono text-[10px]">⌘K</kbd>
             </button>
 
             <div className="relative">
-              <button
-                type="button"
-                onClick={() => (branches && onSwitchBranch ? setBranchMenuOpen((v) => !v) : onNavigate?.('/auth'))}
-                title={`Cambiar ${profile.vocabulary.branchSingular.toLowerCase()}`}
-                className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 text-xs font-medium text-foreground shadow-xs hover:bg-muted"
-              >
-                <Building2 className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="max-w-28 truncate">{branchName}</span>
-                <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+              <button type="button" onClick={() => (branches && onSwitchBranch ? setBranchMenuOpen((v) => !v) : onNavigate?.('/auth'))} title={`Cambiar ${profile.vocabulary.branchSingular.toLowerCase()}`} className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 text-xs font-medium text-foreground shadow-xs hover:bg-muted">
+                <Building2 className="size-3.5 shrink-0 text-muted-foreground" /><span className="max-w-28 truncate">{branchName}</span><ChevronDown className="size-3 shrink-0 text-muted-foreground" />
               </button>
               {branchMenuOpen && branches && onSwitchBranch ? (
                 <div className="absolute right-0 top-10 z-50 w-56 rounded-lg border border-border bg-popover p-1 shadow-md">
                   {branches.map((br) => (
-                    <button
-                      key={br.id}
-                      type="button"
-                      onClick={() => {
-                        setBranchMenuOpen(false);
-                        onSwitchBranch(br.id);
-                      }}
-                      className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-muted"
-                    >
+                    <button key={br.id} type="button" onClick={() => { setBranchMenuOpen(false); onSwitchBranch(br.id); }} className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-left text-xs hover:bg-muted">
                       <span className="truncate">{br.name}</span>
                       {br.id === activeBranchId ? <Check className="size-3.5 text-primary" /> : null}
                     </button>
@@ -293,35 +252,15 @@ export function ShacAppShell({
               ) : null}
             </div>
 
-            <button
-              type="button"
-              aria-label="Módulos"
-              onClick={() => onNavigate?.('/app-store')}
-              className="hidden xl:inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
+            <button type="button" aria-label="Módulos" onClick={() => onNavigate?.('/app-store')} className="hidden xl:inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
               <Plug className="size-4" />
             </button>
 
-            <NotificationBell
-              syncState={syncState}
-              editionPreset={profile.editionPreset}
-              branchName={branchName}
-              onNavigate={onNavigate}
-            />
-
+            <NotificationBell syncState={syncState} editionPreset={profile.editionPreset} branchName={branchName} onNavigate={onNavigate} />
             <SyncStatusPill syncState={syncState} className="hidden sm:inline-flex" />
 
             {onToggleTheme ? (
-              <button
-                type="button"
-                data-slot="theme-toggle"
-                onClick={onToggleTheme}
-                className={cn(
-                  'inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
-                  density === 'touch' ? 'min-h-11 px-3' : 'h-8',
-                )}
-              >
+              <button type="button" data-slot="theme-toggle" onClick={onToggleTheme} className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50', density === 'touch' ? 'min-h-11 px-3' : 'h-8')}>
                 {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
                 <span className="hidden xl:inline">{theme === 'dark' ? 'Claro' : 'Oscuro'}</span>
               </button>
@@ -336,12 +275,7 @@ export function ShacAppShell({
         </main>
       </div>
 
-      <CommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        items={enabledNav}
-        onSelect={(href) => onNavigate?.(href)}
-      />
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} items={enabledNav} onSelect={(href) => onNavigate?.(href)} />
     </div>
   );
 }

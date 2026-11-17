@@ -227,67 +227,36 @@ export function IamAdminView({ rpc }: Phase2ViewProps) {
       <form onSubmit={handleForm} className="grid grid-cols-1 gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-3">
         {tab === 'users' ? (
           <>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Nombre completo</span>
-              <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ana Morales" className={INPUT_CLS} />
-            </label>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Correo electrónico</span>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@empresa.com" className={INPUT_CLS} />
-            </label>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Contraseña (mín. 8)</span>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={INPUT_CLS} />
-            </label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Nombre completo</span><input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Ana Morales" className={INPUT_CLS} /></label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Correo electrónico</span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="correo@empresa.com" className={INPUT_CLS} /></label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Contraseña (mín. 8)</span><input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className={INPUT_CLS} /></label>
             <label className="space-y-1 text-xs">
               <span className="font-medium text-muted-foreground">Rol / Permisos</span>
               <select value={rolePreset} onChange={(e) => setRolePreset(e.target.value)} className={INPUT_CLS}>
-                {Object.entries(STAFF_ROLE_PRESETS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
+                {Object.entries(STAFF_ROLE_PRESETS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </label>
             <label className="space-y-1 text-xs">
               <span className="font-medium text-muted-foreground">Sucursal asignada</span>
               <select value={defaultOrgId || orgs[0]?.id || ''} onChange={(e) => setDefaultOrgId(e.target.value)} className={INPUT_CLS}>
-                {orgs.map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
-                ))}
+                {orgs.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
               </select>
             </label>
             <div className="flex items-end gap-2">
-              <label className="flex-1 space-y-1 text-xs">
-                <span className="font-medium text-muted-foreground">PIN Piso (4 dígitos)</span>
-                <input maxLength={4} value={floorPin} onChange={(e) => setFloorPin(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="4829" className={`${INPUT_CLS} font-mono`} />
-              </label>
-              <button type="submit" className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground">
-                <Plus className="size-3.5" /><span>Guardar</span>
-              </button>
+              <label className="flex-1 space-y-1 text-xs"><span className="font-medium text-muted-foreground">PIN Piso (4 dígitos)</span><input maxLength={4} value={floorPin} onChange={(e) => setFloorPin(e.target.value.replace(/\D/g, '').slice(0, 4))} placeholder="4829" className={`${INPUT_CLS} font-mono`} /></label>
+              <button type="submit" className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"><Plus className="size-3.5" /><span>Guardar</span></button>
             </div>
           </>
         ) : tab === 'orgs' ? (
           <>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Nombre de sucursal</span>
-              <input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Sucursal Norte" className={INPUT_CLS} />
-            </label>
-            <label className="space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Slug URL</span>
-              <input value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} placeholder="sucursal-norte" className={`${INPUT_CLS} font-mono text-xs`} />
-            </label>
-            <div className="flex items-end">
-              <button type="submit" className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"><Plus className="size-3.5" /><span>Crear Sucursal</span></button>
-            </div>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Nombre de sucursal</span><input value={orgName} onChange={(e) => setOrgName(e.target.value)} placeholder="Sucursal Norte" className={INPUT_CLS} /></label>
+            <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Slug URL</span><input value={orgSlug} onChange={(e) => setOrgSlug(e.target.value)} placeholder="sucursal-norte" className={`${INPUT_CLS} font-mono text-xs`} /></label>
+            <div className="flex items-end"><button type="submit" className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"><Plus className="size-3.5" /><span>Crear Sucursal</span></button></div>
           </>
         ) : (
           <>
-            <label className="space-y-1 text-xs md:col-span-2">
-              <span className="font-medium text-muted-foreground">Nombre de API Key</span>
-              <input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="ERP Sync" className={INPUT_CLS} />
-            </label>
-            <div className="flex items-end">
-              <button type="submit" className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"><Plus className="size-3.5" /><span>Generar API Key</span></button>
-            </div>
+            <label className="space-y-1 text-xs md:col-span-2"><span className="font-medium text-muted-foreground">Nombre de API Key</span><input value={keyName} onChange={(e) => setKeyName(e.target.value)} placeholder="ERP Sync" className={INPUT_CLS} /></label>
+            <div className="flex items-end"><button type="submit" className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"><Plus className="size-3.5" /><span>Generar API Key</span></button></div>
           </>
         )}
       </form>

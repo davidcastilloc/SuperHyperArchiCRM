@@ -67,13 +67,27 @@ export function createIamAdminRoutes(profileLoader: ProfileLoader) {
         throw new AppError('VALIDATION_ERROR', 400, 'Invalid user payload', parsed.error.flatten());
       }
       const d = parsed.data;
+      if (d.perms.includes('*') && !auth.actor.perms.includes('*')) {
+        throw new AppError('FORBIDDEN', 403, 'Cannot grant wildcard permission without holding wildcard access');
+      }
+      const orgId = d.defaultOrgId || auth.actor.orgId;
+      const uniqueOrgIds = Array.from(new Set([orgId, ...(d.allowedOrgIds ?? [])]));
+      for (const candidateOrgId of uniqueOrgIds) {
+        const orgRow = await c.env.DB.prepare(
+          `SELECT id FROM iam_organizations WHERE id = ?1 AND tenant_id = ?2 AND deleted_at IS NULL LIMIT 1`,
+        )
+          .bind(candidateOrgId, auth.actor.tenantId)
+          .first<{ id: string }>();
+        if (!orgRow) {
+          throw new AppError('FORBIDDEN_ORG_SCOPE', 403, `Organization ${candidateOrgId} is outside tenant scope`);
+        }
+      }
       const emailNorm = d.email.trim().toLowerCase();
       const emailHash = await sha256Hex(emailNorm);
       const pwHash = d.password ? await hashPasswordPbkdf2(d.password) : null;
       const pinHash = d.floorPin ? await sha256Hex(d.floorPin) : null;
       const id = crypto.randomUUID();
       const nowSec = Math.floor(Date.now() / 1000);
-      const orgId = d.defaultOrgId || auth.actor.orgId;
 
       await c.env.DB.prepare(
         `INSERT INTO iam_users

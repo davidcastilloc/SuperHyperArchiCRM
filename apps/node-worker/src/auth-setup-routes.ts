@@ -244,40 +244,22 @@ export async function handleInitialSetup(c: Context<HonoEnv>, profileLoader: Pro
   await c.env.DB.batch(coreStmts);
 
   const finStmts: D1PreparedStatement[] = [
-    c.env.DB.prepare(
-      `INSERT OR IGNORE INTO fin_accounts (id, tenant_id, org_id, code, name, account_kind, currency, is_default, is_active, created_at, updated_at)
-       VALUES ('acc_usd_cash', ?1, ?2, 'CAJA-USD', 'Caja Principal USD', 'cash_drawer', ?3, 1, 1, ?4, ?4)`,
-    ).bind(profile.tenantId, orgId, baseCurrency, nowSec),
+    c.env.DB.prepare(`INSERT OR IGNORE INTO fin_accounts (id, tenant_id, org_id, code, name, account_kind, currency, is_default, is_active, created_at, updated_at) VALUES ('acc_usd_cash', ?1, ?2, 'CAJA-USD', 'Caja Principal USD', 'cash_drawer', ?3, 1, 1, ?4, ?4)`).bind(profile.tenantId, orgId, baseCurrency, nowSec),
   ];
   if (secondaryCurrency) {
     finStmts.push(
-      c.env.DB.prepare(
-        `INSERT OR IGNORE INTO fin_accounts (id, tenant_id, org_id, code, name, account_kind, currency, is_default, is_active, created_at, updated_at)
-         VALUES ('acc_ves_pm', ?1, ?2, ?3, ?4, 'mobile_pay', ?5, 1, 1, ?6, ?6)`,
-      ).bind(profile.tenantId, orgId, `PM-${secondaryCurrency}`, `Pago Móvil / Banco ${secondaryCurrency}`, secondaryCurrency, nowSec),
+      c.env.DB.prepare(`INSERT OR IGNORE INTO fin_accounts (id, tenant_id, org_id, code, name, account_kind, currency, is_default, is_active, created_at, updated_at) VALUES ('acc_ves_pm', ?1, ?2, ?3, ?4, 'mobile_pay', ?5, 1, 1, ?6, ?6)`).bind(profile.tenantId, orgId, `PM-${secondaryCurrency}`, `Pago Móvil / Banco ${secondaryCurrency}`, secondaryCurrency, nowSec),
     );
   }
   await c.env.DB.batch(finStmts).catch(() => undefined);
 
   await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT OR IGNORE INTO fin_chart_of_accounts_and_periods (id, tenant_id, org_id, record_kind, account_code, name, classification, normal_balance, currency, current_balance_minor, is_active, created_at, updated_at)
-       VALUES ('coa_cash_main', ?1, ?2, 'gl_account', '1010-CASH', 'Caja y Bancos', 'asset', 'debit', ?3, 0, 1, ?4, ?4)`,
-    ).bind(profile.tenantId, orgId, baseCurrency, nowSec),
-    c.env.DB.prepare(
-      `INSERT OR IGNORE INTO fin_chart_of_accounts_and_periods (id, tenant_id, org_id, record_kind, account_code, name, classification, normal_balance, currency, current_balance_minor, is_active, created_at, updated_at)
-       VALUES ('coa_sales_main', ?1, ?2, 'gl_account', '4010-SALES', 'Ingresos Operativos', 'revenue', 'credit', ?3, 0, 1, ?4, ?4)`,
-    ).bind(profile.tenantId, orgId, baseCurrency, nowSec),
+    c.env.DB.prepare(`INSERT OR IGNORE INTO fin_chart_of_accounts_and_periods (id, tenant_id, org_id, record_kind, account_code, name, classification, normal_balance, currency, current_balance_minor, is_active, created_at, updated_at) VALUES ('coa_cash_main', ?1, ?2, 'gl_account', '1010-CASH', 'Caja y Bancos', 'asset', 'debit', ?3, 0, 1, ?4, ?4)`).bind(profile.tenantId, orgId, baseCurrency, nowSec),
+    c.env.DB.prepare(`INSERT OR IGNORE INTO fin_chart_of_accounts_and_periods (id, tenant_id, org_id, record_kind, account_code, name, classification, normal_balance, currency, current_balance_minor, is_active, created_at, updated_at) VALUES ('coa_sales_main', ?1, ?2, 'gl_account', '4010-SALES', 'Ingresos Operativos', 'revenue', 'credit', ?3, 0, 1, ?4, ?4)`).bind(profile.tenantId, orgId, baseCurrency, nowSec),
   ]).catch(() => undefined);
   const session = await issueSession(c.env.SESSION_KV, {
-    userId,
-    fullName: d.adminName.trim(),
-    tenantId: profile.tenantId,
-    orgId,
-    orgPath: '/org_1',
-    branchName: d.branchName.trim(),
-    actorType: 'staff',
-    perms: ['*'],
+    userId, fullName: d.adminName.trim(), tenantId: profile.tenantId, orgId, orgPath: '/org_1',
+    branchName: d.branchName.trim(), actorType: 'staff', perms: ['*'],
   });
   return c.json(session, 201);
 }
@@ -302,19 +284,12 @@ export async function handleSwitchBranch(c: Context<HonoEnv>, profileLoader: Pro
 
   const authHeader = c.req.header('Authorization');
   if (authHeader?.startsWith('Bearer shac_sess_')) {
-    const oldHash = await sha256Hex(authHeader.slice('Bearer '.length).trim());
-    await c.env.SESSION_KV.delete(`session:${oldHash}`);
+    await c.env.SESSION_KV.delete(`session:${await sha256Hex(authHeader.slice('Bearer '.length).trim())}`);
   }
 
   const session = await issueSession(c.env.SESSION_KV, {
-    userId: user.id,
-    fullName: user.full_name,
-    tenantId: actor.tenantId,
-    orgId: org.id,
-    orgPath: org.tree_path,
-    branchName: org.name,
-    actorType: actor.type === 'delegated_staff' ? 'delegated_staff' : 'staff',
-    perms: prefs.perms,
+    userId: user.id, fullName: user.full_name, tenantId: actor.tenantId, orgId: org.id, orgPath: org.tree_path,
+    branchName: org.name, actorType: actor.type === 'delegated_staff' ? 'delegated_staff' : 'staff', perms: prefs.perms,
   });
   return c.json(session, 200);
 }

@@ -208,52 +208,29 @@ export function CatalogView({ rpc }: Phase2ViewProps) {
         onRefresh={() => void productsQuery.refetch()}
         refreshing={productsQuery.isFetching}
         actions={
-          <button
-            type="button"
-            onClick={() => setShowCreate((prev) => !prev)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary-hover"
-          >
-            <Plus className="size-3.5" />
-            <span>{showCreate ? 'Cerrar formulario' : 'Nuevo Producto'}</span>
+          <button type="button" onClick={() => setShowCreate((prev) => !prev)} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary-hover">
+            <Plus className="size-3.5" /><span>{showCreate ? 'Cerrar formulario' : 'Nuevo Producto'}</span>
           </button>
         }
       />
 
       {showCreate ? (
         <form onSubmit={handleCreate} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-6">
-          <label className="space-y-1 text-xs">
-            <span className="font-medium text-muted-foreground">SKU / Código</span>
-            <input type="text" value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU-001" className={`${INPUT_CLS} w-full font-mono`} />
-          </label>
-          <label className="space-y-1 text-xs md:col-span-2">
-            <span className="font-medium text-muted-foreground">Nombre del Producto / Servicio</span>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre comercial" className={`${INPUT_CLS} w-full`} />
-          </label>
+          <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">SKU / Código</span><input type="text" value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU-001" className={`${INPUT_CLS} w-full font-mono`} /></label>
+          <label className="space-y-1 text-xs md:col-span-2"><span className="font-medium text-muted-foreground">Nombre del Producto / Servicio</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre comercial" className={`${INPUT_CLS} w-full`} /></label>
           <label className="space-y-1 text-xs">
             <span className="font-medium text-muted-foreground">Categoría</span>
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={`${INPUT_CLS} w-full`}>
               <option value="">General</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>{cat.name}</option>
-              ))}
+              {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
             </select>
           </label>
-          <label className="space-y-1 text-xs">
-            <span className="font-medium text-muted-foreground">Precio Base (USD)</span>
-            <input type="text" value={basePriceMajor} onChange={(e) => setBasePriceMajor(e.target.value)} placeholder="10.00" className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-          </label>
+          <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Precio Base (USD)</span><input type="text" value={basePriceMajor} onChange={(e) => setBasePriceMajor(e.target.value)} placeholder="10.00" className={`${INPUT_CLS} w-full font-mono tabular-nums`} /></label>
           <div className="flex items-end gap-2">
-            <label className="flex-1 space-y-1 text-xs">
-              <span className="font-medium text-muted-foreground">Costo (USD)</span>
-              <input type="text" value={costPriceMajor} onChange={(e) => setCostPriceMajor(e.target.value)} placeholder="7.00" className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-            </label>
-            <button type="submit" disabled={createMutation.isPending || !sku.trim() || !name.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
-              Guardar
-            </button>
+            <label className="flex-1 space-y-1 text-xs"><span className="font-medium text-muted-foreground">Costo (USD)</span><input type="text" value={costPriceMajor} onChange={(e) => setCostPriceMajor(e.target.value)} placeholder="7.00" className={`${INPUT_CLS} w-full font-mono tabular-nums`} /></label>
+            <button type="submit" disabled={createMutation.isPending || !sku.trim() || !name.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground disabled:opacity-50">Guardar</button>
           </div>
-          <div className="md:col-span-6">
-            <CustomFieldsSection rpc={rpc} targetEntity="cat_products" values={customAttrs} onChange={setCustomAttrs} />
-          </div>
+          <div className="md:col-span-6"><CustomFieldsSection rpc={rpc} targetEntity="cat_products" values={customAttrs} onChange={setCustomAttrs} /></div>
         </form>
       ) : null}
 
@@ -281,35 +258,18 @@ export function CatalogView({ rpc }: Phase2ViewProps) {
         trailingItems={
           <div className="flex items-center gap-2">
             <label htmlFor="cat-fx-rate" className="text-xs font-medium text-muted-foreground">Tasa (Bs/USD)</label>
-            <input
-              id="cat-fx-rate"
-              type="text"
-              value={rateDecimal}
-              onChange={(e) => setRateDecimal(e.target.value)}
-              className={`${INPUT_CLS} w-24 font-mono tabular-nums`}
-            />
-            <button
-              type="button"
-              disabled={rateMutation.isPending}
-              onClick={() => rateMutation.mutate()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50"
-            >
-              <Coins className="size-3.5 text-muted-foreground" />
-              <span>Fijar Tasa BCV</span>
+            <input id="cat-fx-rate" type="text" value={rateDecimal} onChange={(e) => setRateDecimal(e.target.value)} className={`${INPUT_CLS} w-24 font-mono tabular-nums`} />
+            <button type="button" disabled={rateMutation.isPending} onClick={() => rateMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50">
+              <Coins className="size-3.5 text-muted-foreground" /><span>Fijar Tasa BCV</span>
             </button>
           </div>
         }
       />
 
       <DataTable
-        columns={columns}
-        data={items}
-        getRowId={(p) => p.id}
-        loading={productsQuery.isLoading}
-        emptyTitle="Sin productos en catálogo"
-        emptyDescription="Registra el primer SKU para habilitar SmartCheck y POS."
-        emptyActionLabel="Nuevo Producto"
-        onEmptyAction={() => setShowCreate(true)}
+        columns={columns} data={items} getRowId={(p) => p.id} loading={productsQuery.isLoading}
+        emptyTitle="Sin productos en catálogo" emptyDescription="Registra el primer SKU para habilitar SmartCheck y POS."
+        emptyActionLabel="Nuevo Producto" onEmptyAction={() => setShowCreate(true)}
         rowActions={(p) => [
           { id: 'stock', label: 'Consultar saldo FEFO', onSelect: () => stockMutation.mutate(p.id) },
           { id: 'quote', label: 'Cotizar 5 capas', onSelect: () => quoteMutation.mutate(p.id) },

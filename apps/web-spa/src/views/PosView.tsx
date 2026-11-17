@@ -11,7 +11,7 @@ import { loadPersistedPosState, savePersistedPosState, usePosShiftAndCheckout } 
 import { formatMinorToInput, formatMinorUnits, INPUT_CLS, parseMajorToMinor, parseRateToMicros, readApiError, usdToVesMinor, type Phase2ViewProps } from './phase2-format';
 import { PosCameraScannerModal } from './PosCameraScannerModal';
 import { PosCashClosingModal } from './PosCashClosingModal';
-import { parkOrderToList, PosHoldOrdersModal, recallOrderFromList, type HeldPosOrder } from './PosHoldOrdersModal';
+import { parkOrderToList, PosHoldOrdersModal, PosHoldPromptModal, recallOrderFromList, type HeldPosOrder } from './PosHoldOrdersModal';
 import { computeCartTotalWithCouponMinor, PosReceiptPanel, type PosCartLine } from './PosReceiptPanel';
 import { PosProModals } from './PosProModals';
 import { PosTenderModal } from './PosTenderModal';
@@ -49,9 +49,7 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   const [couponDiscountBps, setCouponDiscountBps] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    savePersistedPosState(scopeKey, { shiftId, registerId, cart });
-  }, [scopeKey, shiftId, registerId, cart]);
+  useEffect(() => { savePersistedPosState(scopeKey, { shiftId, registerId, cart }); }, [scopeKey, shiftId, registerId, cart]);
 
   const rateMicros = parseRateToMicros(rateInput);
   const cartTotalMinor = computeCartTotalWithCouponMinor(cart, couponDiscountBps);
@@ -60,9 +58,7 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   const productsQuery = useQuery({
     queryKey: ['pos', 'products', debouncedSearch],
     queryFn: async () => {
-      const res = await rpc.api.catalog.products.$get({
-        query: { limit: '100', ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}) },
-      });
+      const res = await rpc.api.catalog.products.$get({ query: { limit: '100', ...(debouncedSearch.trim() ? { search: debouncedSearch.trim() } : {}) } });
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
@@ -72,8 +68,7 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
     queryKey: ['pos', 'promotions'],
     queryFn: async () => {
       const res = await rpc.api.catalog.promotions.$get();
-      if (!res.ok) return { items: [] as Array<{ code: string; discountBps?: number; active?: boolean }> };
-      return res.json();
+      return res.ok ? res.json() : { items: [] as Array<{ code: string; discountBps?: number; active?: boolean }> };
     },
     staleTime: 60_000,
   });
@@ -227,15 +222,9 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
             ) : null}
             {shiftId ? (
               <>
-                <button type="button" onClick={() => setPinOpen(true)} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted">
-                  <KeyRound className="size-3.5 text-primary" /><span>{cashierName}</span>
-                </button>
-                <button type="button" onClick={() => setReturnOpen(true)} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted">
-                  <RotateCcw className="size-3.5 text-amber-500" /><span>Devolución</span>
-                </button>
-                <button type="button" onClick={() => setClosingOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted">
-                  <Lock className="size-3.5 text-muted-foreground" /><span>Cerrar Caja</span>
-                </button>
+                <button type="button" onClick={() => setPinOpen(true)} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted"><KeyRound className="size-3.5 text-primary" /><span>{cashierName}</span></button>
+                <button type="button" onClick={() => setReturnOpen(true)} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted"><RotateCcw className="size-3.5 text-amber-500" /><span>Devolución</span></button>
+                <button type="button" onClick={() => setClosingOpen(true)} className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted"><Lock className="size-3.5 text-muted-foreground" /><span>Cerrar Caja</span></button>
               </>
             ) : null}
           </>
@@ -244,19 +233,14 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
       {statusMsg ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-1.5 text-xs font-medium text-status-info-text">{statusMsg}</p> : null}
       {!shiftId ? (
         <div className="mx-auto my-auto max-w-md space-y-4 rounded-xl border border-border bg-card p-6 text-center shadow-xs">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-tight">Sesión de Caja Cerrada</h2>
-            <p className="text-sm text-muted-foreground">Abre turno en {registerId} para comenzar a facturar.</p>
-          </div>
+          <div className="space-y-1"><h2 className="text-lg font-semibold tracking-tight">Sesión de Caja Cerrada</h2><p className="text-sm text-muted-foreground">Abre turno en {registerId} para comenzar a facturar.</p></div>
           <div className="grid grid-cols-2 gap-2.5 text-left">
             <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Caja</span><input className={`${INPUT_CLS} h-11 w-full`} value={registerId} onChange={(e) => setRegisterId(e.target.value)} /></label>
             <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Cajero</span><input className={`${INPUT_CLS} h-11 w-full`} value={cashierName} onChange={(e) => setCashierName(e.target.value)} /></label>
             <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Fondo Inicial USD</span><input className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} value={openingUsdInput} onChange={(e) => setOpeningUsdInput(e.target.value)} /></label>
             <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Fondo Inicial VES</span><input className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums`} value={openingVesInput} onChange={(e) => setOpeningVesInput(e.target.value)} /></label>
           </div>
-          <button type="button" onClick={() => openShiftMutation.mutate()} disabled={openShiftMutation.isPending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary-hover">
-            <Play className="size-4" /><span>{openShiftMutation.isPending ? 'Abriendo Caja...' : 'Abrir Caja'}</span>
-          </button>
+          <button type="button" onClick={() => openShiftMutation.mutate()} disabled={openShiftMutation.isPending} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-sm font-medium text-primary-foreground shadow-xs hover:bg-primary-hover"><Play className="size-4" /><span>{openShiftMutation.isPending ? 'Abriendo Caja...' : 'Abrir Caja'}</span></button>
         </div>
       ) : (
         <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[62fr_38fr]">
@@ -264,23 +248,13 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                <input ref={searchInputRef} type="search" value={search} onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && search.trim()) { e.preventDefault(); handleScanCode(search); setSearch(''); } }}
-                  placeholder="Buscar o escanear SKU/GTIN + Enter (F2)..." className={`${INPUT_CLS} h-11 w-full pl-9`} />
+                <input ref={searchInputRef} type="search" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && search.trim()) { e.preventDefault(); handleScanCode(search); setSearch(''); } }} placeholder="Buscar o escanear SKU/GTIN + Enter (F2)..." className={`${INPUT_CLS} h-11 w-full pl-9`} />
               </div>
-              <button type="button" onClick={() => setScannerOpen(true)} title="Escáner con cámara" className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted">
-                <Camera className="size-4 text-primary" />
-              </button>
+              <button type="button" onClick={() => setScannerOpen(true)} title="Escáner con cámara" className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium hover:bg-muted"><Camera className="size-4 text-primary" /></button>
               <div className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1">
                 <span className="text-[11px] font-medium text-muted-foreground">BCV</span>
-                {rateUnlocked ? (
-                  <input type="text" aria-label="Tasa BCV" value={rateInput} onChange={(e) => setRateInput(e.target.value)} className="h-8 w-16 bg-transparent font-mono text-xs tabular-nums focus:outline-none" />
-                ) : (
-                  <span className="font-mono text-xs font-semibold tabular-nums">{rateInput}</span>
-                )}
-                <button type="button" onClick={() => setRateUnlocked((v) => !v)} title="Desbloquear tasa" className="rounded p-1 text-muted-foreground hover:bg-muted">
-                  {rateUnlocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
-                </button>
+                {rateUnlocked ? <input type="text" aria-label="Tasa BCV" value={rateInput} onChange={(e) => setRateInput(e.target.value)} className="h-8 w-16 bg-transparent font-mono text-xs tabular-nums focus:outline-none" /> : <span className="font-mono text-xs font-semibold tabular-nums">{rateInput}</span>}
+                <button type="button" onClick={() => setRateUnlocked((v) => !v)} title="Desbloquear tasa" className="rounded p-1 text-muted-foreground hover:bg-muted">{rateUnlocked ? <Lock className="size-3" /> : <Unlock className="size-3" />}</button>
               </div>
             </div>
             <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-1 gap-2.5 overflow-y-auto pr-1 sm:grid-cols-2 md:grid-cols-3">
@@ -296,30 +270,15 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
             </div>
           </div>
           <PosReceiptPanel
-            cart={cart} cartTotalMinor={cartTotalMinor} cartTotalVesMinor={cartTotalVesMinor}
-            usdInput={usdInput} vesInput={vesInput} onUsdChange={setUsdInput} onVesChange={setVesInput}
-            onUpdateQty={updateQty} onToggleDiscount={toggleDiscount} onHoldOrder={() => setHoldPromptOpen(true)}
-            onOpenTender={() => setTenderOpen(true)} onClearCart={() => setCart([])} onFillRestante={handleRestante}
-            onSubmit={handleCheckout} submitting={checkoutMutation.isPending}
+            cart={cart} cartTotalMinor={cartTotalMinor} cartTotalVesMinor={cartTotalVesMinor} usdInput={usdInput} vesInput={vesInput}
+            onUsdChange={setUsdInput} onVesChange={setVesInput} onUpdateQty={updateQty} onToggleDiscount={toggleDiscount}
+            onHoldOrder={() => setHoldPromptOpen(true)} onOpenTender={() => setTenderOpen(true)} onClearCart={() => setCart([])}
+            onFillRestante={handleRestante} onSubmit={handleCheckout} submitting={checkoutMutation.isPending}
             couponCode={couponCode} couponDiscountBps={couponDiscountBps} onApplyCoupon={handleApplyCoupon}
           />
         </div>
       )}
-      {holdPromptOpen ? (
-        <div role="dialog" aria-modal="true" aria-label="Aparcar ticket" className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
-          <form onSubmit={(e) => { e.preventDefault(); commitParkOrder(); }} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-4 shadow-xl">
-            <h3 className="text-sm font-semibold">Aparcar Ticket (Leylan / Espera)</h3>
-            <label className="block space-y-1 text-xs">
-              <span className="text-muted-foreground">Nombre o referencia</span>
-              <input autoFocus value={holdLabelDraft} onChange={(e) => setHoldLabelDraft(e.target.value)} placeholder="Cliente en Fila" className={`${INPUT_CLS} h-10 w-full`} />
-            </label>
-            <div className="flex gap-2">
-              <button type="button" onClick={() => setHoldPromptOpen(false)} className="inline-flex h-9 flex-1 items-center justify-center rounded-md border border-border text-xs font-medium">Cancelar</button>
-              <button type="submit" className="inline-flex h-9 flex-1 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">Aparcar</button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <PosHoldPromptModal open={holdPromptOpen} label={holdLabelDraft} onLabelChange={setHoldLabelDraft} onClose={() => setHoldPromptOpen(false)} onConfirm={commitParkOrder} />
       <PosCameraScannerModal open={scannerOpen} onClose={() => setScannerOpen(false)} onDetected={handleScanCode} />
       <PosHoldOrdersModal open={heldOpen} onClose={() => setHeldOpen(false)} heldOrders={heldOrders}
         onRecall={(id) => {
@@ -328,15 +287,9 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
           if (recalled) { setCart(recalled.items); syncPaymentInputs(recalled.items); setHeldOrders(remaining); setStatusMsg(`Ticket retomado: ${recalled.customerName}`); }
         }}
         onDelete={(id) => setHeldOrders((prev) => prev.filter((o) => o.id !== id))} />
-      <PosTenderModal open={tenderOpen} onClose={() => setTenderOpen(false)} totalUsdMinor={cartTotalMinor} rateMicros={rateMicros}
-        usdInput={usdInput} vesInput={vesInput} onUsdChange={setUsdInput} onVesChange={setVesInput}
-        onFillRestante={handleRestante} onConfirmCheckout={() => handleCheckout()} submitting={checkoutMutation.isPending} />
-      <PosCashClosingModal open={closingOpen} onClose={() => setClosingOpen(false)} registerId={registerId} cashierName={cashierName}
-        onConfirmClose={(counted) => closeShiftMutation.mutate(counted)} submitting={closeShiftMutation.isPending}
-        lastClosedReport={lastClosedReport} onClearReport={clearLastClosedReport} />
-      <PosProModals rpc={rpc} branchId={session?.actor.orgId ?? 'org_1'} pinOpen={pinOpen} onClosePin={() => setPinOpen(false)}
-        onSwitchCashier={(n) => { setCashierName(n); setStatusMsg(`Relevo activo: ${n}`); }}
-        returnOpen={returnOpen} onCloseReturn={() => setReturnOpen(false)} onReturnSuccess={(m) => setStatusMsg(m)} />
+      <PosTenderModal open={tenderOpen} onClose={() => setTenderOpen(false)} totalUsdMinor={cartTotalMinor} rateMicros={rateMicros} usdInput={usdInput} vesInput={vesInput} onUsdChange={setUsdInput} onVesChange={setVesInput} onFillRestante={handleRestante} onConfirmCheckout={() => handleCheckout()} submitting={checkoutMutation.isPending} />
+      <PosCashClosingModal open={closingOpen} onClose={() => setClosingOpen(false)} registerId={registerId} cashierName={cashierName} onConfirmClose={(counted) => closeShiftMutation.mutate(counted)} submitting={closeShiftMutation.isPending} lastClosedReport={lastClosedReport} onClearReport={clearLastClosedReport} />
+      <PosProModals rpc={rpc} branchId={session?.actor.orgId ?? 'org_1'} pinOpen={pinOpen} onClosePin={() => setPinOpen(false)} onSwitchCashier={(n) => { setCashierName(n); setStatusMsg(`Relevo activo: ${n}`); }} returnOpen={returnOpen} onCloseReturn={() => setReturnOpen(false)} onReturnSuccess={(m) => setStatusMsg(m)} />
     </section>
   );
 }

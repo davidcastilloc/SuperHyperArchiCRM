@@ -1,6 +1,6 @@
 import '@shac/ui/globals.css';
 
-import { lazy, StrictMode, Suspense, useEffect, useState, type ComponentType } from 'react';
+import { StrictMode, Suspense, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -21,48 +21,18 @@ import { useBranchRealtimeSync } from './lib/useBranchRealtimeSync';
 import { buildNavItems, DEFAULT_BRANCHES, DEFAULT_PROFILE, getDefaultCollapsedGroups } from './nav';
 import { AiAssistantDrawer } from './views/AiAssistantDrawer';
 import { AuthPage } from './views/AuthPage';
-import { PublicFormView, PublicQuoteView } from './views/PublicFormAndQuoteView';
-import type { Phase2ViewProps } from './views/phase2-format';
-
-const lazyView = <K extends string>(
-  loader: () => Promise<Record<K, ComponentType<Phase2ViewProps>>>,
-  key: K,
-) => lazy(() => loader().then((m) => ({ default: m[key] })));
-
-const DashboardView = lazy(() => import('./views/DashboardView').then((m) => ({ default: m.DashboardView })));
-const SalesOrdersView = lazy(() => import('./views/SalesOrdersView').then((m) => ({ default: m.SalesOrdersView })));
-const DemoAndSopCenterView = lazy(() => import('./views/DemoAndSopCenterView').then((m) => ({ default: m.DemoAndSopCenterView })));
-const AppStoreView = lazy(() => import('./views/AppStoreView').then((m) => ({ default: m.AppStoreView })));
-const AuditLogsView = lazyView(() => import('./views/AuditLogsView'), 'AuditLogsView');
-const AutomationView = lazyView(() => import('./views/AutomationView'), 'AutomationView');
-const CatalogStructureView = lazyView(() => import('./views/CatalogStructureView'), 'CatalogStructureView');
-const ClaimsAndServicesView = lazyView(() => import('./views/ClaimsAndServicesView'), 'ClaimsAndServicesView');
-const ClinicalEhrView = lazyView(() => import('./views/ClinicalEhrView'), 'ClinicalEhrView');
-const CondoResidentHubView = lazyView(() => import('./views/CondoResidentHubView'), 'CondoResidentHubView');
-const CustomerTasksView = lazyView(() => import('./views/CustomerTasksView'), 'CustomerTasksView');
-const CustomFieldsView = lazyView(() => import('./views/CustomFieldsView'), 'CustomFieldsView');
-const DealsKanbanView = lazyView(() => import('./views/DealsKanbanView'), 'DealsKanbanView');
-const EudrComplianceView = lazyView(() => import('./views/EudrComplianceView'), 'EudrComplianceView');
-const FinanceView = lazyView(() => import('./views/FinanceView'), 'FinanceView');
-const FormsBuilderView = lazyView(() => import('./views/FormsBuilderView'), 'FormsBuilderView');
-const HeliosSecurityView = lazyView(() => import('./views/HeliosSecurityView'), 'HeliosSecurityView');
-const HospitalityPmsView = lazyView(() => import('./views/HospitalityPmsView'), 'HospitalityPmsView');
-const IamAdminView = lazyView(() => import('./views/IamAdminView'), 'IamAdminView');
-const IntegrationsHubView = lazyView(() => import('./views/IntegrationsHubView'), 'IntegrationsHubView');
-const LabelsAndFleetView = lazyView(() => import('./views/LabelsAndFleetView'), 'LabelsAndFleetView');
-const LegalPracticeView = lazyView(() => import('./views/LegalPracticeView'), 'LegalPracticeView');
-const CatalogView = lazyView(() => import('./views/CatalogView'), 'CatalogView');
-const PartiesView = lazyView(() => import('./views/PartiesView'), 'PartiesView');
-const PortalView = lazyView(() => import('./views/PortalView'), 'PortalView');
-const PosView = lazyView(() => import('./views/PosView'), 'PosView');
-const SmartCheckKioskView = lazyView(() => import('./views/SmartCheckKioskView'), 'SmartCheckKioskView');
-const WmsView = lazyView(() => import('./views/WmsView'), 'WmsView');
-const ProjectsBoardView = lazyView(() => import('./views/ProjectsBoardView'), 'ProjectsBoardView');
-const PromotionsView = lazyView(() => import('./views/PromotionsView'), 'PromotionsView');
-const QuotesView = lazyView(() => import('./views/QuotesView'), 'QuotesView');
-const StaffHubView = lazyView(() => import('./views/StaffHubView'), 'StaffHubView');
-const WmsLocationsView = lazyView(() => import('./views/WmsLocationsView'), 'WmsLocationsView');
-const WorkflowsVisualView = lazyView(() => import('./views/WorkflowsVisualView'), 'WorkflowsVisualView');
+import { PublicFormView } from './views/PublicFormAndQuoteView';
+import { PublicQuoteView } from './views/PublicQuoteView';
+import {
+  AppStoreView, AuditLogsView, AutomationView, CatalogStructureView, CatalogView,
+  ClaimsAndServicesView, ClinicalEhrView, CondoResidentHubView, CustomFieldsView,
+  CustomerTasksView, DashboardView, DealsKanbanView, DemoAndSopCenterView,
+  EudrComplianceView, FinanceView, FormsBuilderView, HeliosSecurityView,
+  HospitalityPmsView, IamAdminView, IntegrationsHubView, LabelsAndFleetView,
+  LegalPracticeView, PartiesView, PortalView, PosView, ProjectsBoardView,
+  PromotionsView, QuotesView, SalesOrdersView, SmartCheckKioskView, StaffHubView,
+  WmsLocationsView, WmsView, WorkflowsVisualView,
+} from './lazyViews';
 
 const queryClient = createShacQueryClient();
 export const rpcClient = createRpcClient(

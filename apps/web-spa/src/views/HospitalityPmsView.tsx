@@ -35,7 +35,7 @@ export function HospitalityPmsView({ rpc, vocabulary }: Phase2ViewProps) {
   const rackQuery = useQuery({
     queryKey: ['spaces', 'rack'],
     queryFn: async () => {
-      const res = await rpc.api.spaces.rack.$get();
+      const res = await rpc.api.spaces.rack.$get({ query: {} });
       if (!res.ok) return null;
       return res.json();
     },

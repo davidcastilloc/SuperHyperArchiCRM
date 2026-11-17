@@ -219,20 +219,13 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                 Últimos clientes agregados para seguimiento rápido.
               </p>
             </div>
-            <button
-              type="button"
-              aria-label="Actualizar clientes"
-              onClick={() => void partiesQuery.refetch()}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
+            <button type="button" aria-label="Actualizar clientes" onClick={() => void partiesQuery.refetch()} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
               <RefreshCw className={`size-3.5 ${partiesQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {parties.length === 0 ? (
-            <div className="p-4">
-              <EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel={`Ir a ${vocabulary.partyPlural}`} onAction={() => onNavigate('/parties')} />
-            </div>
+            <div className="p-4"><EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel={`Ir a ${vocabulary.partyPlural}`} onAction={() => onNavigate('/parties')} /></div>
           ) : (
             <div className="divide-y divide-border/70">
               {parties.map((party) => (
@@ -242,13 +235,8 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                     <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{formatEpochDate(party.createdAt)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">{party.rolesMask.join(', ')}</p>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('/parties')}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
-                  >
-                    <span>Ver registro</span>
-                    <ArrowUpRight className="size-3 text-muted-foreground" />
+                  <button type="button" onClick={() => onNavigate('/parties')} className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline">
+                    <span>Ver registro</span><ArrowUpRight className="size-3 text-muted-foreground" />
                   </button>
                 </div>
               ))}
@@ -260,24 +248,15 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
             <div className="space-y-0.5">
               <h2 className="text-sm font-semibold tracking-tight">Nuevas Oportunidades</h2>
-              <p className="text-xs text-muted-foreground">
-                Sigue los deals recién creados en tu pipeline comercial.
-              </p>
+              <p className="text-xs text-muted-foreground">Sigue los deals recién creados en tu pipeline comercial.</p>
             </div>
-            <button
-              type="button"
-              aria-label="Actualizar deals"
-              onClick={() => void dealsQuery.refetch()}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
+            <button type="button" aria-label="Actualizar deals" onClick={() => void dealsQuery.refetch()} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
               <RefreshCw className={`size-3.5 ${dealsQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {deals.length === 0 ? (
-            <div className="p-4">
-              <EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Ir a Kanban Deals" onAction={() => onNavigate('/deals')} />
-            </div>
+            <div className="p-4"><EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Ir a Kanban Deals" onAction={() => onNavigate('/deals')} /></div>
           ) : (
             <div className="divide-y divide-border/70">
               {deals.map((deal) => (
@@ -290,13 +269,8 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                     <StatusBadge label={deal.outcome} tone={outcomeTone(deal.outcome)} appearance="dot" />
                     <span className="font-mono text-xs font-medium tabular-nums">{formatMinorUnits(deal.valueMinor, deal.currency)}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('/deals')}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
-                  >
-                    <span>Ver registro</span>
-                    <ArrowUpRight className="size-3 text-muted-foreground" />
+                  <button type="button" onClick={() => onNavigate('/deals')} className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline">
+                    <span>Ver registro</span><ArrowUpRight className="size-3 text-muted-foreground" />
                   </button>
                 </div>
               ))}
