@@ -100,3 +100,12 @@ export function usdToVesMinor(usdMinor: number, rateMicros: number): number {
   const safeRate = BigInt(Math.max(1, Math.trunc(rateMicros)));
   return Number((safeMinor * safeRate + 500_000n) / 1_000_000n);
 }
+
+/** Parses human percentage string ('15.5' -> 1550 bps), clamping invalid/negative to 0..10000. */
+export function parsePercentToBps(raw: string): number {
+  const clean = raw.trim().replace(',', '.');
+  if (!/^\d+(?:\.\d+)?$/.test(clean)) return 0;
+  const num = Number(clean);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.min(10_000, Math.round(num * 100));
+}

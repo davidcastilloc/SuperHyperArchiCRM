@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderTree, Layers, Plus } from 'lucide-react';
 import { DataTable, PageHeader, StatusBadge, type DataTableColumn } from '@shac/ui';
-import { formatMinorUnits, INPUT_CLS, parseNonNegInt, readApiError, type Phase2ViewProps } from './phase2-format';
+import { formatMinorUnits, INPUT_CLS, parseMajorToMinor, readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** Open Mercato DS v3 Catalog Categories, Dictionaries & Product Variants view. */
 export function CatalogStructureView({ rpc }: Phase2ViewProps) {
@@ -13,8 +13,10 @@ export function CatalogStructureView({ rpc }: Phase2ViewProps) {
   const [kind, setKind] = useState<'product_category' | 'dictionary' | 'brand'>('product_category');
   const [productId, setProductId] = useState('');
   const [varSku, setVarSku] = useState('');
+  const [varBarcode, setVarBarcode] = useState('');
   const [presName, setPresName] = useState('Caja x 12');
-  const [overrideMinor, setOverrideMinor] = useState('1500');
+  const [overrideMajor, setOverrideMajor] = useState('15.00');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const catsQuery = useQuery({
     queryKey: ['catalog', 'categories'],
@@ -37,7 +39,7 @@ export function CatalogStructureView({ rpc }: Phase2ViewProps) {
   const prodsQuery = useQuery({
     queryKey: ['catalog', 'products', 'struct-select'],
     queryFn: async () => {
-      const res = await rpc.api.catalog.products.$get({ query: { limit: '50' } });
+      const res = await rpc.api.catalog.products.$get({ query: { limit: '100' } });
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
@@ -49,27 +51,41 @@ export function CatalogStructureView({ rpc }: Phase2ViewProps) {
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['catalog', 'categories'] }),
+    onSuccess: () => {
+      setErrorMsg(null);
+      void queryClient.invalidateQueries({ queryKey: ['catalog', 'categories'] });
+    },
+    onError: (err: Error) => setErrorMsg(err.message),
   });
 
   const addVarMutation = useMutation({
     mutationFn: async () => {
       const targetProd = productId || prodsQuery.data?.items[0]?.id || '';
       const res = await rpc.api.catalog.variants.$post({
-        json: { productId: targetProd, sku: varSku.trim(), presentationName: presName.trim(), overridePriceMinor: parseNonNegInt(overrideMinor, 0) },
+        json: {
+          productId: targetProd,
+          sku: varSku.trim(),
+          barcode: varBarcode.trim() || undefined,
+          presentationName: presName.trim(),
+          overridePriceMinor: parseMajorToMinor(overrideMajor),
+        },
       });
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: () => {
+      setErrorMsg(null);
       setVarSku('');
+      setVarBarcode('');
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'variants'] });
     },
+    onError: (err: Error) => setErrorMsg(err.message),
   });
 
   const cats = catsQuery.data?.items ?? [];
   const vars = varsQuery.data?.items ?? [];
   const prods = prodsQuery.data?.items ?? [];
+  const prodMap = new Map(prods.map((p) => [p.id, `${p.sku} · ${p.name}`]));
   type CatRow = (typeof cats)[number];
   type VarRow = (typeof vars)[number];
 
@@ -82,7 +98,7 @@ export function CatalogStructureView({ rpc }: Phase2ViewProps) {
   const varCols: DataTableColumn<VarRow>[] = [
     { id: 'sku', header: 'SKU Variante', cell: (v) => <span className="font-mono text-xs font-medium">{v.sku}</span> },
     { id: 'pres', header: 'Presentación', cell: (v) => <span className="font-medium">{v.presentationName}</span> },
-    { id: 'prod', header: 'Producto Padre', cell: (v) => <span className="font-mono text-xs text-muted-foreground">{v.productId}</span> },
+    { id: 'prod', header: 'Producto Padre', cell: (v) => <span className="text-xs text-muted-foreground">{prodMap.get(v.productId) ?? v.productId}</span> },
     { id: 'price', header: 'Precio Override', align: 'right', cell: (v) => <span className="font-mono tabular-nums">{v.overridePriceMinor !== null ? formatMinorUnits(v.overridePriceMinor, 'USD') : 'Base'}</span> },
   ];
 
@@ -107,27 +123,58 @@ export function CatalogStructureView({ rpc }: Phase2ViewProps) {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-2.5 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-4">
+      {errorMsg ? (
+        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {errorMsg}
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-5">
         {tab === 'categories' ? (
           <>
-            <select value={kind} onChange={(e) => setKind(e.target.value as 'product_category' | 'dictionary' | 'brand')} className={INPUT_CLS}>
-              <option value="product_category">Categoría de Producto</option>
-              <option value="dictionary">Diccionario</option>
-              <option value="brand">Marca</option>
-            </select>
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Código" className={`${INPUT_CLS} font-mono text-xs`} />
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre" className={INPUT_CLS} />
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Tipo</span>
+              <select value={kind} onChange={(e) => setKind(e.target.value as 'product_category' | 'dictionary' | 'brand')} className={`${INPUT_CLS} w-full`}>
+                <option value="product_category">Categoría de Producto</option>
+                <option value="dictionary">Diccionario</option>
+                <option value="brand">Marca</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Código</span>
+              <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="CAT-BEV" className={`${INPUT_CLS} w-full font-mono text-xs`} />
+            </label>
+            <label className="space-y-1 text-xs md:col-span-2">
+              <span className="font-medium text-muted-foreground">Nombre</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre" className={`${INPUT_CLS} w-full`} />
+            </label>
             <button type="submit" className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground"><Plus className="size-3.5" /><span>Guardar</span></button>
           </>
         ) : (
           <>
-            <select value={productId || prods[0]?.id || ''} onChange={(e) => setProductId(e.target.value)} className={INPUT_CLS}>
-              {prods.map((p) => <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>)}
-            </select>
-            <input value={varSku} onChange={(e) => setVarSku(e.target.value)} placeholder="SKU Variante" className={`${INPUT_CLS} font-mono text-xs`} />
-            <input value={presName} onChange={(e) => setPresName(e.target.value)} placeholder="Presentación" className={INPUT_CLS} />
-            <div className="flex gap-2">
-              <input value={overrideMinor} onChange={(e) => setOverrideMinor(e.target.value)} placeholder="Minor" className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Producto Padre</span>
+              <select value={productId || prods[0]?.id || ''} onChange={(e) => setProductId(e.target.value)} className={`${INPUT_CLS} w-full`}>
+                {prods.map((p) => <option key={p.id} value={p.id}>{p.sku} · {p.name}</option>)}
+              </select>
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">SKU Variante</span>
+              <input value={varSku} onChange={(e) => setVarSku(e.target.value)} placeholder="SKU Variante" className={`${INPUT_CLS} w-full font-mono text-xs`} />
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Código de Barras</span>
+              <input value={varBarcode} onChange={(e) => setVarBarcode(e.target.value)} placeholder="EAN / GTIN" className={`${INPUT_CLS} w-full font-mono text-xs`} />
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Presentación</span>
+              <input value={presName} onChange={(e) => setPresName(e.target.value)} placeholder="Caja x 12" className={`${INPUT_CLS} w-full`} />
+            </label>
+            <div className="flex items-end gap-2">
+              <label className="flex-1 space-y-1 text-xs">
+                <span className="font-medium text-muted-foreground">Precio (USD)</span>
+                <input value={overrideMajor} onChange={(e) => setOverrideMajor(e.target.value)} placeholder="15.00" className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
+              </label>
               <button type="submit" className="h-9 shrink-0 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground">Crear</button>
             </div>
           </>
