@@ -1,15 +1,17 @@
-import { ArrowRight, BookOpenCheck, CheckCircle2, Play, Printer, RotateCcw, Users } from 'lucide-react';
+import { AlertCircle, ArrowRight, BookOpenCheck, CheckCircle2, Loader2, Play, Printer, RotateCcw, Users } from 'lucide-react';
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { KpiCard, PageHeader, SegmentedTabs, StatusBadge } from '@shac/ui';
 import {
-  advanceScenarioStep,
   DEMO_PERSONAS,
   DEMO_SCENARIOS,
+  executeLiveScenarioStep,
   SOP_CHEAT_SHEETS,
+  type DemoPersona,
   type ScenarioProgressState,
 } from '../lib/demoScenarios';
 import { PosAudio } from '../lib/posAudio';
-import type { Phase2ViewProps } from './phase2-format';
+import { readApiError, type Phase2ViewProps } from './phase2-format';
 
 interface DemoAndSopCenterViewProps extends Phase2ViewProps {
   onNavigate: (href: string) => void;
@@ -17,30 +19,66 @@ interface DemoAndSopCenterViewProps extends Phase2ViewProps {
 
 type CenterTab = 'runner' | 'personas' | 'sop';
 
-/** Interactive Demo Scenario Runner, 6-Industry Persona Switcher & Printable SOP Cheat-Sheets. */
-export function DemoAndSopCenterView({ onNavigate }: DemoAndSopCenterViewProps) {
+/** Interactive Demo Scenario Runner, Industry Persona Switcher & Printable SOP Cheat-Sheets. */
+export function DemoAndSopCenterView({ rpc, onNavigate }: DemoAndSopCenterViewProps) {
+  const qc = useQueryClient();
   const [tab, setTab] = useState<CenterTab>('runner');
   const [scenarioId, setScenarioId] = useState(DEMO_SCENARIOS[0]!.id);
   const [progressByScenario, setProgressByScenario] = useState<Record<string, ScenarioProgressState>>({});
+  const [runningStep, setRunningStep] = useState(false);
+  const [switchingPersonaId, setSwitchingPersonaId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const activeScenario = DEMO_SCENARIOS.find((s) => s.id === scenarioId) ?? DEMO_SCENARIOS[0]!;
   const state = progressByScenario[activeScenario.id] ?? { currentStep: 0, logs: [] };
   const pct = Math.round((state.currentStep / activeScenario.steps.length) * 100);
 
-  function handleRunNext() {
-    PosAudio.playPaymentSuccess();
-    setProgressByScenario((prev) => ({
-      ...prev,
-      [activeScenario.id]: advanceScenarioStep(state, activeScenario),
-    }));
+  async function handleRunNext() {
+    if (runningStep) return;
+    setErrorMsg(null);
+    setRunningStep(true);
+    try {
+      const receiptLine = await executeLiveScenarioStep(rpc, activeScenario.id, state.currentStep);
+      PosAudio.playPaymentSuccess();
+      setProgressByScenario((prev) => ({
+        ...prev,
+        [activeScenario.id]: {
+          currentStep: Math.min(activeScenario.steps.length, state.currentStep + 1),
+          logs: [receiptLine, ...state.logs],
+        },
+      }));
+    } catch (err) {
+      PosAudio.playErrorTone();
+      setErrorMsg(err instanceof Error ? err.message : 'Error ejecutando paso del escenario.');
+    } finally {
+      setRunningStep(false);
+    }
   }
 
   function handleReset() {
     PosAudio.playScanBeep();
+    setErrorMsg(null);
     setProgressByScenario((prev) => ({
       ...prev,
       [activeScenario.id]: { currentStep: 0, logs: [] },
     }));
+  }
+
+  async function handleEnterPersona(p: DemoPersona) {
+    setErrorMsg(null);
+    setSwitchingPersonaId(p.id);
+    try {
+      const res = await rpc.api.system['app-store'].toggle.$post({
+        json: { switchPreset: p.presetId, presetMode: 'replace' } as never,
+      });
+      if (!res.ok) throw await readApiError(res);
+      await qc.invalidateQueries({ queryKey: ['auth', 'bootstrap'] });
+      onNavigate(p.route);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'No se pudo cambiar de vertical.');
+    } finally {
+      setSwitchingPersonaId(null);
+    }
   }
 
   return (
@@ -70,6 +108,13 @@ export function DemoAndSopCenterView({ onNavigate }: DemoAndSopCenterViewProps) 
           { id: 'sop', label: 'Guías SOP & Atajos', count: SOP_CHEAT_SHEETS.length, icon: <BookOpenCheck className="size-3.5" /> },
         ]}
       />
+
+      {errorMsg ? (
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-3.5 py-2.5 text-xs font-medium text-destructive">
+          <AlertCircle className="size-4 shrink-0" />
+          <span>{errorMsg}</span>
+        </div>
+      ) : null}
 
       {tab === 'runner' ? (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -103,11 +148,12 @@ export function DemoAndSopCenterView({ onNavigate }: DemoAndSopCenterViewProps) 
                 </button>
                 <button
                   type="button"
-                  disabled={state.currentStep >= activeScenario.steps.length}
-                  onClick={handleRunNext}
+                  disabled={runningStep || state.currentStep >= activeScenario.steps.length}
+                  onClick={() => void handleRunNext()}
                   className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-45"
                 >
-                  <Play className="size-3.5" /><span>Ejecutar Paso</span>
+                  {runningStep ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                  <span>{runningStep ? 'Ejecutando...' : 'Ejecutar Paso'}</span>
                 </button>
               </div>
             </div>
@@ -154,8 +200,15 @@ export function DemoAndSopCenterView({ onNavigate }: DemoAndSopCenterViewProps) 
                 <h3 className="text-sm font-semibold">{p.roleTitle}</h3>
                 <p className="text-xs text-muted-foreground">{p.summary}</p>
               </div>
-              <button type="button" onClick={() => onNavigate(p.route)} className="mt-4 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:opacity-90">
-                <span>Entrar como {p.roleTitle}</span><ArrowRight className="size-3.5" />
+              <button
+                type="button"
+                disabled={switchingPersonaId === p.id}
+                onClick={() => void handleEnterPersona(p)}
+                className="mt-4 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-xs font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                {switchingPersonaId === p.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                <span>{switchingPersonaId === p.id ? 'Cambiando vertical...' : `Entrar como ${p.roleTitle}`}</span>
+                <ArrowRight className="size-3.5" />
               </button>
             </div>
           ))}

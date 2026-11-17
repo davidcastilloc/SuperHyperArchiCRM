@@ -136,6 +136,34 @@ export function createPortalRoutes(profileLoader: ProfileLoader) {
 /** Mounts /api/automation/* RPC routes with full Hono type inference. */
 export function createAutomationRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
+    .get('/proposals', async (c) => {
+      const auth = await authenticateWorkerActor(
+        c.env,
+        c.req.raw.headers,
+        profileLoader,
+        'automation',
+        'automation.proposals.decide',
+      );
+      const orgPathPrefix = `${auth.actor.orgPath}%`;
+      const rows = await c.env.DB.prepare(
+        `SELECT id, target_command_id, target_record_id, confidence_bps, disposition, model_id, created_at
+         FROM kernel_ai_proposals
+         WHERE tenant_id = ?1 AND deleted_at IS NULL
+           AND org_id IN (SELECT id FROM iam_organizations WHERE tenant_id = ?1 AND (tree_path = ?2 OR tree_path LIKE ?3))
+         ORDER BY created_at DESC LIMIT 30`,
+      )
+        .bind(auth.actor.tenantId, auth.actor.orgPath, orgPathPrefix)
+        .all<{
+          id: string;
+          target_command_id: string;
+          target_record_id: string | null;
+          confidence_bps: number;
+          disposition: string;
+          model_id: string;
+          created_at: number;
+        }>();
+      return c.json({ items: rows.results ?? [] });
+    })
     .post(
       '/rules/evaluate',
       jsonCommandHandler(automationRulesEvaluateCommand, profileLoader),

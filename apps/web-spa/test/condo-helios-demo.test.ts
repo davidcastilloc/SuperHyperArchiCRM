@@ -33,4 +33,56 @@ describe('Condo Split Rent, Helios QR/PIN & Demo Playbooks UX', () => {
     expect(decoded).toContain('A9F3K2P1');
     expect(decoded).toContain('Parque Norte');
   });
+
+  it('covers all 6+ industry presets in DEMO_PERSONAS and SOP_CHEAT_SHEETS, and executes real RPC steps without fabricating logs', async () => {
+    const demoMod = await import('../src/lib/demoScenarios.js');
+    const validPresets = new Set([
+      'retail-pos',
+      'distro-wms',
+      'tech-service',
+      'hospitality-pms',
+      'property-condo',
+      'clinic-practice',
+      'legal-psa',
+      'industrial-gate',
+      'omni-enterprise',
+    ]);
+    expect(demoMod.DEMO_PERSONAS.length).toBeGreaterThanOrEqual(6);
+    for (const persona of demoMod.DEMO_PERSONAS) {
+      expect(validPresets.has(persona.presetId)).toBe(true);
+    }
+    expect(demoMod.SOP_CHEAT_SHEETS.length).toBeGreaterThanOrEqual(6);
+
+    const mockRpc = {
+      api: {
+        wms: {
+          'catalog-csv-import': {
+            $post: async () => ({
+              ok: true,
+              json: async () => ({ importedCount: 3 }),
+            }),
+          },
+        },
+      },
+    };
+    const okLine = await demoMod.executeLiveScenarioStep(mockRpc as never, 'retail-pos-fefo', 0);
+    expect(okLine).toContain('POST /api/wms/catalog-csv-import');
+
+    const failRpc = {
+      api: {
+        wms: {
+          'catalog-csv-import': {
+            $post: async () => ({
+              ok: false,
+              status: 403,
+              json: async () => ({ error: { message: 'Módulo no habilitado' } }),
+            }),
+          },
+        },
+      },
+    };
+    await expect(
+      demoMod.executeLiveScenarioStep(failRpc as never, 'retail-pos-fefo', 0),
+    ).rejects.toThrow(/Módulo no habilitado|403/);
+  });
 });
