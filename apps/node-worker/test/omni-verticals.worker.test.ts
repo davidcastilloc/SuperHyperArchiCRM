@@ -505,4 +505,109 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
     expect(listBody.briefs).toHaveLength(1);
     expect(listBody.ethicsAndCitations).toHaveLength(1);
   });
+
+  it('serves wms_locations, wms vehicles, B2B orders/quotes, and AI copilot under distro-wms preset', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify({
+        deploymentId: 'dep_distro',
+        tenantId: 'ten_1',
+        editionPreset: 'distro-wms',
+        regionPack: 've',
+        activeModules: ['core', 'iam', 'customers', 'catalog', 'wms', 'regional', 'finance', 'portal', 'services'],
+        vocabulary: {
+          partySingular: 'Cuenta Mayorista',
+          partyPlural: 'Cuentas Mayoristas',
+          orderSingular: 'Orden de Despacho',
+          branchSingular: 'CEDI',
+          spaceSingular: 'Andén',
+          caseSingular: 'RMA',
+        },
+        currency: {
+          baseCurrency: 'USD',
+          operatingCurrencies: ['USD', 'VES'],
+          rateSource: 'bcv',
+          enforceAccountCurrencyMatch: true,
+        },
+        entitlements: {
+          maxBranches: 5,
+          maxPosRegisters: 4,
+          maxSpacesOrUnits: 50,
+          aiCopilotEnabled: true,
+          customEntitiesLimit: 20,
+        },
+        federation: {
+          enabled: false,
+          nodeDid: 'did:shac:node:dep_distro',
+          publishPublicCatalog: false,
+          acceptPeerB2BOrders: false,
+          consolidateLowStockHours: 24,
+          allowedSupplierDids: [],
+        },
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    invalidateProfileCache();
+    const testEnv = makeTestEnv();
+
+    const createLoc = await workerApp.request(
+      'http://localhost/api/wms/locations',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ locationCode: 'BIN-A1-01', name: 'Pasillo A Estante 1', locationKind: 'internal' }),
+      },
+      testEnv,
+    );
+    expect(createLoc.status).toBe(201);
+
+    const listLocs = await workerApp.request(
+      'http://localhost/api/wms/locations',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    expect(listLocs.status).toBe(200);
+    const locsJson = (await listLocs.json()) as { items: Array<{ code: string }> };
+    expect(locsJson.items.some((l) => l.code === 'BIN-A1-01')).toBe(true);
+
+    const createVeh = await workerApp.request(
+      'http://localhost/api/wms/vehicles',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ vehicleCode: 'VEH-FRIO-1', plateNumber: 'AB123CD', driverName: 'Carlos', isColdChain: true }),
+      },
+      testEnv,
+    );
+    expect(createVeh.status).toBe(201);
+
+    const quoteRes = await workerApp.request(
+      'http://localhost/api/pos/quotes',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ currency: 'USD', totalMinor: 25000 }),
+      },
+      testEnv,
+    );
+    expect(quoteRes.status).toBe(201);
+
+    const ordersRes = await workerApp.request(
+      'http://localhost/api/pos/orders',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    expect(ordersRes.status).toBe(200);
+
+    const aiRes = await workerApp.request(
+      'http://localhost/api/automation/ai-chat',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Resumen de inventario' }),
+      },
+      testEnv,
+    );
+    expect(aiRes.status).toBe(200);
+  });
 });

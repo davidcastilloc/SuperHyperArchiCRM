@@ -22,6 +22,7 @@ import {
   wmsPickingsProcessCommand,
 } from '@shac/mod-wms';
 import { Hono } from 'hono';
+import { authenticateAnyModule, createD1ContextFromAuth } from './wms-vehicles-locations-routes.js';
 import {
   jsonCommandHandler,
   queryCommandHandler,
@@ -66,7 +67,17 @@ export function createPosRoutes(profileLoader: ProfileLoader) {
     )
     .get(
       '/orders',
-      queryCommandHandler(posOrdersListCommand, profileLoader),
+      async (c) => {
+        const auth = await authenticateAnyModule(
+          c.env, c.req.raw.headers, profileLoader, ['pos', 'wms', 'catalog'], posOrdersListCommand.requiredPermission,
+        );
+        const queryInput = posOrdersListCommand.inputSchema.parse(c.req.query());
+        const result = await posOrdersListCommand.handler(
+          createD1ContextFromAuth(c.env, auth.profile, auth.actor, c.req.header('X-Request-Id') ?? crypto.randomUUID()),
+          queryInput,
+        );
+        return c.json(result, 200);
+      },
     )
     .get(
       '/kiosk/smartcheck',

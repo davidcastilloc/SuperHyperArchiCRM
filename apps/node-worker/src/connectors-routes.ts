@@ -61,7 +61,10 @@ export function createConnectorsRoutes(profileLoader: ProfileLoader) {
       return c.json({ id, ...d, status: 'ACTIVE' }, 201);
     })
     .post('/automation/ai-chat', async (c) => {
-      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'automation', 'automation.rules.evaluate');
+      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'core', 'customers.read');
+      if (!auth.profile.entitlements.aiCopilotEnabled) {
+        throw new AppError('MODULE_NOT_ENABLED', 403, 'AI Copilot is disabled in active market profile');
+      }
       const parsed = AiChatSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid AI prompt', parsed.error.flatten());
       const prompt = parsed.data.prompt.trim();
