@@ -12,6 +12,7 @@ import {
 } from './schema/custom-fields.js';
 import * as docsAutomationSchema from './schema/docs-automation.js';
 import * as financeSchema from './schema/finance.js';
+import * as hardeningSchema from './schema/hardening.js';
 import * as iamSchema from './schema/iam.js';
 import * as leasesSchema from './schema/leases.js';
 import * as partiesSchema from './schema/parties.js';
@@ -44,6 +45,7 @@ const allSchemas = {
   ...financeSchema,
   ...docsAutomationSchema,
   ...physicalSchema,
+  ...hardeningSchema,
 };
 
 export type ShacD1Database = DrizzleD1Database<typeof allSchemas>;
