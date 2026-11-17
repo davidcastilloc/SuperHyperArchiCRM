@@ -27,7 +27,12 @@ import type {
   ClosePosShiftInput,
   ClosePosShiftResult,
 } from './pos-contracts.js';
-import { ensureHotTables } from './schema.js';
+import {
+  serializeRealtimeFrame,
+  shouldDeliverToSocketTags,
+  type BranchRealtimeEvent,
+  type RealtimeTopic,
+} from './realtime-hub.js';
 import {
   acquireSpaceLockInTx,
   listPosShiftsInTx,
@@ -89,6 +94,13 @@ export {
 } from './pos-contracts.js';
 export { ensureHotTables } from './schema.js';
 export {
+  parseRealtimeTopicsToTags,
+  serializeRealtimeFrame,
+  shouldDeliverToSocketTags,
+  type BranchRealtimeEvent,
+  type RealtimeTopic,
+} from './realtime-hub.js';
+export {
   acquireSpaceLockInTx,
   acquireSpaceLockInputSchema,
   listPosShiftsInTx,
@@ -116,10 +128,15 @@ export {
   type SpaceLockGrant,
 } from './space-lock.js';
 
+import { ensureHotTables } from './schema.js';
+
 /**
  * Per-branch transactional Durable Object owning the 8 hot SQLite tables.
  */
 export class BranchInventoryDO extends DurableObject<unknown> {
+  private realtimeSeq = 0;
+  private recentEvents: BranchRealtimeEvent[] = [];
+
   constructor(ctx: DurableObjectState, env: unknown) {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
@@ -127,28 +144,62 @@ export class BranchInventoryDO extends DurableObject<unknown> {
     });
   }
 
-  private broadcastBranchEvent(eventType: string, summary: Record<string, unknown>): void {
+  private broadcastBranchEvent(
+    eventType: string,
+    summary: Record<string, unknown>,
+    topic: RealtimeTopic = 'all',
+    entityId: string = '',
+  ): void {
+    this.realtimeSeq += 1;
+    const event: BranchRealtimeEvent<Record<string, unknown>> = {
+      branchId: this.ctx.id.toString(),
+      seqId: this.realtimeSeq,
+      topic,
+      eventType,
+      entityId,
+      occurredAtMs: Date.now(),
+      payload: summary,
+    };
+    this.recentEvents.push(event);
+    if (this.recentEvents.length > 100) {
+      this.recentEvents.shift();
+    }
+
     const sockets = this.ctx.getWebSockets();
     if (sockets.length === 0) return;
-    const frame = JSON.stringify({ eventType, summary, ts: Date.now() });
+    const frame = serializeRealtimeFrame(event);
     for (const ws of sockets) {
       try {
-        ws.send(frame);
+        const tags = this.ctx.getTags(ws);
+        if (tags.length === 0 || shouldDeliverToSocketTags(tags, topic)) {
+          ws.send(frame);
+        }
       } catch {
         // Ignore closed socket handles during hibernation
       }
     }
   }
 
-  acceptBranchWebSocket(ws: WebSocket): void {
-    this.ctx.acceptWebSocket(ws);
+  acceptBranchWebSocket(ws: WebSocket, tags: string[] = ['topic:all'], sinceSeq = 0): void {
+    this.ctx.acceptWebSocket(ws, tags);
+    if (sinceSeq > 0 || this.recentEvents.length > 0) {
+      for (const ev of this.recentEvents) {
+        if (ev.seqId > sinceSeq && shouldDeliverToSocketTags(tags, ev.topic)) {
+          try {
+            ws.send(serializeRealtimeFrame(ev));
+          } catch {
+            break;
+          }
+        }
+      }
+    }
   }
 
   async receiveLot(input: ReceiveLotInput): Promise<ReceiveLotResult> {
     const result = this.ctx.storage.transactionSync(() =>
       receiveLotInTx(this.ctx.storage.sql, input),
     );
-    this.broadcastBranchEvent('lot.received', { productId: input.productId, lotId: result.lotId });
+    this.broadcastBranchEvent('lot.received', { productId: input.productId, lotId: result.lotId }, 'wms', result.lotId);
     return result;
   }
 
@@ -156,7 +207,7 @@ export class BranchInventoryDO extends DurableObject<unknown> {
     const result = this.ctx.storage.transactionSync(() =>
       allocateFefoInTx(this.ctx.storage.sql, input),
     );
-    this.broadcastBranchEvent('fefo.allocated', { productId: input.productId, orderId: input.orderId });
+    this.broadcastBranchEvent('fefo.allocated', { productId: input.productId, orderId: input.orderId }, 'wms', input.orderId);
     return result;
   }
 
@@ -172,9 +223,11 @@ export class BranchInventoryDO extends DurableObject<unknown> {
   async acquireSpaceLock(
     input: AcquireSpaceLockInput,
   ): Promise<SpaceLockResult> {
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       acquireSpaceLockInTx(this.ctx.storage.sql, input),
     );
+    this.broadcastBranchEvent('space.locked', { spaceId: input.spaceId, slotBucket: input.slotBucket }, 'spaces', input.spaceId);
+    return result;
   }
 
   async listSpaceLocks(spaceId?: string): Promise<SpaceLockRecord[]> {
@@ -184,9 +237,11 @@ export class BranchInventoryDO extends DurableObject<unknown> {
   }
 
   async openPosShift(input: OpenPosShiftInput): Promise<OpenPosShiftResult> {
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       openPosShiftInTx(this.ctx.storage.sql, input),
     );
+    this.broadcastBranchEvent('pos.shift_opened', { shiftId: result.shiftId, registerId: input.registerId }, 'pos', result.shiftId);
+    return result;
   }
 
   async listPosShifts(registerId?: string): Promise<PosShiftRecord[]> {
