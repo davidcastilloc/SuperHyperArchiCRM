@@ -22,11 +22,17 @@ import { PHASE8_COMMANDS } from './phase8-registry.js';
 import { PHASE6_COMMANDS } from './spaces-leases-registry.js';
 import { PHASE4_SYSTEM_COMMANDS } from './system-routes.js';
 
+interface WorkersAiBinding {
+  run(model: string, input: Record<string, unknown>): Promise<unknown>;
+}
+
 export interface WorkerEnv extends CorsEnv {
   DB: D1Database;
   CONFIG_KV: KVNamespace;
   SESSION_KV: KVNamespace;
   BRANCH_DO: DurableObjectNamespace;
+  MEDIA_BUCKET?: R2Bucket;
+  AI?: WorkersAiBinding;
   JWT_PUBLIC_KEY_JWK?: string;
   LICENSE_HMAC_SECRET?: string;
 }

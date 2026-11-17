@@ -38,6 +38,7 @@ export interface BranchActorHttpTarget {
   ): Promise<ApprovePhysicalReturnResult>;
   listOutbox(limit?: number): Promise<OutboxEvent[]>;
   drainOutbox(options?: DrainOutboxOptions): Promise<OutboxEvent[]>;
+  acceptBranchWebSocket?(ws: WebSocket): void;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -169,6 +170,19 @@ export async function handleBranchHttpRequest(
     if (method === 'POST' && path === '/pos-return-approve') {
       const body = (await readJsonBody(request)) as ApprovePhysicalReturnInput;
       return jsonResponse(await actor.approvePhysicalReturn(body));
+    }
+    if (method === 'GET' && path === '/ws') {
+      if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+        return new Response('Expected Upgrade: websocket', { status: 426 });
+      }
+      const pair = new WebSocketPair();
+      const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
+      if (actor.acceptBranchWebSocket) {
+        actor.acceptBranchWebSocket(server);
+      } else {
+        server.accept();
+      }
+      return new Response(null, { status: 101, webSocket: client });
     }
     if (method === 'GET' && path === '/outbox') {
       const limit = parseLimitParam(url.searchParams.get('limit'));

@@ -1,0 +1,22 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "account_id": "aedd0159259bcb5220041dfe0f088976",
+  "name": "shac-control-plane",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "CP_DB",
+      "database_name": "shac-primary",
+      "database_id": "e9600aff-1439-4a91-8a12-c5d1d14953bd",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CP_KV",
+      "id": "14c739e1ee8c49619668446fbe1ca1b4"
+    }
+  ]
+}

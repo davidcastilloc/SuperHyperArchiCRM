@@ -44,6 +44,8 @@ import { createCustomFieldsRoutes } from './custom-fields-routes.js';
 import { createFederationRoutes } from './federation-routes.js';
 import { createFormsWorkflowsRoutes } from './forms-workflows-routes.js';
 import { createIamAdminRoutes } from './iam-admin-routes.js';
+import { createMediaAndWebhooksRoutes } from './media-and-webhooks-routes.js';
+import { createPublicPortalRoutes } from './public-portal-routes.js';
 import { createStaffRoutes } from './staff-routes.js';
 import { buildMcpServerForRequest } from './mcp-server.js';
 import {
@@ -88,7 +90,17 @@ function createWorkerApp(
     .get('/api/health', (c) =>
       c.json({ ok: true, service: 'shac-node-worker' }, 200),
     )
+    .get('/ws/branch/:branchId', async (c) => {
+      if (c.req.header('Upgrade')?.toLowerCase() !== 'websocket') {
+        return c.text('Expected Upgrade: websocket', 426);
+      }
+      const tenantId = c.req.query('tenantId') ?? 'ten_1';
+      const branchId = c.req.param('branchId');
+      const stub = c.env.BRANCH_DO.get(c.env.BRANCH_DO.idFromName(`${tenantId}:${branchId}`));
+      return stub.fetch('https://branch/ws', c.req.raw);
+    })
     .route('/api/auth', createAuthRoutes(profileLoader))
+    .route('/api', createPublicPortalRoutes())
     .get('/api/iam/orgs', queryCommandHandler(iamOrgsListCommand, profileLoader))
     .post('/api/iam/orgs', jsonCommandHandler(iamOrgsCreateCommand, profileLoader))
     .post(
@@ -178,6 +190,7 @@ function createWorkerApp(
       jsonCommandHandler(systemAppStoreToggleCommand, profileLoader),
     )
     .route('/api/system', createCustomFieldsRoutes(profileLoader))
+    .route('/api', createMediaAndWebhooksRoutes(profileLoader))
     .route('/api/staff', createStaffRoutes(profileLoader))
     .route('/api', createIamAdminRoutes(profileLoader))
     .route('/api', createCatalogExtRoutes(profileLoader))

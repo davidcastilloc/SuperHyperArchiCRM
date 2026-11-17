@@ -25,7 +25,7 @@ const AiChatSchema = z.object({
 export function createConnectorsRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
     .get('/system/connectors', async (c) => {
-      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'core', 'iam.orgs.read');
+      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'iam', 'iam.orgs.read');
       const res = await c.env.DB.prepare(
         `SELECT id, record_kind, provider_or_url, subscribed_events_json, processed_count, status, created_at
          FROM int_webhooks_and_sync_jobs WHERE tenant_id = ?1 AND deleted_at IS NULL
@@ -47,7 +47,7 @@ export function createConnectorsRoutes(profileLoader: ProfileLoader) {
       });
     })
     .post('/system/connectors', async (c) => {
-      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'core', 'iam.orgs.write');
+      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'iam', 'iam.orgs.write');
       const parsed = ConnectorSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid connector payload', parsed.error.flatten());
       const d = parsed.data;
@@ -76,7 +76,15 @@ export function createConnectorsRoutes(profileLoader: ProfileLoader) {
       const orderStats = (ordersRes?.results?.[0] as { cnt?: number; total?: number } | undefined) ?? { cnt: 0, total: 0 };
       const dealStats = (dealsRes?.results?.[0] as { cnt?: number; total?: number } | undefined) ?? { cnt: 0, total: 0 };
 
-      const reply = [
+      const telemetrySummary = [
+        `Tenant: ${auth.profile.tenantId} (${auth.actor.orgId})`,
+        `Clientes activos: ${partyCount}`,
+        `Órdenes registradas: ${orderStats.cnt ?? 0} ($${((orderStats.total ?? 0) / 100).toFixed(2)})`,
+        `Pipeline abierto: ${dealStats.cnt ?? 0} oportunidades ($${((dealStats.total ?? 0) / 100).toFixed(2)})`,
+      ].join(' | ');
+
+      let engine = 'd1-deterministic-copilot';
+      let reply = [
         `Consulta ejecutada sobre el Edge D1 de ${auth.profile.tenantId} (${auth.actor.orgId}):`,
         `• Clientes activos: ${partyCount}`,
         `• Órdenes registradas: ${orderStats.cnt ?? 0} ($${((orderStats.total ?? 0) / 100).toFixed(2)})`,
@@ -84,6 +92,26 @@ export function createConnectorsRoutes(profileLoader: ProfileLoader) {
         `Acción sugerida para "${prompt}": puedes abrir /orders, /deals o /custom-fields desde la paleta ⌘K.`,
       ].join('\n');
 
-      return c.json({ reply, metrics: { partyCount, ordersCount: orderStats.cnt ?? 0, openDealsCount: dealStats.cnt ?? 0 } }, 200);
+      if (c.env.AI) {
+        try {
+          const aiOut = (await c.env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+            messages: [
+              {
+                role: 'system',
+                content: `Eres el copiloto operativo de SuperHyperArchiCRM. Responde en español conciso usando esta telemetría viva: ${telemetrySummary}`,
+              },
+              { role: 'user', content: prompt },
+            ],
+          })) as { response?: string } | undefined;
+          if (aiOut?.response?.trim()) {
+            engine = 'workers-ai:@cf/meta/llama-3.1-8b-instruct';
+            reply = aiOut.response.trim();
+          }
+        } catch {
+          // Graceful fallback to D1 deterministic summary when AI binding fails
+        }
+      }
+
+      return c.json({ ok: true, engine, reply, metrics: { partyCount, ordersCount: orderStats.cnt ?? 0, openDealsCount: dealStats.cnt ?? 0 } }, 200);
     });
 }

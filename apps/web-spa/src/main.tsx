@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClientProvider, useQuery } from '@tanstack/react-query';
 import {
   Outlet, RouterProvider, createRootRoute, createRoute, createRouter,
-  useNavigate, useRouterState,
+  useNavigate, useParams, useRouterState,
 } from '@tanstack/react-router';
 import { Bot, LogOut, UserRound } from 'lucide-react';
 import { ShacAppShell } from '@shac/ui';
@@ -13,6 +13,7 @@ import { clearAuthSession, useAuthSession } from './lib/authSession';
 import { listOfflineQueue } from './lib/offlineQueue';
 import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
+import { useBranchRealtimeSync } from './lib/useBranchRealtimeSync';
 import { DEFAULT_BRANCHES, DEFAULT_PROFILE, NAV_ITEMS } from './nav';
 import { AiAssistantDrawer } from './views/AiAssistantDrawer';
 import { AppStoreView } from './views/AppStoreView';
@@ -37,6 +38,7 @@ import { PortalView } from './views/PortalView';
 import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
 import { ProjectsBoardView } from './views/ProjectsBoardView';
 import { PromotionsView } from './views/PromotionsView';
+import { PublicFormView, PublicQuoteView } from './views/PublicFormAndQuoteView';
 import { QuotesView } from './views/QuotesView';
 import { SalesOrdersView } from './views/SalesOrdersView';
 import { LeasesView, SpacesView } from './views/SpacesLeasesViews';
@@ -63,6 +65,7 @@ function RootLayout() {
       return res.json();
     },
   });
+  useBranchRealtimeSync(bootstrapQuery.data?.branches[0]?.id, session?.actor.tenantId);
   const queueQuery = useQuery({
     queryKey: ['pos', 'offlineQueue'],
     queryFn: () => listOfflineQueue(),
@@ -123,7 +126,7 @@ function RootLayout() {
         ) : null
       }
     >
-      {session || pathname === '/auth' ? (
+      {session || pathname === '/auth' || pathname.startsWith('/f/') || pathname.startsWith('/quote/') ? (
         <Outlet />
       ) : (
         <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />
@@ -184,7 +187,19 @@ const routeSpecs: Array<[string, () => ReturnType<typeof HomePage>]> = [
   ['/integrations', () => <IntegrationsHubView vocabulary={voc} rpc={rpcClient} />],
   ['/physical', () => <PhysicalView vocabulary={voc} rpc={rpcClient} />],
   ['/app-store', () => <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />],
+  ['/f/$slug', () => <PublicFormRoutePage />],
+  ['/quote/$orderNumber', () => <PublicQuoteRoutePage />],
 ];
+
+function PublicFormRoutePage() {
+  const { slug = '' } = useParams({ strict: false }) as { slug?: string };
+  return <PublicFormView slug={slug} />;
+}
+
+function PublicQuoteRoutePage() {
+  const { orderNumber = '' } = useParams({ strict: false }) as { orderNumber?: string };
+  return <PublicQuoteView orderNumber={orderNumber} />;
+}
 
 const routeTree = rootRoute.addChildren(
   routeSpecs.map(([path, component]) => createRoute({ getParentRoute: () => rootRoute, path, component })),

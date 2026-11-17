@@ -1,5 +1,6 @@
-import type { FormEvent } from 'react';
-import { Calculator, CheckCircle2, Minus, Plus, Trash2 } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { Calculator, CheckCircle2, Minus, Plus, Printer, Trash2 } from 'lucide-react';
+import { ThermalReceiptModal } from '@shac/ui';
 import { formatMinorUnits, INPUT_CLS } from './phase2-format';
 
 export interface PosCartLine {
@@ -40,6 +41,8 @@ export function PosReceiptPanel({
   onSubmit,
   submitting,
 }: PosReceiptPanelProps) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+
   return (
     <form
       onSubmit={onSubmit}
@@ -140,6 +143,16 @@ export function PosReceiptPanel({
             <span>Restante Bs</span>
           </button>
           <button
+            type="button"
+            onClick={() => setPreviewOpen(true)}
+            disabled={cart.length === 0}
+            title="Imprimir ticket ESC/POS 80mm"
+            aria-label="Imprimir ticket térmico"
+            className="inline-flex h-10 items-center justify-center rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-45"
+          >
+            <Printer className="size-4 text-muted-foreground" />
+          </button>
+          <button
             type="submit"
             disabled={submitting || cart.length === 0}
             className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-checkout px-4 text-sm font-medium text-checkout-foreground shadow-xs transition-opacity hover:opacity-95 disabled:opacity-45"
@@ -149,6 +162,19 @@ export function PosReceiptPanel({
           </button>
         </div>
       </div>
+      <ThermalReceiptModal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        receipt={{
+          storeName: 'SuperHyperArchiCRM · Sucursal',
+          orderNumber: 'BORRADOR-POS',
+          cashierName: 'Caja Activa',
+          currencyCode: 'USD',
+          lines: cart.map((l) => ({ title: l.name, qty: l.qty, lineTotalMinor: l.unitPriceMinor * l.qty })),
+          grandTotalMinor: cartTotalMinor,
+          kickCashDrawer: true,
+        }}
+      />
     </form>
   );
 }

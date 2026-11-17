@@ -277,4 +277,56 @@ describe('@shac/ui smoke tests', () => {
     expect(onExport).toHaveBeenCalledTimes(1);
     expect(toCsvString(['Order', 'Total'], [['ORD-1', 150]])).toContain('ORD-1,150');
   });
+
+  it('renders TimeSeriesChart with SVG bars and accessible labels', async () => {
+    const { TimeSeriesChart } = await import('../src/index.js');
+    render(
+      <TimeSeriesChart
+        title="Ingresos por Canal (Últimos 7 días)"
+        subtitle="Importes netos en USD"
+        series={[
+          { label: 'Lun', value: 1240, secondaryValue: 980 },
+          { label: 'Mar', value: 1890, secondaryValue: 1120 },
+          { label: 'Mié', value: 1560, secondaryValue: 1340 },
+        ]}
+        valuePrefix="$"
+      />,
+    );
+    expect(screen.getByText('Ingresos por Canal (Últimos 7 días)')).toBeInTheDocument();
+    expect(screen.getByText('Lun')).toBeInTheDocument();
+    expect(document.querySelector('svg')).toBeTruthy();
+  });
+
+  it('encodes ESC/POS receipt bytes and renders ThermalReceiptModal', async () => {
+    const { encodeEscPosReceipt, ThermalReceiptModal } = await import('../src/index.js');
+    const bytes = encodeEscPosReceipt({
+      storeName: 'SHAC Casa Matriz',
+      orderNumber: 'POS-2026-0099',
+      cashierName: 'Georgina',
+      currencyCode: 'USD',
+      lines: [{ title: 'Café Molido 500g', qty: 2, lineTotalMinor: 1500 }],
+      grandTotalMinor: 1500,
+      kickCashDrawer: true,
+    });
+    expect(bytes[0]).toBe(0x1b);
+    expect(bytes[1]).toBe(0x40);
+    expect(bytes.includes(0x70)).toBe(true);
+
+    render(
+      <ThermalReceiptModal
+        open={true}
+        onClose={() => {}}
+        receipt={{
+          storeName: 'SHAC Casa Matriz',
+          orderNumber: 'POS-2026-0099',
+          cashierName: 'Georgina',
+          currencyCode: 'USD',
+          lines: [{ title: 'Café Molido 500g', qty: 2, lineTotalMinor: 1500 }],
+          grandTotalMinor: 1500,
+        }}
+      />,
+    );
+    expect(screen.getAllByText(/POS-2026-0099/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/ESC\/POS 80mm/)).toBeInTheDocument();
+  });
 });

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, ReceiptText, RefreshCw, SlidersHorizontal } from 'lucide-react';
-import { EmptyState, KpiCard, StatusBadge } from '@shac/ui';
+import { EmptyState, KpiCard, StatusBadge, TimeSeriesChart } from '@shac/ui';
 import { formatMinorUnits, readApiError, type Phase2ViewProps } from './phase2-format';
 
 interface DashboardViewProps extends Phase2ViewProps {
@@ -110,6 +110,17 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           comparisonLabel="Oportunidades en negociación"
         />
       </div>
+
+      <TimeSeriesChart
+        title="Actividad Operativa por Módulo"
+        subtitle="Clientes, oportunidades abiertas y tareas registradas"
+        series={[
+          { label: 'Clientes', value: partiesQuery.data?.total ?? parties.length, secondaryValue: 10 },
+          { label: 'Tareas', value: tasksQuery.data?.summary.openCount ?? tasks.length, secondaryValue: 8 },
+          { label: 'Deals', value: deals.length, secondaryValue: 6 },
+          { label: 'Pipeline $', value: Math.round((dealsSummary?.openValueMinor ?? 0) / 100), secondaryValue: 500 },
+        ]}
+      />
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         <div className="flex flex-col rounded-xl border border-border bg-card shadow-xs">

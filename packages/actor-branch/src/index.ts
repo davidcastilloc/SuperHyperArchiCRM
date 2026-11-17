@@ -114,16 +114,37 @@ export class BranchInventoryDO extends DurableObject<unknown> {
     });
   }
 
+  private broadcastBranchEvent(eventType: string, summary: Record<string, unknown>): void {
+    const sockets = this.ctx.getWebSockets();
+    if (sockets.length === 0) return;
+    const frame = JSON.stringify({ eventType, summary, ts: Date.now() });
+    for (const ws of sockets) {
+      try {
+        ws.send(frame);
+      } catch {
+        // Ignore closed socket handles during hibernation
+      }
+    }
+  }
+
+  acceptBranchWebSocket(ws: WebSocket): void {
+    this.ctx.acceptWebSocket(ws);
+  }
+
   async receiveLot(input: ReceiveLotInput): Promise<ReceiveLotResult> {
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       receiveLotInTx(this.ctx.storage.sql, input),
     );
+    this.broadcastBranchEvent('lot.received', { productId: input.productId, lotId: result.lotId });
+    return result;
   }
 
   async allocateFefo(input: AllocateFefoInput): Promise<AllocateFefoResult> {
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       allocateFefoInTx(this.ctx.storage.sql, input),
     );
+    this.broadcastBranchEvent('fefo.allocated', { productId: input.productId, orderId: input.orderId });
+    return result;
   }
 
   async getBalances(
@@ -164,15 +185,19 @@ export class BranchInventoryDO extends DurableObject<unknown> {
   async checkoutPosSale(
     input: CheckoutPosSaleInput,
   ): Promise<CheckoutPosSaleResult> {
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       checkoutPosSaleInTx(this.ctx.storage.sql, input),
     );
+    this.broadcastBranchEvent('pos.checkout', { orderId: result.orderId, registerId: input.registerId });
+    return result;
   }
 
   async closePosShift(input: ClosePosShiftInput): Promise<ClosePosShiftResult> {
-    return this.ctx.storage.transactionSync(() =>
+    const result = this.ctx.storage.transactionSync(() =>
       closePosShiftInTx(this.ctx.storage.sql, input),
     );
+    this.broadcastBranchEvent('pos.shift_closed', { shiftId: input.shiftId });
+    return result;
   }
 
   async approvePhysicalReturn(
