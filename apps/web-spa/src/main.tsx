@@ -1,6 +1,6 @@
 import '@shac/ui/globals.css';
 
-import { StrictMode, Suspense, useEffect, useState } from 'react';
+import { StrictMode, Suspense, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -23,6 +23,7 @@ import { AiAssistantDrawer } from './views/AiAssistantDrawer';
 import { AuthPage } from './views/AuthPage';
 import { PublicFormView } from './views/PublicFormAndQuoteView';
 import { PublicQuoteView } from './views/PublicQuoteView';
+import type { Phase2ViewProps } from './views/phase2-format';
 import {
   AppStoreView, AuditLogsView, AutomationView, CatalogStructureView, CatalogView,
   ClaimsAndServicesView, ClinicalEhrView, CondoResidentHubView, CustomFieldsView,
