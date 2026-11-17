@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
-import { Calculator, CheckCircle2, Minus, Plus, Printer, Trash2 } from 'lucide-react';
+import { Calculator, CheckCircle2, Clock, Minus, Percent, Plus, Printer, Trash2, Wallet } from 'lucide-react';
 import { ThermalReceiptModal } from '@shac/ui';
+import { applyLineDiscountMinor } from '../lib/usePosScanner';
 import { formatMinorUnits, INPUT_CLS } from './phase2-format';
 
 export interface PosCartLine {
@@ -9,6 +10,7 @@ export interface PosCartLine {
   name: string;
   unitPriceMinor: number;
   qty: number;
+  discountBps?: number;
 }
 
 interface PosReceiptPanelProps {
@@ -20,6 +22,9 @@ interface PosReceiptPanelProps {
   onUsdChange: (value: string) => void;
   onVesChange: (value: string) => void;
   onUpdateQty: (productId: string, delta: number) => void;
+  onToggleDiscount?: (productId: string) => void;
+  onHoldOrder?: () => void;
+  onOpenTender?: () => void;
   onClearCart: () => void;
   onFillRestante: () => void;
   onSubmit: (e: FormEvent) => void;
@@ -36,6 +41,9 @@ export function PosReceiptPanel({
   onUsdChange,
   onVesChange,
   onUpdateQty,
+  onToggleDiscount,
+  onHoldOrder,
+  onOpenTender,
   onClearCart,
   onFillRestante,
   onSubmit,
@@ -69,23 +77,39 @@ export function PosReceiptPanel({
           </p>
         ) : (
           <ul className="divide-y divide-border/80">
-            {cart.map((line) => (
-              <li key={line.productId} className="flex items-center justify-between gap-2 py-2.5 text-sm">
-                <div className="min-w-0">
-                  <p className="truncate font-medium">{line.name}</p>
-                  <p className="font-mono text-xs text-muted-foreground tabular-nums">
-                    {formatMinorUnits(line.unitPriceMinor, 'USD')} × {line.qty}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    aria-label={`Restar ${line.name}`}
-                    onClick={() => onUpdateQty(line.productId, -1)}
-                    className="inline-flex size-7 items-center justify-center rounded-md border border-border hover:bg-muted"
-                  >
-                    <Minus className="size-3" />
-                  </button>
+            {cart.map((line) => {
+              const lineFinalMinor = applyLineDiscountMinor(line.unitPriceMinor * line.qty, line.discountBps ?? 0);
+              return (
+                <li key={line.productId} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{line.name}</p>
+                    <p className="font-mono text-xs text-muted-foreground tabular-nums">
+                      {formatMinorUnits(line.unitPriceMinor, 'USD')} × {line.qty}
+                      {line.discountBps ? ` (-${Math.round(line.discountBps / 100)}%)` : ''} ·{' '}
+                      <span className="font-semibold text-foreground">{formatMinorUnits(lineFinalMinor, 'USD')}</span>
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {onToggleDiscount ? (
+                      <button
+                        type="button"
+                        title="Alternar descuento 10%"
+                        onClick={() => onToggleDiscount(line.productId)}
+                        className={`inline-flex size-7 items-center justify-center rounded-md border text-xs ${
+                          line.discountBps ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted'
+                        }`}
+                      >
+                        <Percent className="size-3" />
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      aria-label={`Restar ${line.name}`}
+                      onClick={() => onUpdateQty(line.productId, -1)}
+                      className="inline-flex size-7 items-center justify-center rounded-md border border-border hover:bg-muted"
+                    >
+                      <Minus className="size-3" />
+                    </button>
                   <span className="w-6 text-center font-mono text-xs font-medium tabular-nums">{line.qty}</span>
                   <button
                     type="button"
@@ -97,7 +121,8 @@ export function PosReceiptPanel({
                   </button>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
       </div>
@@ -132,7 +157,19 @@ export function PosReceiptPanel({
           </label>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {onHoldOrder ? (
+            <button
+              type="button"
+              onClick={onHoldOrder}
+              disabled={cart.length === 0}
+              title="Aparcar ticket / Leylan (F8)"
+              className="inline-flex h-10 items-center gap-1 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-45"
+            >
+              <Clock className="size-3.5 text-amber-500" />
+              <span>F8</span>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={onFillRestante}
@@ -142,6 +179,18 @@ export function PosReceiptPanel({
             <Calculator className="size-3.5 text-muted-foreground" />
             <span>Restante Bs</span>
           </button>
+          {onOpenTender ? (
+            <button
+              type="button"
+              onClick={onOpenTender}
+              disabled={cart.length === 0}
+              title="Cobro rápido / Billetes (F9)"
+              className="inline-flex h-10 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-45"
+            >
+              <Wallet className="size-3.5 text-primary" />
+              <span>F9</span>
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setPreviewOpen(true)}

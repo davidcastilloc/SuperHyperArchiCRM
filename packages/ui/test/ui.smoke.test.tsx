@@ -329,4 +329,17 @@ describe('@shac/ui smoke tests', () => {
     expect(screen.getAllByText(/POS-2026-0099/).length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/ESC\/POS 80mm/)).toBeInTheDocument();
   });
+
+  it('renders PosVirtualKeypad and emits touch digit entries', async () => {
+    const { PosVirtualKeypad } = await import('../src/index.js');
+    const onChange = vi.fn();
+    const onSubmit = vi.fn();
+    render(<PosVirtualKeypad value="12" onChange={onChange} onSubmit={onSubmit} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '5' }));
+    expect(onChange).toHaveBeenCalledWith('125');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
 });

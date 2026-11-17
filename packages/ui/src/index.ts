@@ -61,3 +61,7 @@ export {
   type EscPosReceiptLine,
   type ThermalReceiptModalProps,
 } from './components/ThermalReceiptModal.js';
+export {
+  PosVirtualKeypad,
+  type PosVirtualKeypadProps,
+} from './components/PosVirtualKeypad.js';
