@@ -13,9 +13,10 @@ const CreateUserSchema = z.object({
   fullName: z.string().min(1).max(120),
   realm: z.enum(['staff', 'portal', 'admin']).default('staff'),
   defaultOrgId: z.string().min(1).optional(),
+  allowedOrgIds: z.array(z.string().min(1)).optional(),
   password: z.string().min(8).max(128).optional(),
   floorPin: z.string().regex(/^\d{4}$/).optional(),
-  perms: z.array(z.string()).default(['*']),
+  perms: z.array(z.string()).default(['customers.read']),
 });
 
 const CustomRecordSchema = z.object({
@@ -79,12 +80,27 @@ export function createIamAdminRoutes(profileLoader: ProfileLoader) {
           (id, tenant_id, default_org_id, realm, email, email_hash, full_name, password_hash_webcrypto, floor_pin_hash, is_verified, preferences_json, is_active, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, 1, ?11, ?11)
          ON CONFLICT(tenant_id, email_hash) DO UPDATE SET
+           default_org_id = excluded.default_org_id,
            full_name = excluded.full_name,
            realm = excluded.realm,
+           password_hash_webcrypto = COALESCE(excluded.password_hash_webcrypto, iam_users.password_hash_webcrypto),
+           floor_pin_hash = COALESCE(excluded.floor_pin_hash, iam_users.floor_pin_hash),
            preferences_json = excluded.preferences_json,
            updated_at = excluded.updated_at`,
       )
-        .bind(id, auth.actor.tenantId, orgId, d.realm, emailNorm, emailHash, d.fullName.trim(), pwHash, pinHash, JSON.stringify({ perms: d.perms }), nowSec)
+        .bind(
+          id,
+          auth.actor.tenantId,
+          orgId,
+          d.realm,
+          emailNorm,
+          emailHash,
+          d.fullName.trim(),
+          pwHash,
+          pinHash,
+          JSON.stringify({ perms: d.perms, ...(d.allowedOrgIds ? { allowedOrgIds: d.allowedOrgIds } : {}) }),
+          nowSec,
+        )
         .run();
 
       return c.json({ id, email: emailNorm, fullName: d.fullName.trim(), realm: d.realm, defaultOrgId: orgId }, 201);
