@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   enqueueOfflineMutation,
   flushOfflineQueue,
+  isPermanentDomainRejection,
   listOfflineQueue,
+  listQuarantinedOfflineMutations,
   type OfflineMutationItem,
 } from '../src/lib/offlineQueue';
 import { createShacQueryClient } from '../src/lib/queryClient';
@@ -361,5 +363,74 @@ describe('@shac/web-spa offlineFirst, RPC client & IndexedDB offline queue', () 
     expect(iamMod.STAFF_ROLE_PRESETS!.clinician!.perms).not.toContain('*');
     expect(iamMod.STAFF_ROLE_PRESETS!.guard!.perms).not.toContain('*');
     expect(iamMod.STAFF_ROLE_PRESETS!.admin!.perms).toEqual(['*']);
+  });
+
+  it('quarantines permanent 400/409/422 domain rejections without blocking subsequent offline mutations', async () => {
+    expect(isPermanentDomainRejection(400)).toBe(true);
+    expect(isPermanentDomainRejection(409)).toBe(true);
+    expect(isPermanentDomainRejection(422)).toBe(true);
+    expect(isPermanentDomainRejection(503)).toBe(false);
+
+    const queueKey = `test-quarantine-${crypto.randomUUID()}`;
+    await enqueueOfflineMutation(
+      {
+        clientMutationId: 'mut-bad-422',
+        endpoint: '/api/pos/sales/checkout',
+        kind: 'pos.sales.checkout',
+        payload: { shiftId: 'shift-1', amount: -5 },
+      },
+      { queueKey },
+    );
+    await enqueueOfflineMutation(
+      {
+        clientMutationId: 'mut-good-200',
+        endpoint: '/api/pos/sales/checkout',
+        kind: 'pos.sales.checkout',
+        payload: { shiftId: 'shift-1', amount: 100 },
+      },
+      { queueKey },
+    );
+
+    const result = await flushOfflineQueue(
+      async (item: OfflineMutationItem) => {
+        if (item.clientMutationId === 'mut-bad-422') {
+          return new Response(
+            JSON.stringify({ error: { code: 'VALIDATION_ERROR', message: 'Invalid amount' } }),
+            { status: 422, headers: { 'Content-Type': 'application/json' } },
+          );
+        }
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+      { queueKey },
+    );
+
+    expect(result.settled).toBe(1);
+    expect(result.retained).toBe(0);
+    expect(result.quarantinedMutations).toHaveLength(1);
+    expect(result.quarantinedMutations[0]?.id).toBe('mut-bad-422');
+    expect(result.quarantinedMutations[0]?.statusCode).toBe(422);
+
+    const persistedQuarantine = await listQuarantinedOfflineMutations({ queueKey });
+    expect(persistedQuarantine).toHaveLength(1);
+    expect(await listOfflineQueue({ queueKey })).toHaveLength(0);
+  });
+
+  it('attaches Idempotency-Key header automatically on POST RPC mutations', async () => {
+    let seenIdempotencyKey: string | null = null;
+    const rpc = createRpcClient('https://edge.shac.local', {
+      fetchImpl: async (_input, init) => {
+        const headers = new Headers(init?.headers);
+        seenIdempotencyKey = headers.get('Idempotency-Key');
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      },
+    });
+    await rpc.api.pos.sales.checkout.$post({ json: {} as never });
+    expect(seenIdempotencyKey).toBeTruthy();
   });
 });

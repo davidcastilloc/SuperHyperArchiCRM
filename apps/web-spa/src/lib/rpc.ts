@@ -21,6 +21,13 @@ export function createRpcClient(baseUrl: string, options: RpcClientOptions = {})
         headers.set('X-Org-Id', session.actor.orgId);
       }
     }
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+    if (
+      (method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE') &&
+      !headers.has('Idempotency-Key')
+    ) {
+      headers.set('Idempotency-Key', crypto.randomUUID());
+    }
 
     const response = await baseFetch(input, { ...init, headers });
     const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;

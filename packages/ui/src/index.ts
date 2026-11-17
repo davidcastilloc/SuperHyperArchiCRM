@@ -83,3 +83,7 @@ export {
   AiCopilotBanner,
   type AiCopilotBannerProps,
 } from './components/AiCopilotBanner.js';
+export {
+  ViewErrorBoundary,
+  type ViewErrorBoundaryProps,
+} from './components/ViewErrorBoundary.js';
