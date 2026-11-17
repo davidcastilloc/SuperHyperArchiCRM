@@ -12,6 +12,7 @@ import { applySqlScript, makeProfile, seedTenantsAndOrgs } from './test-helpers.
 
 describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
   let publicKeyJwkJson: string;
+  let privateKeyJwk: JsonWebKey;
   let tokenTen1: string;
 
   beforeAll(async () => {
@@ -32,6 +33,7 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
       ),
     );
     const keys = await generateEd25519KeyPair();
+    privateKeyJwk = keys.privateKeyJwk;
     publicKeyJwkJson = JSON.stringify(keys.publicKeyJwk);
     tokenTen1 = await signJwtEdDsa(
       {
@@ -609,5 +611,89 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
       testEnv,
     );
     expect(aiRes.status).toBe(200);
+  });
+
+  it('saves AI Scribe SOAP notes as DRAFT, parses JSON cleanly, signs via /notes/:id/sign, and isolates orgPath', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['core', 'iam', 'customers', 'cases', 'services', 'finance', 'portal', 'automation'])),
+    );
+    invalidateProfileCache();
+    const aiMockEnv = {
+      ...makeTestEnv(),
+      AI: {
+        async run() {
+          return {
+            response: JSON.stringify({
+              subjective: 'Cefalea frontal de 48h',
+              objective: 'PA 120/80 mmHg',
+              assessment: 'Migraña sin aura',
+              plan: 'Sumatriptán 50mg PRN',
+              icd10: ['G43.0'],
+            }),
+          };
+        },
+      },
+    } as unknown as WorkerEnv;
+
+    const tokenOrg2 = await signJwtEdDsa(
+      { sub: 'usr_doc_2', tenantId: 'ten_1', orgId: 'org_2', orgPath: '/org_1/org_2', actorType: 'staff', perms: ['*'] },
+      privateKeyJwk as never,
+      600,
+    );
+    const tokenOrg3 = await signJwtEdDsa(
+      { sub: 'usr_doc_3', tenantId: 'ten_1', orgId: 'org_3', orgPath: '/org_1/org_3', actorType: 'staff', perms: ['*'] },
+      privateKeyJwk as never,
+      600,
+    );
+
+    const encRes = await workerApp.request(
+      'http://localhost/api/clinical/encounters',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenOrg2}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          patientPartyId: 'pty_pat_org2',
+          chiefComplaint: 'Cefalea intensa',
+          vitals: { bpSystolic: 120, bpDiastolic: 80, heartRate: 72 },
+          dictationText: 'Paciente refiere cefalea frontal',
+        }),
+      },
+      aiMockEnv,
+    );
+    expect(encRes.status).toBe(201);
+    const encBody = (await encRes.json()) as { noteId: string; soap: { assessment: string } };
+    expect(encBody.soap.assessment).toBe('Migraña sin aura');
+    expect(encBody.soap.assessment).not.toContain('{');
+
+    const org3Overview = await workerApp.request(
+      'http://localhost/api/clinical/overview',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenOrg3}` } },
+      aiMockEnv,
+    );
+    expect(org3Overview.status).toBe(200);
+    const org3Data = (await org3Overview.json()) as { notes: Array<{ id: string; status: string }> };
+    expect(org3Data.notes.some((n) => n.id === encBody.noteId)).toBe(false);
+
+    const org2Overview = await workerApp.request(
+      'http://localhost/api/clinical/overview',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenOrg2}` } },
+      aiMockEnv,
+    );
+    const org2Data = (await org2Overview.json()) as { notes: Array<{ id: string; status: string }> };
+    expect(org2Data.notes.find((n) => n.id === encBody.noteId)?.status).toBe('DRAFT');
+
+    const signRes = await workerApp.request(
+      `http://localhost/api/clinical/notes/${encBody.noteId}/sign`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenOrg2}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ assessment: 'Migraña sin aura confirmada' }),
+      },
+      aiMockEnv,
+    );
+    expect(signRes.status).toBe(200);
+    const signBody = (await signRes.json()) as { status: string };
+    expect(signBody.status).toBe('SIGNED');
   });
 });
