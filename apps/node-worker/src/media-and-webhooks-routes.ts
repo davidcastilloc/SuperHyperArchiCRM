@@ -1,4 +1,9 @@
-import { AppError, sha256Hex, type ProfileLoader } from '@shac/kernel';
+import {
+  AppError,
+  sha256Hex,
+  signHmacSha256Hex,
+  type ProfileLoader,
+} from '@shac/kernel';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { authenticateWorkerActor, type HonoEnv } from './command-registry.js';
@@ -15,19 +20,6 @@ function sanitizeMediaKey(rawKey: string): string {
     throw new AppError('VALIDATION_ERROR', 400, 'Invalid media object key');
   }
   return cleaned;
-}
-
-async function signHmacSha256Hex(secret: string, bodyText: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(bodyText));
-  return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /** Mounts R2/D1 media object storage (`doc_attachments`) and HMAC-SHA256 webhook dispatcher routes. */
