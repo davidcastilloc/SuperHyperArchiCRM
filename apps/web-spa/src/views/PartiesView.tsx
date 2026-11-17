@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Building2, CheckCircle2, CreditCard, FileText, Plus, ShieldCheck } from 'lucide-react';
+import { Building2, CheckCircle2, Copy, CreditCard, FileText, Plus, ShieldCheck } from 'lucide-react';
 import { DataTable, FilterBar, KpiCard, PageHeader, StatusBadge, type DataTableColumn } from '@shac/ui';
+import { useMarketProfile } from '../lib/marketProfile';
 import { CrmDealsAndConflictsPanel, type CrmPanelTab } from './CrmDealsAndConflictsPanel';
+import { CustomFieldsSection } from './CustomFieldsSection';
 import {
   formatMinorUnits,
   INPUT_CLS,
@@ -23,8 +25,27 @@ const PARTY_ROLE_OPTIONS = [
 
 type PartyRoleOption = (typeof PARTY_ROLE_OPTIONS)[number];
 
-/** Open Mercato DS v3 CRM Workbench: KPI strip, 360° Company Header, FilterBar, and DataTable. */
+const ROLE_LABELS_ES: Record<PartyRoleOption, string> = {
+  customer: 'Cliente',
+  vendor: 'Proveedor',
+  patient: 'Paciente',
+  guest: 'Huésped',
+  tenant_resident: 'Residente',
+  legal_client: 'Representado',
+  carrier: 'Transportista',
+};
+
+function defaultRoleForPreset(presetId: string): PartyRoleOption {
+  if (presetId === 'clinic-practice') return 'patient';
+  if (presetId === 'hospitality-pms') return 'guest';
+  if (presetId === 'property-condo') return 'tenant_resident';
+  if (presetId === 'legal-psa') return 'legal_client';
+  return 'customer';
+}
+
+/** Open Mercato DS v3 CRM Workbench: KPI strip, 360° Company Header, FilterBar, CustomFields & DataTable. */
 export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
+  const profile = useMarketProfile();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [activeRoleChip, setActiveRoleChip] = useState<string>('all');
@@ -34,7 +55,9 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
   const [displayName, setDisplayName] = useState('');
   const [taxIdNumber, setTaxIdNumber] = useState('');
   const [creditLimitMajor, setCreditLimitMajor] = useState('0.00');
-  const [role, setRole] = useState<PartyRoleOption>('customer');
+  const [role, setRole] = useState<PartyRoleOption>(() => defaultRoleForPreset(profile.editionPreset));
+  const [customFields, setCustomFields] = useState<Record<string, string | number | boolean>>({});
+  const [copiedId, setCopiedId] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const listQuery = useQuery({
@@ -71,6 +94,7 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
           displayName: displayName.trim(),
           taxIdNumber: taxIdNumber.trim() || undefined,
           creditLimitMinor: parseMajorToMinor(creditLimitMajor),
+          customFields,
         },
       });
       if (!res.ok) throw await readApiError(res);
@@ -80,6 +104,7 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
       setDisplayName('');
       setTaxIdNumber('');
       setCreditLimitMajor('0.00');
+      setCustomFields({});
       setShowCreateForm(false);
       setSelectedPartyId(created.id);
       setFeedback(`${vocabulary.partySingular} "${created.displayName}" guardado`);
@@ -177,9 +202,16 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
-                <StatusBadge label="Active" tone="success" icon={<CheckCircle2 className="size-3" />} />
+                <StatusBadge label="Activo" tone="success" icon={<CheckCircle2 className="size-3" />} />
+                <button
+                  type="button"
+                  onClick={() => { void navigator.clipboard?.writeText(selectedParty.id); setCopiedId(true); setTimeout(() => setCopiedId(false), 1500); }}
+                  className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:bg-muted"
+                >
+                  <Copy className="size-2.5" /><span>{copiedId ? 'Copiado' : selectedParty.id.slice(0, 8)}</span>
+                </button>
                 {selectedParty.rolesMask.map((r) => (
-                  <StatusBadge key={r} label={r} tone="info" />
+                  <StatusBadge key={r} label={ROLE_LABELS_ES[r as PartyRoleOption] ?? r} tone="info" />
                 ))}
               </div>
             </div>
@@ -211,12 +243,12 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
           <label className="space-y-1 text-xs">
             <span className="font-medium text-muted-foreground">Rol principal</span>
             <select value={role} onChange={(e) => setRole(e.target.value as PartyRoleOption)} className={`${INPUT_CLS} w-full`}>
-              {PARTY_ROLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+              {PARTY_ROLE_OPTIONS.map((opt) => <option key={opt} value={opt}>{ROLE_LABELS_ES[opt]}</option>)}
             </select>
           </label>
           <label className="space-y-1 text-xs">
-            <span className="font-medium text-muted-foreground">RIF / ID Fiscal</span>
-            <input type="text" value={taxIdNumber} onChange={(e) => setTaxIdNumber(e.target.value)} placeholder="J-12345678-9" className={`${INPUT_CLS} w-full`} />
+            <span className="font-medium text-muted-foreground">Documento / ID Fiscal</span>
+            <input type="text" value={taxIdNumber} onChange={(e) => setTaxIdNumber(e.target.value)} placeholder="V-12345678 / J-12345678-9" className={`${INPUT_CLS} w-full`} />
           </label>
           <div className="flex items-end gap-2">
             <label className="flex-1 space-y-1 text-xs">
@@ -226,6 +258,9 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
             <button type="submit" disabled={upsertMutation.isPending || !displayName.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs disabled:opacity-50">
               Guardar
             </button>
+          </div>
+          <div className="md:col-span-5">
+            <CustomFieldsSection rpc={rpc} targetEntity="crm_parties" values={customFields} onChange={setCustomFields} />
           </div>
         </form>
       ) : null}
@@ -244,7 +279,7 @@ export function PartiesView({ vocabulary, rpc }: Phase2ViewProps) {
             onSelectChip={setActiveRoleChip}
             chips={[
               { id: 'all', label: 'Todos' },
-              ...PARTY_ROLE_OPTIONS.map((r) => ({ id: r, label: r })),
+              ...PARTY_ROLE_OPTIONS.map((r) => ({ id: r, label: ROLE_LABELS_ES[r] })),
             ]}
           />
           <DataTable

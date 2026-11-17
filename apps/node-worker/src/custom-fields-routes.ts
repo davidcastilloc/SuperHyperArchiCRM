@@ -125,6 +125,17 @@ export function createCustomFieldsRoutes(profileLoader: ProfileLoader) {
         )
         .run();
 
+      let indexExecuted = false;
+      if (ddl) {
+        const info = await c.env.DB.prepare(`PRAGMA table_xinfo(${data.entityType})`).all<{ name: string }>();
+        const hasCol = (info.results ?? []).some((col) => col.name === ddl.columnName);
+        if (!hasCol) {
+          await c.env.DB.prepare(ddl.alterSql).run();
+        }
+        await c.env.DB.prepare(ddl.indexSql).run();
+        indexExecuted = true;
+      }
+
       return c.json(
         {
           id,
@@ -137,6 +148,7 @@ export function createCustomFieldsRoutes(profileLoader: ProfileLoader) {
           virtualColumnName: ddl?.columnName ?? null,
           alterSql: ddl?.alterSql ?? null,
           indexSql: ddl?.indexSql ?? null,
+          indexExecuted,
         },
         201,
       );
