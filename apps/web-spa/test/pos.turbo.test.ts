@@ -63,4 +63,50 @@ describe('POS Omni-Turbo scanner & integer math', () => {
     expect(next.currentStep).toBe(1);
     expect(next.logs).toHaveLength(1);
   });
+
+  it('builds POS checkout payload with manualDiscountBps, selected method/accounts, and exchangeRateMicros', async () => {
+    const {
+      buildPosCheckoutPayload,
+      loadPersistedPosState,
+      savePersistedPosState,
+    } = await import('../src/lib/usePosShiftAndCheckout.js');
+    const payload = buildPosCheckoutPayload({
+      shiftId: 'sh_1',
+      orderCurrency: 'USD',
+      cart: [
+        {
+          productId: 'p1',
+          sku: 'AMOX-500',
+          name: 'Amoxicilina',
+          unitPriceMinor: 1000,
+          qty: 1,
+          discountBps: 1000,
+        },
+      ],
+      usdMinor: 500,
+      vesMinor: 21900,
+      rateMicros: 54_750_000,
+      usdAccountId: 'acc_1',
+      vesAccountId: 'acc_2',
+      usdMethod: 'ZELLE',
+    });
+    expect(payload.items[0]?.manualDiscountBps).toBe(1000);
+    expect(payload.payments[0]?.methodCode).toBe('ZELLE');
+    expect(payload.payments[0]?.financialAccountId).toBe('acc_1');
+    expect(payload.payments[1]?.exchangeRateMicros).toBe(54_750_000);
+
+    savePersistedPosState('ten_1:org_1', {
+      shiftId: 'sh_1',
+      registerId: 'CAJA-01',
+      cart: payload.items.map((i) => ({
+        productId: i.productId,
+        sku: 'AMOX-500',
+        name: 'Amoxicilina',
+        unitPriceMinor: 1000,
+        qty: i.qty,
+        discountBps: i.manualDiscountBps,
+      })),
+    });
+    expect(loadPersistedPosState('ten_1:org_1')?.shiftId).toBe('sh_1');
+  });
 });
