@@ -34,4 +34,13 @@ describe('Finance GAAP & Deal Kanban UX', () => {
       ]).valid,
     ).toBe(false);
   });
+
+  it('computes bidirectional adjacent stages for DealsKanbanView', async () => {
+    const { getAdjacentDealStages } = await import('../src/views/DealsKanbanView.js');
+    expect(getAdjacentDealStages('stage_proposal')).toEqual({
+      prev: 'stage_qualified',
+      next: 'stage_negotiation',
+    });
+    expect(getAdjacentDealStages('stage_qualified').prev).toBeNull();
+  });
 });
