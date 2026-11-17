@@ -85,4 +85,15 @@ describe('Condo Split Rent, Helios QR/PIN & Demo Playbooks UX', () => {
       demoMod.executeLiveScenarioStep(failRpc as never, 'retail-pos-fefo', 0),
     ).rejects.toThrow(/Módulo no habilitado|403/);
   });
+
+  it('serializes non-empty workflow steps and rejects empty step lists', async () => {
+    const wfMod = await import('../src/views/WorkflowsVisualView.js');
+    const serialized = wfMod.serializeWorkflowSteps([
+      { id: 's1', label: 'Validar Stock', kind: 'check' },
+    ]);
+    const parsed = JSON.parse(serialized) as Array<{ id: string; label: string; kind: string }>;
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toEqual({ id: 's1', label: 'Validar Stock', kind: 'check' });
+    expect(() => wfMod.serializeWorkflowSteps([])).toThrow(/al menos un paso/i);
+  });
 });

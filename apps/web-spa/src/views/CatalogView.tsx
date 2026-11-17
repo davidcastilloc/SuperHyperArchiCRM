@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calculator, Coins, PackagePlus, Plus } from 'lucide-react';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn } from '@shac/ui';
 import { useMarketVocabulary } from '../lib/marketProfile';
+import { CustomFieldsSection } from './CustomFieldsSection';
 import {
   formatMinorUnits,
   INPUT_CLS,
@@ -23,6 +24,7 @@ export function CatalogView({ rpc }: Phase2ViewProps) {
   const [categoryId, setCategoryId] = useState('');
   const [basePriceMajor, setBasePriceMajor] = useState('10.00');
   const [costPriceMajor, setCostPriceMajor] = useState('7.00');
+  const [customAttrs, setCustomAttrs] = useState<Record<string, string | number | boolean>>({});
   const [rateDecimal, setRateDecimal] = useState('54.75');
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -59,7 +61,8 @@ export function CatalogView({ rpc }: Phase2ViewProps) {
           basePriceMinor: parseMajorToMinor(basePriceMajor),
           costPriceMinor: parseMajorToMinor(costPriceMajor),
           primaryCurrency: 'USD',
-        },
+          ...(Object.keys(customAttrs).length > 0 ? { customAttributes: customAttrs } : {}),
+        } as never,
       });
       if (!res.ok) throw await readApiError(res);
       return res.json();
@@ -67,6 +70,7 @@ export function CatalogView({ rpc }: Phase2ViewProps) {
     onSuccess: (data) => {
       setSku('');
       setName('');
+      setCustomAttrs({});
       setShowCreate(false);
       setFeedback(`Producto ${data.product.sku} creado (${data.product.id})`);
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'products'] });
@@ -246,6 +250,9 @@ export function CatalogView({ rpc }: Phase2ViewProps) {
             <button type="submit" disabled={createMutation.isPending || !sku.trim() || !name.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
               Guardar
             </button>
+          </div>
+          <div className="md:col-span-6">
+            <CustomFieldsSection rpc={rpc} targetEntity="cat_products" values={customAttrs} onChange={setCustomAttrs} />
           </div>
         </form>
       ) : null}
