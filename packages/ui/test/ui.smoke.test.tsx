@@ -462,4 +462,33 @@ describe('@shac/ui smoke tests', () => {
     fireEvent.click(screen.getByRole('button', { name: /Sucursal Norte/i }));
     expect(onSwitchBranch).toHaveBeenCalledWith('br_2');
   });
+
+  it('virtualizes DataTable rows when data length > 80 via computeVirtualWindowSlice', async () => {
+    const mod = (await import('../src/components/DataTable.js')) as {
+      DataTable: typeof import('../src/components/DataTable.js').DataTable;
+      computeVirtualWindowSlice?: (
+        totalRows: number,
+        scrollTopPx: number,
+        viewportHeightPx: number,
+        rowHeightPx?: number,
+        overscanRows?: number,
+      ) => { startIndex: number; endIndex: number; topSpacerPx: number; bottomSpacerPx: number };
+    };
+    expect(mod.computeVirtualWindowSlice).toBeDefined();
+    const slice = mod.computeVirtualWindowSlice!(200, 440, 440, 44, 6);
+    expect(slice.startIndex).toBe(4);
+    expect(slice.endIndex).toBe(26);
+    expect(slice.topSpacerPx).toBe(4 * 44);
+
+    const rows = Array.from({ length: 200 }, (_, i) => ({ id: `row_${i}`, label: `Item ${i}` }));
+    const { container } = render(
+      <mod.DataTable
+        data={rows}
+        getRowId={(r) => r.id}
+        columns={[{ id: 'label', header: 'Label', cell: (r) => r.label }]}
+      />,
+    );
+    const renderedRows = container.querySelectorAll('tbody tr[data-row-id]');
+    expect(renderedRows.length).toBeLessThan(80);
+  });
 });
