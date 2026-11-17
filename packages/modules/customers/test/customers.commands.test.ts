@@ -280,4 +280,44 @@ describe('@shac/mod-customers manifest, parties.upsert & parties.list', () => {
     expect(moved.probabilityBps).toBe(9000);
     expect(moved.outcome).toBe('won');
   });
+
+  it('projects customFields on upsert and filters via indexed cfFilter in parties.list', async () => {
+    const { ctx } = makeCustomersCtx(env.DB);
+    await customersPartiesUpsertCommand.handler(
+      ctx,
+      customersPartiesUpsertCommand.inputSchema.parse({
+        clientMutationId: 'mut_cf_vip',
+        partyKind: 'company',
+        displayName: 'VIP Gold Corp',
+        rolesMask: ['customer'],
+        customFields: { segment_tier: 'VIP_GOLD', credit_score: 780 },
+      }),
+    );
+    await customersPartiesUpsertCommand.handler(
+      ctx,
+      customersPartiesUpsertCommand.inputSchema.parse({
+        clientMutationId: 'mut_cf_std',
+        partyKind: 'company',
+        displayName: 'Standard Corp',
+        rolesMask: ['customer'],
+        customFields: { segment_tier: 'STANDARD', credit_score: 500 },
+      }),
+    );
+
+    const textFiltered = await customersPartiesListCommand.handler(
+      ctx,
+      customersPartiesListCommand.inputSchema.parse({
+        cfFilter: { fieldKey: 'segment_tier', textEquals: 'VIP_GOLD' },
+      } as Record<string, unknown>),
+    );
+    expect(textFiltered.items.map((i) => i.displayName)).toEqual(['VIP Gold Corp']);
+
+    const numFiltered = await customersPartiesListCommand.handler(
+      ctx,
+      customersPartiesListCommand.inputSchema.parse({
+        cfFilter: { fieldKey: 'credit_score', numMin: 700, numMax: 850 },
+      } as Record<string, unknown>),
+    );
+    expect(numFiltered.items.map((i) => i.displayName)).toEqual(['VIP Gold Corp']);
+  });
 });

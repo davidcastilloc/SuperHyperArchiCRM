@@ -1,4 +1,6 @@
 import {
+  chunkIdsForD1InClause,
+  chunkRowsForD1Insert,
   wmsPackagesAndLots,
   wmsPickings,
   wmsStockMoves,
@@ -13,6 +15,14 @@ import type { pickingOperationKindSchema } from './wms-schemas.js';
 
 export type WmsBatchOp = Parameters<ShacD1Database['batch']>[0][number];
 type OperationKind = z.infer<typeof pickingOperationKindSchema>;
+
+export function chunkPickingIdsForD1(ids: readonly string[]): string[][] {
+  return chunkIdsForD1InClause(ids, 4);
+}
+
+export function chunkWmsBatchOpsForD1<T>(ops: readonly T[]): T[][] {
+  return chunkRowsForD1Insert(ops, 18);
+}
 
 export function buildValuationBatchOps(
   db: ShacD1Database,

@@ -7,6 +7,7 @@ import {
 import type { ExecutionContext, TenantMarketProfile } from '@shac/kernel';
 import migration0001Sql from '../../../db-d1/migrations/0001_phase1_iam_core.sql?raw';
 import migration0002Sql from '../../../db-d1/migrations/0002_phase2_universal_trunk.sql?raw';
+import migration0008Sql from '../../../db-d1/migrations/0008_hash_chain_audit_and_cf_indexes.sql?raw';
 
 const baseTestProfile: TenantMarketProfile = {
   deploymentId: 'dep_p2_test',
@@ -60,6 +61,7 @@ async function applySqlScript(db: D1Database, sqlText: string): Promise<void> {
 export async function setupCustomersD1(d1: D1Database): Promise<void> {
   await applySqlScript(d1, migration0001Sql);
   await applySqlScript(d1, migration0002Sql);
+  await applySqlScript(d1, migration0008Sql);
 
   const now = 1763300000;
   await d1.batch([

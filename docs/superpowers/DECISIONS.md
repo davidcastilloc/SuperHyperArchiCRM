@@ -140,3 +140,12 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
 
 - **Contexto:** Sincronizar cajas POS, recepción y despacho en $< 15\text{ ms}$ sin costo en reposo y mantener 60 FPS en tablas de $+10,000$ filas.
 - **Decisión:** Implementar `realtime-hub.ts` en `@shac/actor-branch` con tags por tópico (`topic:*`) y replay desde `sinceSeq` sobre `/api/branch/:branchId/realtime/ws` (con fallback a polling 30s en `useBranchRealtimeSync.ts`), y activar `computeVirtualWindowSlice` + navegación por teclado en `DataTable.tsx` cuando `rows.length > 80`.
+
+
+## ADR-105 (2026-11-17): Proyecciones Vivas de Custom Fields, Herramienta MCP de Auditoría SHA-256 y Enlace Multi-Worker en Producción
+
+- **Contexto:** Cerrar los 4 deltas finales del Milestone M4: indexación en vivo de `customFields`, techo de 90 parámetros en `pickings-process`, verificación de auditoría vía MCP y enlace explícito entre `shac-node-worker`, `shac-federation-hub` y `shac-control-plane`.
+- **Decisión:**
+  1. Conectar `buildPartyCustomFieldProjectionStatements` (`parties-upsert.ts`) y `cfFilter` indexado (`parties-list.ts`) sobre `custom_field_search_projections`.
+  2. Aplicar `chunkPickingIdsForD1` y `chunkWmsBatchOpsForD1` en `pickings-batch-ops.ts` y `pickings-process.ts`.
+  3. Exponer `audit_verify_hash_chain` en `mcp-server.ts` compartiendo `verifyAuditChainStream` (`audit-chain-routes.ts`), y configurar `FEDERATION_HUB_URL` + `CONTROL_PLANE_URL` en `apps/node-worker/wrangler.jsonc`.

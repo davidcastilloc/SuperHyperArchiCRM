@@ -14,6 +14,51 @@ export const AUDIT_CHAIN_STREAMS = [
   'physical:tamper',
 ] as const;
 
+export async function verifyAuditChainStream(
+  db: D1Database,
+  orgId: string,
+  streamKey: string,
+  limit = 500,
+) {
+  const safeLimit = Math.max(1, Math.min(500, Math.floor(limit)));
+  const rows = await db
+    .prepare(
+      `SELECT org_id, stream_key, seq_no, actor_id, action, target_id, occurred_at_ms, prev_hash_hex, record_hash_hex, payload_json
+       FROM immutable_audit_chain_ledger
+       WHERE org_id = ?1 AND stream_key = ?2
+       ORDER BY seq_no ASC LIMIT ?3`,
+    )
+    .bind(orgId, streamKey, safeLimit)
+    .all<{
+      org_id: string;
+      stream_key: string;
+      seq_no: number;
+      actor_id: string;
+      action: string;
+      target_id: string;
+      occurred_at_ms: number;
+      prev_hash_hex: string;
+      record_hash_hex: string;
+      payload_json: string;
+    }>();
+  const entries: Array<AuditChainEntryInput & { readonly recordHashHex: string }> = (
+    rows.results ?? []
+  ).map((r) => ({
+    orgId: r.org_id,
+    streamKey: r.stream_key,
+    seqNo: r.seq_no,
+    actorId: r.actor_id,
+    action: r.action,
+    targetId: r.target_id,
+    occurredAtMs: r.occurred_at_ms,
+    prevHashHex: r.prev_hash_hex,
+    recordHashHex: r.record_hash_hex,
+    payload: JSON.parse(r.payload_json) as unknown,
+  }));
+  const result = await verifyAuditHashChain(entries);
+  return { streamKey, ...result };
+}
+
 export function createAuditChainRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
     .get('/streams', async (c) => {
@@ -67,40 +112,7 @@ export function createAuditChainRoutes(profileLoader: ProfileLoader) {
         typeof body.orgId === 'string' && body.orgId.trim()
           ? body.orgId.trim()
           : auth.actor.orgId;
-      const rows = await c.env.DB.prepare(
-        `SELECT org_id, stream_key, seq_no, actor_id, action, target_id, occurred_at_ms, prev_hash_hex, record_hash_hex, payload_json
-         FROM immutable_audit_chain_ledger
-         WHERE org_id = ?1 AND stream_key = ?2
-         ORDER BY seq_no ASC LIMIT 500`,
-      )
-        .bind(orgId, streamKey)
-        .all<{
-          org_id: string;
-          stream_key: string;
-          seq_no: number;
-          actor_id: string;
-          action: string;
-          target_id: string;
-          occurred_at_ms: number;
-          prev_hash_hex: string;
-          record_hash_hex: string;
-          payload_json: string;
-        }>();
-      const entries: Array<AuditChainEntryInput & { readonly recordHashHex: string }> = (
-        rows.results ?? []
-      ).map((r) => ({
-        orgId: r.org_id,
-        streamKey: r.stream_key,
-        seqNo: r.seq_no,
-        actorId: r.actor_id,
-        action: r.action,
-        targetId: r.target_id,
-        occurredAtMs: r.occurred_at_ms,
-        prevHashHex: r.prev_hash_hex,
-        recordHashHex: r.record_hash_hex,
-        payload: JSON.parse(r.payload_json) as unknown,
-      }));
-      const result = await verifyAuditHashChain(entries);
-      return c.json({ streamKey, ...result }, 200);
+      const result = await verifyAuditChainStream(c.env.DB, orgId, streamKey, 500);
+      return c.json(result, 200);
     });
 }
