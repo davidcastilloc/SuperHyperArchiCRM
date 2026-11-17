@@ -167,3 +167,27 @@ export function defineCommand<
 export function defineModule(manifest: ModuleManifest): ModuleManifest {
   return manifest;
 }
+
+export interface McpToolMetadata {
+  readonly description: string;
+  readonly readOnlyHint?: boolean;
+  readonly destructiveHint?: boolean;
+}
+
+export interface CommandDescriptor<TInput = unknown, TOutput = unknown, TContext = unknown> {
+  readonly name: string;
+  readonly moduleId: string;
+  readonly summary?: string;
+  readonly idempotent?: boolean;
+  readonly requiredPermissions?: readonly string[];
+  readonly mcpTool?: McpToolMetadata;
+  readonly inputSchema?: { parse: (input: unknown) => TInput };
+  readonly handler: (input: TInput, ctx: TContext) => Promise<TOutput>;
+}
+
+export interface CommandModuleManifest<TContext = unknown> {
+  readonly moduleId: string;
+  readonly version: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly commands: readonly CommandDescriptor<any, any, TContext>[];
+}
