@@ -20,3 +20,4 @@ export * from './schema/hardening.js';
 export * from './idempotency.js';
 export * from './scope.js';
 export * from './d1-batch-chunker.js';
+export * from './audit-chain-writer.js';

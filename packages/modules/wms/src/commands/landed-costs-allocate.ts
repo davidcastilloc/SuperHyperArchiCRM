@@ -3,6 +3,7 @@ import {
   buildIdempotencyInsert,
   catProducts,
   checkIdempotency,
+  chunkRowsForD1Insert,
   wmsPickings,
   wmsValuationAndLandedCosts,
   type ShacD1Database,
@@ -227,9 +228,8 @@ export const wmsLandedCostsAllocateCommand = defineCommand<
     };
     const responseJson = JSON.stringify(response);
 
+    const opChunks = chunkRowsForD1Insert(ops, 15);
     await ctx.db.batch([
-      ops[0]!,
-      ...ops.slice(1),
       buildIdempotencyInsert(ctx.db, {
         tenantId: ctx.tenantId,
         orgId: targetOrgId,
@@ -249,7 +249,13 @@ export const wmsLandedCostsAllocateCommand = defineCommand<
         snapshotAfterJson: responseJson,
         nowSec,
       }),
+      ...(opChunks[0] ?? []),
     ]);
+    for (const extraChunk of opChunks.slice(1)) {
+      if (extraChunk.length > 0) {
+        await ctx.db.batch(extraChunk as [WmsBatchOp, ...WmsBatchOp[]]);
+      }
+    }
 
     return response;
   },

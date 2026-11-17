@@ -1,6 +1,7 @@
 import {
   buildActionLogInsert,
   buildIdempotencyInsert,
+  buildNextAuditChainInsert,
   finTrustEscrowLedgers,
 } from '@shac/db-d1';
 import { AppError } from '@shac/kernel';
@@ -122,6 +123,16 @@ export async function transactExistingTrustLedger(
     );
   }
 
+  const auditChainStmt = await buildNextAuditChainInsert(ctx.db, {
+    orgId: ledger.orgId,
+    streamKey: 'finance:trust',
+    actorId: ctx.actor.id,
+    action: input.txKind,
+    targetId: ledger.id,
+    occurredAtMs: nowSec * 1000,
+    payload: output,
+  });
+
   await ctx.db.batch([
     ctx.db
       .update(finTrustEscrowLedgers)
@@ -152,6 +163,7 @@ export async function transactExistingTrustLedger(
       snapshotAfterJson: responseJson,
       nowSec,
     }),
+    ...(auditChainStmt ? [auditChainStmt.stmt] : []),
   ]);
 
   return output;
@@ -222,6 +234,16 @@ export async function createAndTransactTrustLedger(
   );
   const responseJson = JSON.stringify(output);
 
+  const auditChainStmt = await buildNextAuditChainInsert(ctx.db, {
+    orgId: targetOrgId,
+    streamKey: 'finance:trust',
+    actorId: ctx.actor.id,
+    action: input.txKind,
+    targetId: newLedgerId,
+    occurredAtMs: nowSec * 1000,
+    payload: output,
+  });
+
   await ctx.db.batch([
     ctx.db.insert(finTrustEscrowLedgers).values({
       id: newLedgerId,
@@ -259,6 +281,7 @@ export async function createAndTransactTrustLedger(
       snapshotAfterJson: responseJson,
       nowSec,
     }),
+    ...(auditChainStmt ? [auditChainStmt.stmt] : []),
   ]);
 
   return output;

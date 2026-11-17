@@ -1,6 +1,7 @@
 import {
   buildActionLogInsert,
   buildIdempotencyInsert,
+  buildNextAuditChainInsert,
   checkIdempotency,
   legDocketsAndEvents,
   legMatters,
@@ -197,6 +198,19 @@ export const casesLegalMatterDocketCommand = defineCommand<
           updatedAt: nowSec,
         }),
       );
+    }
+
+    const auditChainStmt = await buildNextAuditChainInsert(ctx.db, {
+      orgId: targetOrgId,
+      streamKey: 'legal:docket',
+      actorId: ctx.actor.id,
+      action: 'LEGAL_MATTER_DOCKET',
+      targetId: matterId,
+      occurredAtMs: nowSec * 1000,
+      payload: created,
+    });
+    if (auditChainStmt) {
+      statements.push(auditChainStmt.stmt);
     }
 
     await ctx.db.batch(statements);

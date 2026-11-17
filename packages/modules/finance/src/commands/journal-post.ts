@@ -1,6 +1,7 @@
 import {
   buildActionLogInsert,
   buildIdempotencyInsert,
+  buildNextAuditChainInsert,
   checkIdempotency,
   finChartOfAccountsAndPeriods,
   finJournalEntries,
@@ -170,6 +171,16 @@ export const financeJournalPostCommand = defineCommand<
         );
     });
 
+    const auditChainStmt = await buildNextAuditChainInsert(ctx.db, {
+      orgId: targetOrgId,
+      streamKey: 'finance:journal',
+      actorId: ctx.actor.id,
+      action: 'JOURNAL_POST',
+      targetId: entryId,
+      occurredAtMs: nowSec * 1000,
+      payload: output,
+    });
+
     await ctx.db.batch([
       ctx.db.insert(finJournalEntries).values({
         id: entryId,
@@ -212,6 +223,7 @@ export const financeJournalPostCommand = defineCommand<
         snapshotAfterJson: responseJson,
         nowSec,
       }),
+      ...(auditChainStmt ? [auditChainStmt.stmt] : []),
     ]);
 
     return output;
