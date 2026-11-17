@@ -25,4 +25,15 @@ describe('WMS FEFO LotBadge & RMA Stepper UX', () => {
       selectable: true,
     });
   });
+
+  it('maps RMA warranty claim statuses to live stepper steps 1..4', async () => {
+    const { mapClaimStatusToStep } = await import('../src/views/ClaimsAndServicesView.js');
+    expect(mapClaimStatusToStep('REQUESTED')).toBe(1);
+    expect(mapClaimStatusToStep('OPEN')).toBe(1);
+    expect(mapClaimStatusToStep('APPROVED')).toBe(2);
+    expect(mapClaimStatusToStep('IN_PROGRESS')).toBe(2);
+    expect(mapClaimStatusToStep('RECEIVED')).toBe(3);
+    expect(mapClaimStatusToStep('COMPLETED')).toBe(4);
+    expect(mapClaimStatusToStep('CREDITED')).toBe(4);
+  });
 });
