@@ -295,6 +295,15 @@ describe('@shac/ui smoke tests', () => {
     expect(screen.getByText('Ingresos por Canal (Últimos 7 días)')).toBeInTheDocument();
     expect(screen.getByText('Lun')).toBeInTheDocument();
     expect(document.querySelector('svg')).toBeTruthy();
+
+    const { container: noBadgeContainer } = render(
+      <TimeSeriesChart
+        title="Conteos"
+        series={[{ label: 'Hoy', value: 5 }]}
+        showTotalBadge={false}
+      />,
+    );
+    expect(noBadgeContainer.querySelector('[data-slot="chart-total-badge"]')).toBeNull();
   });
 
   it('encodes ESC/POS receipt bytes and renders ThermalReceiptModal', async () => {
@@ -341,6 +350,19 @@ describe('@shac/ui smoke tests', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
+
+    const key5 = screen.getByRole('button', { name: '5' });
+    expect(key5.className).toContain('min-h-14');
+
+    const onReplace = vi.fn();
+    render(<PosVirtualKeypad value="10.00" onChange={onReplace} replaceOnFirstInput />);
+    const keys2 = screen.getAllByRole('button', { name: '2' });
+    fireEvent.click(keys2[keys2.length - 1]!);
+    expect(onReplace).toHaveBeenCalledWith('2');
+
+    const clears = screen.getAllByRole('button', { name: 'Limpiar' });
+    fireEvent.click(clears[clears.length - 1]!);
+    expect(onReplace).toHaveBeenCalledWith('');
   });
 
   it('renders deterministic Code-128B BarcodeSvg, SegmentedTabs with counts, and AiCopilotBanner prompt chips', async () => {
@@ -374,5 +396,70 @@ describe('@shac/ui smoke tests', () => {
     expect(onSelectTab).toHaveBeenCalledWith('soap');
     fireEvent.click(screen.getByRole('button', { name: 'Auditar glosas RCM' }));
     expect(onRunPrompt).toHaveBeenCalledWith('Auditar glosas RCM');
+  });
+
+  it('renders ExternalPortalShell without ERP sidebar and SegmentedTabs with no-scrollbar', async () => {
+    const uiModule = (await import('../src/index.js')) as Record<string, unknown>;
+    expect('ExternalPortalShell' in uiModule).toBe(true);
+    const ExternalPortalShell = uiModule.ExternalPortalShell as React.ComponentType<{
+      title?: string;
+      subtitle?: string;
+      theme?: 'light' | 'dark';
+      density?: 'touch' | 'compact';
+      children: React.ReactNode;
+    }>;
+    const { SegmentedTabs } = await import('../src/index.js');
+
+    const { container } = render(
+      <ExternalPortalShell title="Portal Externo" theme="dark" density="touch">
+        <SegmentedTabs
+          activeId="a"
+          onSelect={() => {}}
+          tabs={[{ id: 'a', label: 'Tab A' }]}
+        />
+      </ExternalPortalShell>,
+    );
+
+    const ext = container.querySelector('[data-slot="external-portal-shell"]');
+    expect(ext).toBeInTheDocument();
+    expect(ext).toHaveAttribute('data-density', 'touch');
+    expect(ext).toHaveClass('dark');
+    expect(container.querySelector('[data-slot="app-shell-sidebar"]')).toBeNull();
+    expect(container.querySelector('[data-slot="segmented-tabs"]')?.className).toContain('no-scrollbar');
+  });
+
+  it('filters navItems by allowedPresets, collapses desktop sidebar to 64px rail, and switches branches inline', () => {
+    const onSwitchBranch = vi.fn();
+    const { container } = render(
+      <ShacAppShell
+        profile={PROFILE}
+        branchName="Sede Centro"
+        activeBranchId="br_1"
+        branches={[
+          { id: 'br_1', name: 'Sede Centro', orgPath: '/org_1' },
+          { id: 'br_2', name: 'Sucursal Norte', orgPath: '/org_1/norte' },
+        ]}
+        onSwitchBranch={onSwitchBranch}
+        syncState={{ status: 'online' }}
+        navItems={[
+          { id: 'pos', label: 'POS Táctil', href: '/pos', moduleId: 'pos', allowedPresets: ['retail-pos'] },
+          { id: 'legal', label: 'Suite Legal', href: '/legal-hub', moduleId: 'iam', allowedPresets: ['legal-psa'] },
+        ]}
+      >
+        <div>Workspace</div>
+      </ShacAppShell>,
+    );
+
+    expect(screen.getByText('POS Táctil')).toBeInTheDocument();
+    expect(screen.queryByText('Suite Legal')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Alternar barra lateral' }));
+    const sidebar = container.querySelector('[data-slot="app-shell-sidebar"]');
+    expect(sidebar).toBeInTheDocument();
+    expect(sidebar).toHaveAttribute('data-collapsed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /Sede Centro/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Sucursal Norte/i }));
+    expect(onSwitchBranch).toHaveBeenCalledWith('br_2');
   });
 });

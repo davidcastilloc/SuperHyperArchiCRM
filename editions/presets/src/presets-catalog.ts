@@ -49,7 +49,7 @@ export const EDITION_PRESETS: Readonly<Record<EditionPresetId, EditionPresetDefi
     label: 'Retail POS',
     targetMarket: 'Minimarkets, farmacias, ferreterias, tiendas',
     familyPacks: ['commerce-wms'],
-    activeModules: ['core', 'iam', 'customers', 'catalog', 'pos', 'regional', 'wms'],
+    activeModules: ['core', 'iam', 'customers', 'catalog', 'pos', 'regional', 'wms', 'services'],
     vocabulary: {
       partySingular: 'Cliente',
       partyPlural: 'Clientes',
@@ -71,13 +71,13 @@ export const EDITION_PRESETS: Readonly<Record<EditionPresetId, EditionPresetDefi
     label: 'Distro & WMS',
     targetMarket: 'Mayoristas, importadoras, distribuidoras, 3PL',
     familyPacks: ['commerce-wms'],
-    activeModules: ['core', 'iam', 'customers', 'catalog', 'wms', 'regional', 'finance', 'portal'],
+    activeModules: ['core', 'iam', 'customers', 'catalog', 'wms', 'regional', 'finance', 'portal', 'services'],
     vocabulary: {
       partySingular: 'Cuenta Mayorista',
       partyPlural: 'Cuentas Mayoristas',
       orderSingular: 'Orden de Despacho',
       branchSingular: 'CEDI',
-      spaceSingular: 'Anden',
+      spaceSingular: 'Andén',
       caseSingular: 'RMA',
     },
     entitlements: {
@@ -98,9 +98,9 @@ export const EDITION_PRESETS: Readonly<Record<EditionPresetId, EditionPresetDefi
       partySingular: 'Cliente',
       partyPlural: 'Clientes',
       orderSingular: 'Orden de Servicio',
-      branchSingular: 'Sede Tecnica',
+      branchSingular: 'Sede Técnica',
       spaceSingular: 'Banco de Trabajo',
-      caseSingular: 'Garantia RMA',
+      caseSingular: 'Garantía RMA',
     },
     entitlements: {
       maxBranches: 3,
@@ -116,14 +116,14 @@ export const EDITION_PRESETS: Readonly<Record<EditionPresetId, EditionPresetDefi
     targetMarket: 'Hoteles, posadas, resorts, apart-hoteles',
     familyPacks: ['spaces-stays', 'physical-iot'],
     activeModules: [
-      'core', 'iam', 'customers', 'catalog', 'spaces', 'pos', 'services', 'portal', 'physical',
+      'core', 'iam', 'customers', 'catalog', 'spaces', 'pos', 'services', 'finance', 'portal', 'physical',
     ],
     vocabulary: {
-      partySingular: 'Huesped',
-      partyPlural: 'Huespedes',
+      partySingular: 'Huésped',
+      partyPlural: 'Huéspedes',
       orderSingular: 'Reserva & Folio',
       branchSingular: 'Propiedad',
-      spaceSingular: 'Habitacion',
+      spaceSingular: 'Habitación',
       caseSingular: 'Housekeeping',
     },
     entitlements: {
@@ -170,9 +170,9 @@ export const EDITION_PRESETS: Readonly<Record<EditionPresetId, EditionPresetDefi
       partySingular: 'Paciente',
       partyPlural: 'Pacientes',
       orderSingular: 'Superbill-Consulta',
-      branchSingular: 'Sede Clinica',
+      branchSingular: 'Sede Clínica',
       spaceSingular: 'Consultorio',
-      caseSingular: 'Historia Clinica',
+      caseSingular: 'Historia Clínica',
     },
     entitlements: {
       maxBranches: 3,
@@ -239,7 +239,7 @@ export const EDITION_PRESETS: Readonly<Record<EditionPresetId, EditionPresetDefi
     vocabulary: {
       partySingular: 'Cuenta',
       partyPlural: 'Cuentas',
-      orderSingular: 'Operacion',
+      orderSingular: 'Operación',
       branchSingular: 'Unidad de Negocio',
       spaceSingular: 'Espacio',
       caseSingular: 'Caso',

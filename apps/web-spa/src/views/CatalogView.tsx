@@ -2,24 +2,30 @@ import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Calculator, Coins, PackagePlus, Plus } from 'lucide-react';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn } from '@shac/ui';
+import { useMarketVocabulary } from '../lib/marketProfile';
+import { CustomFieldsSection } from './CustomFieldsSection';
 import {
   formatMinorUnits,
   INPUT_CLS,
-  parseNonNegInt,
+  parseMajorToMinor,
+  parseRateToMicros,
   readApiError,
   type Phase2ViewProps,
 } from './phase2-format';
 
-/** Open Mercato DS v3 Catalog, BCV exchange rate, 5-layer pricing quote, and FEFO receipt. */
-export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
+/** Open Mercato DS v3 Catalog, BCV exchange rate (decimal), 5-layer pricing quote, and FEFO receipt. */
+export function CatalogView({ rpc }: Phase2ViewProps) {
+  const vocabulary = useMarketVocabulary();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [sku, setSku] = useState('');
   const [name, setName] = useState('');
-  const [basePriceMinor, setBasePriceMinor] = useState('1000');
-  const [costPriceMinor, setCostPriceMinor] = useState('700');
-  const [rateMicros, setRateMicros] = useState('54750000');
+  const [categoryId, setCategoryId] = useState('');
+  const [basePriceMajor, setBasePriceMajor] = useState('10.00');
+  const [costPriceMajor, setCostPriceMajor] = useState('7.00');
+  const [customAttrs, setCustomAttrs] = useState<Record<string, string | number | boolean>>({});
+  const [rateDecimal, setRateDecimal] = useState('54.75');
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const productsQuery = useQuery({
@@ -34,6 +40,16 @@ export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
     },
   });
 
+  const categoriesQuery = useQuery({
+    queryKey: ['catalog', 'categories'],
+    queryFn: async () => {
+      const res = await rpc.api.catalog.categories.$get();
+      if (!res.ok) return { items: [] as Array<{ id: string; code: string; name: string; kind: string }> };
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
   const createMutation = useMutation({
     mutationFn: async () => {
       const res = await rpc.api.catalog.products.$post({
@@ -41,10 +57,12 @@ export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
           clientMutationId: crypto.randomUUID(),
           sku: sku.trim(),
           name: name.trim(),
-          basePriceMinor: parseNonNegInt(basePriceMinor, 0),
-          costPriceMinor: parseNonNegInt(costPriceMinor, 0),
+          categoryId: categoryId || undefined,
+          basePriceMinor: parseMajorToMinor(basePriceMajor),
+          costPriceMinor: parseMajorToMinor(costPriceMajor),
           primaryCurrency: 'USD',
-        },
+          ...(Object.keys(customAttrs).length > 0 ? { customAttributes: customAttrs } : {}),
+        } as never,
       });
       if (!res.ok) throw await readApiError(res);
       return res.json();
@@ -52,6 +70,7 @@ export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
     onSuccess: (data) => {
       setSku('');
       setName('');
+      setCustomAttrs({});
       setShowCreate(false);
       setFeedback(`Producto ${data.product.sku} creado (${data.product.id})`);
       void queryClient.invalidateQueries({ queryKey: ['catalog', 'products'] });
@@ -61,19 +80,20 @@ export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
 
   const rateMutation = useMutation({
     mutationFn: async () => {
+      const rateMicros = Math.max(1, parseRateToMicros(rateDecimal));
       const res = await rpc.api.catalog.rates.$post({
         json: {
           clientMutationId: crypto.randomUUID(),
           fromCurrency: 'USD',
           toCurrency: 'VES',
-          rateMicros: Math.max(1, parseNonNegInt(rateMicros, 54_750_000)),
+          rateMicros,
           source: 'BCV',
         },
       });
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
-    onSuccess: () => setFeedback(`Tasa USD a VES actualizada (${rateMicros} micros)`),
+    onSuccess: () => setFeedback(`Tasa USD a VES actualizada (${rateDecimal} Bs/USD)`),
     onError: (err) => setFeedback(err.message),
   });
 
@@ -124,6 +144,7 @@ export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
     createMutation.mutate();
   }
 
+  const categories = (categoriesQuery.data?.items ?? []).filter((c) => c.kind === 'product_category');
   const items = productsQuery.data?.items ?? [];
   type ProductRow = (typeof items)[number];
   const columns: DataTableColumn<ProductRow>[] = [
@@ -187,28 +208,29 @@ export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
         onRefresh={() => void productsQuery.refetch()}
         refreshing={productsQuery.isFetching}
         actions={
-          <button
-            type="button"
-            onClick={() => setShowCreate((prev) => !prev)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary-hover"
-          >
-            <Plus className="size-3.5" />
-            <span>{showCreate ? 'Cerrar formulario' : 'Nuevo Producto'}</span>
+          <button type="button" onClick={() => setShowCreate((prev) => !prev)} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary-hover">
+            <Plus className="size-3.5" /><span>{showCreate ? 'Cerrar formulario' : 'Nuevo Producto'}</span>
           </button>
         }
       />
 
       {showCreate ? (
-        <form onSubmit={handleCreate} className="grid grid-cols-1 gap-2.5 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-5">
-          <input type="text" value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU" className={`${INPUT_CLS} font-mono`} />
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre del producto" className={`${INPUT_CLS} md:col-span-2`} />
-          <input type="number" min={0} step={1} value={basePriceMinor} onChange={(e) => setBasePriceMinor(e.target.value)} placeholder="Precio minor" className={`${INPUT_CLS} font-mono tabular-nums`} />
-          <div className="flex gap-2">
-            <input type="number" min={0} step={1} value={costPriceMinor} onChange={(e) => setCostPriceMinor(e.target.value)} placeholder="Costo minor" className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
-            <button type="submit" disabled={createMutation.isPending || !sku.trim() || !name.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground disabled:opacity-50">
-              Guardar
-            </button>
+        <form onSubmit={handleCreate} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-6">
+          <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">SKU / Código</span><input type="text" value={sku} onChange={(e) => setSku(e.target.value)} placeholder="SKU-001" className={`${INPUT_CLS} w-full font-mono`} /></label>
+          <label className="space-y-1 text-xs md:col-span-2"><span className="font-medium text-muted-foreground">Nombre del Producto / Servicio</span><input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nombre comercial" className={`${INPUT_CLS} w-full`} /></label>
+          <label className="space-y-1 text-xs">
+            <span className="font-medium text-muted-foreground">Categoría</span>
+            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={`${INPUT_CLS} w-full`}>
+              <option value="">General</option>
+              {categories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+            </select>
+          </label>
+          <label className="space-y-1 text-xs"><span className="font-medium text-muted-foreground">Precio Base (USD)</span><input type="text" value={basePriceMajor} onChange={(e) => setBasePriceMajor(e.target.value)} placeholder="10.00" className={`${INPUT_CLS} w-full font-mono tabular-nums`} /></label>
+          <div className="flex items-end gap-2">
+            <label className="flex-1 space-y-1 text-xs"><span className="font-medium text-muted-foreground">Costo (USD)</span><input type="text" value={costPriceMajor} onChange={(e) => setCostPriceMajor(e.target.value)} placeholder="7.00" className={`${INPUT_CLS} w-full font-mono tabular-nums`} /></label>
+            <button type="submit" disabled={createMutation.isPending || !sku.trim() || !name.trim()} className="h-9 shrink-0 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground disabled:opacity-50">Guardar</button>
           </div>
+          <div className="md:col-span-6"><CustomFieldsSection rpc={rpc} targetEntity="cat_products" values={customAttrs} onChange={setCustomAttrs} /></div>
         </form>
       ) : null}
 
@@ -235,37 +257,19 @@ export function CatalogView({ vocabulary, rpc }: Phase2ViewProps) {
         searchPlaceholder="Buscar por SKU o nombre..."
         trailingItems={
           <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={rateMicros}
-              onChange={(e) => setRateMicros(e.target.value)}
-              aria-label="Tasa USD a VES en micros"
-              className={`${INPUT_CLS} w-36 font-mono tabular-nums`}
-            />
-            <button
-              type="button"
-              disabled={rateMutation.isPending}
-              onClick={() => rateMutation.mutate()}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50"
-            >
-              <Coins className="size-3.5 text-muted-foreground" />
-              <span>Fijar Tasa BCV</span>
+            <label htmlFor="cat-fx-rate" className="text-xs font-medium text-muted-foreground">Tasa (Bs/USD)</label>
+            <input id="cat-fx-rate" type="text" value={rateDecimal} onChange={(e) => setRateDecimal(e.target.value)} className={`${INPUT_CLS} w-24 font-mono tabular-nums`} />
+            <button type="button" disabled={rateMutation.isPending} onClick={() => rateMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium shadow-xs hover:bg-muted disabled:opacity-50">
+              <Coins className="size-3.5 text-muted-foreground" /><span>Fijar Tasa BCV</span>
             </button>
           </div>
         }
       />
 
       <DataTable
-        columns={columns}
-        data={items}
-        getRowId={(p) => p.id}
-        loading={productsQuery.isLoading}
-        emptyTitle="Sin productos en catálogo"
-        emptyDescription="Registra el primer SKU para habilitar SmartCheck y POS."
-        emptyActionLabel="Nuevo Producto"
-        onEmptyAction={() => setShowCreate(true)}
+        columns={columns} data={items} getRowId={(p) => p.id} loading={productsQuery.isLoading}
+        emptyTitle="Sin productos en catálogo" emptyDescription="Registra el primer SKU para habilitar SmartCheck y POS."
+        emptyActionLabel="Nuevo Producto" onEmptyAction={() => setShowCreate(true)}
         rowActions={(p) => [
           { id: 'stock', label: 'Consultar saldo FEFO', onSelect: () => stockMutation.mutate(p.id) },
           { id: 'quote', label: 'Cotizar 5 capas', onSelect: () => quoteMutation.mutate(p.id) },

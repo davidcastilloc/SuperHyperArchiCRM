@@ -2,10 +2,12 @@ import {
   buildActionLogInsert,
   buildIdempotencyInsert,
   checkIdempotency,
+  finChartOfAccountsAndPeriods,
   finJournalEntries,
   type ShacD1Database,
 } from '@shac/db-d1';
 import { AppError, defineCommand, sha256Hex } from '@shac/kernel';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import {
   sumJournalLinesBigInt,
@@ -148,6 +150,26 @@ export const financeJournalPostCommand = defineCommand<
     };
     const responseJson = JSON.stringify(output);
 
+    const coaUpdates = input.lines.map((line) => {
+      const debit = Math.trunc(line.debitMinor);
+      const credit = Math.trunc(line.creditMinor);
+      const code = line.accountCode.trim().toUpperCase();
+      return ctx.db
+        .update(finChartOfAccountsAndPeriods)
+        .set({
+          currentBalanceMinor: sql`CASE WHEN classification IN ('asset', 'expense') THEN current_balance_minor + (${debit} - ${credit}) ELSE current_balance_minor + (${credit} - ${debit}) END`,
+          updatedAt: nowSec,
+        })
+        .where(
+          and(
+            eq(finChartOfAccountsAndPeriods.tenantId, ctx.tenantId),
+            eq(finChartOfAccountsAndPeriods.recordKind, 'gl_account'),
+            eq(finChartOfAccountsAndPeriods.accountCode, code),
+            isNull(finChartOfAccountsAndPeriods.deletedAt),
+          ),
+        );
+    });
+
     await ctx.db.batch([
       ctx.db.insert(finJournalEntries).values({
         id: entryId,
@@ -170,6 +192,7 @@ export const financeJournalPostCommand = defineCommand<
         createdAt: nowSec,
         updatedAt: nowSec,
       }),
+      ...coaUpdates,
       buildIdempotencyInsert(ctx.db, {
         tenantId: ctx.tenantId,
         orgId: targetOrgId,

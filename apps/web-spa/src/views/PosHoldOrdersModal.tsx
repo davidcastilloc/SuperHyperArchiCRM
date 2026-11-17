@@ -122,3 +122,22 @@ export function PosHoldOrdersModal({
     </div>
   );
 }
+
+/** Lightweight prompt dialog to park an order into Leylan hold list. */
+export function PosHoldPromptModal({ open, label, onLabelChange, onClose, onConfirm }: {
+  open: boolean; label: string; onLabelChange: (v: string) => void; onClose: () => void; onConfirm: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Aparcar ticket" className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+      <form onSubmit={(e) => { e.preventDefault(); onConfirm(); }} className="w-full max-w-xs space-y-3 rounded-xl border border-border bg-card p-4 shadow-xl">
+        <h3 className="text-sm font-semibold">Aparcar Ticket (Leylan / Espera)</h3>
+        <label className="block space-y-1 text-xs"><span className="text-muted-foreground">Nombre o referencia</span><input autoFocus value={label} onChange={(e) => onLabelChange(e.target.value)} placeholder="Cliente en Fila" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" /></label>
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className="inline-flex h-9 flex-1 items-center justify-center rounded-md border border-border text-xs font-medium">Cancelar</button>
+          <button type="submit" className="inline-flex h-9 flex-1 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">Aparcar</button>
+        </div>
+      </form>
+    </div>
+  );
+}

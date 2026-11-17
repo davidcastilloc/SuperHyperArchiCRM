@@ -1,31 +1,46 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClipboardCheck, FileSpreadsheet, Printer, ScanBarcode, Truck } from 'lucide-react';
 import { useState } from 'react';
-import { AiCopilotBanner, BarcodeSvg, DataTable, EmptyState, KpiCard, PageHeader, SegmentedTabs, StatusBadge } from '@shac/ui';
+import { AiCopilotBanner, BarcodeSvg, EmptyState, KpiCard, PageHeader, SegmentedTabs } from '@shac/ui';
+import { FleetDispatchPanel } from './FleetDispatchPanel';
 import { formatMinorUnits, INPUT_CLS, parseMajorToMinor, readApiError, type Phase2ViewProps } from './phase2-format';
 
 type TabId = 'labels' | 'csv' | 'cycle' | 'fleet';
 
-/** Barcode Label Studio, CSV Bulk Importer, Cycle Counts & Fleet ePOD Dispatch (CRMWarehouse + GeorginaPOS). */
+/** Barcode Label Studio, CSV Bulk Importer, Cycle Counts, Vehicle Registry & Canvas e-POD. */
 export function LabelsAndFleetView({ rpc }: Phase2ViewProps) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<TabId>('labels');
-  const [rateInput, setRateInput] = useState('54.75');
   const [csvText, setCsvText] = useState('SKU-901,Acetaminofén 500mg Caja x10,4.50\nSKU-902,Vitamina C 1000mg,8.25');
-  const [vehicleCode, setVehicleCode] = useState('VAN-01');
-  const [licensePlate, setLicensePlate] = useState('AB123CD');
-  const [orderId, setOrderId] = useState('ORD-2026-001');
-  const [recipient, setRecipient] = useState('');
   const [ccProduct, setCcProduct] = useState('');
   const [ccMeasured, setCcMeasured] = useState('25');
   const [aiReply, setAiReply] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const productsQuery = useQuery({
     queryKey: ['catalog', 'products', 'labels-studio'],
     queryFn: async () => {
       const res = await rpc.api.catalog.products.$get({ query: { limit: '50' } });
       if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+  });
+
+  const vehiclesQuery = useQuery({
+    queryKey: ['wms', 'vehicles'],
+    queryFn: async () => {
+      const res = await rpc.api.wms.vehicles.$get();
+      if (!res.ok) return { items: [] as Array<{ id: string; vehicleCode: string; plateNumber: string; driverName: string }> };
+      return res.json();
+    },
+  });
+
+  const ordersQuery = useQuery({
+    queryKey: ['pos', 'orders', 'fleet-select'],
+    queryFn: async () => {
+      const res = await rpc.api.pos.orders.$get({ query: { limit: '50' } });
+      if (!res.ok) return { items: [] as Array<{ id: string; orderNumber: string }> };
       return res.json();
     },
   });
@@ -41,23 +56,20 @@ export function LabelsAndFleetView({ rpc }: Phase2ViewProps) {
 
   const csvMutation = useMutation({
     mutationFn: async () => {
-      const rows = csvText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [sku = '', name = '', price = '0'] = line.split(',').map((s) => s.trim());
-          return { sku, name, basePriceMinor: parseMajorToMinor(price), primaryCurrency: 'USD' };
-        })
-        .filter((r) => r.sku && r.name);
+      const rows = csvText.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
+        const [sku = '', name = '', price = '0'] = line.split(',').map((s) => s.trim());
+        return { sku, name, basePriceMinor: parseMajorToMinor(price), primaryCurrency: 'USD' };
+      }).filter((r) => r.sku && r.name);
       const res = await rpc.api.wms['catalog-csv-import'].$post({ json: { rows } });
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
     onSuccess: (d) => {
+      setErrorMsg(null);
       void queryClient.invalidateQueries({ queryKey: ['catalog'] });
       setStatusMsg(`Importados ${d.importedCount} productos por CSV al catálogo.`);
     },
+    onError: (err: Error) => setErrorMsg(err.message),
   });
 
   const cycleMutation = useMutation({
@@ -69,23 +81,11 @@ export function LabelsAndFleetView({ rpc }: Phase2ViewProps) {
       return res.json();
     },
     onSuccess: () => {
+      setErrorMsg(null);
       void queryClient.invalidateQueries({ queryKey: ['wms', 'fleet-and-qc'] });
       setStatusMsg('Conteo cíclico registrado en WMS.');
     },
-  });
-
-  const fleetMutation = useMutation({
-    mutationFn: async () => {
-      const res = await rpc.api.wms['fleet-dispatch'].$post({
-        json: { vehicleCode, licensePlate, orderId, epodRecipientName: recipient || undefined, status: 'en_route' },
-      });
-      if (!res.ok) throw await readApiError(res);
-      return res.json();
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['wms', 'fleet-and-qc'] });
-      setStatusMsg(`Despacho asignado a unidad ${vehicleCode}.`);
-    },
+    onError: (err: Error) => setErrorMsg(err.message),
   });
 
   const aiMutation = useMutation({
@@ -94,90 +94,89 @@ export function LabelsAndFleetView({ rpc }: Phase2ViewProps) {
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
-    onSuccess: (d) => setAiReply(d.reply),
+    onSuccess: (d) => { setErrorMsg(null); setAiReply(d.reply); },
+    onError: (err: Error) => setErrorMsg(err.message),
   });
 
   const products = productsQuery.data?.items ?? [];
-  const rateNum = Number.parseFloat(rateInput) || 54.75;
-  const cycleCounts = (opsQuery.data?.cycleCounts ?? []) as Array<{ id: string; product_id: string; measured_value: number; norm_min: number; status: string }>;
-  const fleetTrips = (opsQuery.data?.fleetTrips ?? []) as Array<{ id: string; vehicle_code: string; license_plate: string; order_id: string; epod_recipient_name: string | null; status: string }>;
+  const vehicles = vehiclesQuery.data?.items ?? [];
+  const orders = ordersQuery.data?.items ?? [];
+  const trips = ((opsQuery.data?.fleetTrips ?? []) as Array<{ id?: string; vehicleId?: string; status?: string }>).map((t, i) => ({
+    id: t.id ?? `trip_${i}`,
+    kind: 'Despacho e-POD',
+    code: t.vehicleId ?? '—',
+    status: t.status ?? 'completed',
+  }));
+  const cycles = ((opsQuery.data?.cycleCounts ?? []) as Array<{ id?: string; productId?: string; status?: string }>).map((c, i) => ({
+    id: c.id ?? `cc_${i}`,
+    kind: 'Conteo Cíclico',
+    code: c.productId ?? '—',
+    status: c.status ?? 'completed',
+  }));
+  const ops = [...trips, ...cycles];
 
   return (
-    <section className="space-y-5" data-slot="labels-fleet-view">
+    <section className="space-y-4">
       <PageHeader
-        title="Etiquetas, CSV Masivo & Flota ePOD"
-        description="Estudio de códigos de barra SVG (USD/Bs), importación masiva CSV, conteos cíclicos y despacho de rutas."
-        onRefresh={() => { void productsQuery.refetch(); void opsQuery.refetch(); }}
-        refreshing={productsQuery.isFetching || opsQuery.isFetching}
+        title="Etiquetas Barcode, CSV, Conteos & Flota e-POD"
+        description="Impresión térmica de habladores CODE128, importación masiva CSV, auditoría física y firma e-POD."
         actions={
-          <button type="button" onClick={() => window.print()} className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:opacity-90">
-            <Printer className="size-3.5" /><span>Imprimir Etiquetas</span>
-          </button>
+          <SegmentedTabs
+            activeId={tab}
+            onSelect={(v) => setTab(v as TabId)}
+            tabs={[
+              { id: 'labels', label: 'Etiquetas' },
+              { id: 'csv', label: 'Importar CSV' },
+              { id: 'cycle', label: 'Conteo Cíclico' },
+              { id: 'fleet', label: 'Flota & e-POD' },
+            ]}
+          />
         }
       />
 
       <AiCopilotBanner
-        title="Copiloto Logístico IA"
-        summary="Optimiza rutas de despacho, detecta mermas de conteo cíclico y sugiere reposición."
-        prompts={['Analizar mermas y conteos cíclicos', 'Resumir rutas en tránsito']}
-        onRunPrompt={(p) => aiMutation.mutate(p)}
+        title="Copilot Logístico & Flota"
+        summary="Consulta discrepancias de inventario, rutas de despacho pendientes o recomendaciones de reabastecimiento."
+        prompts={['Resume rutas e-POD activas', 'Auditar conteos cíclicos']}
+        loading={aiMutation.isPending}
         reply={aiReply}
         onClearReply={() => setAiReply(null)}
-        loading={aiMutation.isPending}
+        onRunPrompt={(q) => aiMutation.mutate(q)}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <KpiCard title="SKUs Etiquetables" value={products.length} />
-        <KpiCard title="Conteos Cíclicos" value={cycleCounts.length} />
-        <KpiCard title="Viajes de Flota" value={fleetTrips.length} />
-      </div>
-
-      {statusMsg ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{statusMsg}</p> : null}
-
-      <SegmentedTabs
-        activeId={tab}
-        onSelect={(id) => setTab(id as TabId)}
-        tabs={[
-          { id: 'labels', label: 'Etiquetas Código de Barras', count: products.length, icon: <ScanBarcode className="size-3.5" /> },
-          { id: 'csv', label: 'Importar CSV Masivo', icon: <FileSpreadsheet className="size-3.5" /> },
-          { id: 'cycle', label: 'Conteo Cíclico', count: cycleCounts.length, icon: <ClipboardCheck className="size-3.5" /> },
-          { id: 'fleet', label: 'Flota & ePOD', count: fleetTrips.length, icon: <Truck className="size-3.5" /> },
-        ]}
-      />
+      {errorMsg ? <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{errorMsg}</div> : null}
+      {statusMsg ? <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">{statusMsg}</div> : null}
 
       {tab === 'labels' ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-              <span>Tasa Bs/USD para etiqueta:</span>
-              <input value={rateInput} onChange={(e) => setRateInput(e.target.value)} className={`${INPUT_CLS} w-24 font-mono`} />
-            </label>
+        <div className="space-y-3">
+          <div className="flex justify-end">
+            <button type="button" onClick={() => window.print()} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-semibold text-primary-foreground">
+              <Printer className="size-3.5" /><span>Imprimir Etiquetas</span>
+            </button>
           </div>
-          {products.length === 0 ? (
-            <EmptyState title="Sin productos" description="Importa productos por CSV o crea ítems en Catálogo." />
-          ) : (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-              {products.map((p) => {
-                const bs = ((p.basePriceMinor / 100) * rateNum).toFixed(2);
-                return (
-                  <BarcodeSvg
-                    key={p.id}
-                    value={p.sku}
-                    label={p.name}
-                    priceLabel={`${formatMinorUnits(p.basePriceMinor, 'USD')} · Bs ${bs}`}
-                  />
-                );
-              })}
+          {products.length === 0 ? <EmptyState icon={<ScanBarcode className="size-8" />} title="Catálogo vacío" description="Agrega productos para generar habladores." /> : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {products.map((p) => (
+                <div key={p.id} className="space-y-2 rounded-xl border border-border bg-card p-3.5 shadow-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-semibold leading-tight">{p.name}</p>
+                    <span className="font-mono text-sm font-bold text-primary tabular-nums">{formatMinorUnits(p.basePriceMinor, 'USD')}</span>
+                  </div>
+                  <BarcodeSvg value={p.sku} height={42} />
+                </div>
+              ))}
             </div>
           )}
         </div>
       ) : null}
 
       {tab === 'csv' ? (
-        <div className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-xs">
-          <p className="text-xs text-muted-foreground">Formato por línea: <span className="font-mono">SKU,Nombre del producto,PrecioUSD</span></p>
-          <textarea rows={6} value={csvText} onChange={(e) => setCsvText(e.target.value)} className="w-full rounded-md border border-input bg-background p-3 font-mono text-xs" />
-          <button type="button" onClick={() => csvMutation.mutate()} disabled={csvMutation.isPending} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground">
+        <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+          <label className="block space-y-1 text-xs">
+            <span className="font-semibold">Pega filas CSV (`SKU,Nombre,PrecioUSD`)</span>
+            <textarea rows={5} value={csvText} onChange={(e) => setCsvText(e.target.value)} className={`${INPUT_CLS} h-auto w-full py-2 font-mono text-xs`} />
+          </label>
+          <button type="button" disabled={csvMutation.isPending} onClick={() => csvMutation.mutate()} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground">
             <FileSpreadsheet className="size-3.5" /><span>{csvMutation.isPending ? 'Importando...' : 'Importar CSV al Catálogo'}</span>
           </button>
         </div>
@@ -185,45 +184,33 @@ export function LabelsAndFleetView({ rpc }: Phase2ViewProps) {
 
       {tab === 'cycle' ? (
         <div className="space-y-4">
-          <form className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-4" onSubmit={(e) => { e.preventDefault(); cycleMutation.mutate(); }}>
-            <input placeholder="SKU o ID producto" value={ccProduct} onChange={(e) => setCcProduct(e.target.value)} className={`${INPUT_CLS} flex-1 font-mono`} />
-            <input type="number" placeholder="Conteo físico" value={ccMeasured} onChange={(e) => setCcMeasured(e.target.value)} className={`${INPUT_CLS} w-32 font-mono`} />
-            <button type="submit" className="inline-flex h-9 items-center rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground">Registrar Conteo</button>
-          </form>
-          <DataTable
-            columns={[
-              { id: 'prod', header: 'Producto / SKU', cell: (r) => <span className="font-mono text-xs">{r.product_id}</span> },
-              { id: 'val', header: 'Conteo Físico', cell: (r) => <span className="font-mono tabular-nums">{r.measured_value}</span> },
-              { id: 'st', header: 'Estado', cell: (r) => <StatusBadge label={r.status} tone="info" /> },
-            ]}
-            data={cycleCounts}
-            getRowId={(r) => r.id}
-            emptyTitle="Sin conteos registrados"
-          />
+          <div className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-3">
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">SKU / Producto</span>
+              <input value={ccProduct} onChange={(e) => setCcProduct(e.target.value)} placeholder="SKU" className={`${INPUT_CLS} w-full font-mono`} />
+            </label>
+            <label className="space-y-1 text-xs">
+              <span className="font-medium text-muted-foreground">Cantidad Física Contada</span>
+              <input type="number" value={ccMeasured} onChange={(e) => setCcMeasured(e.target.value)} className={`${INPUT_CLS} w-full font-mono`} />
+            </label>
+            <button type="button" disabled={cycleMutation.isPending} onClick={() => cycleMutation.mutate()} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-xs font-semibold text-primary-foreground">
+              <ClipboardCheck className="size-3.5" /><span>Registrar Conteo</span>
+            </button>
+          </div>
+          <KpiCard title="Registros Flota / Auditoría" value={ops.length} />
         </div>
       ) : null}
 
       {tab === 'fleet' ? (
-        <div className="space-y-4">
-          <form className="grid grid-cols-1 gap-2 rounded-xl border border-border bg-card p-4 sm:grid-cols-5" onSubmit={(e) => { e.preventDefault(); fleetMutation.mutate(); }}>
-            <input placeholder="Unidad (VAN-01)" value={vehicleCode} onChange={(e) => setVehicleCode(e.target.value)} className={`${INPUT_CLS} font-mono`} />
-            <input placeholder="Placa" value={licensePlate} onChange={(e) => setLicensePlate(e.target.value)} className={`${INPUT_CLS} font-mono`} />
-            <input placeholder="Orden" value={orderId} onChange={(e) => setOrderId(e.target.value)} className={`${INPUT_CLS} font-mono`} />
-            <input placeholder="Destinatario ePOD" value={recipient} onChange={(e) => setRecipient(e.target.value)} className={INPUT_CLS} />
-            <button type="submit" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground">Despachar Ruta</button>
-          </form>
-          <DataTable
-            columns={[
-              { id: 'veh', header: 'Unidad', cell: (r) => <span className="font-mono text-xs font-semibold">{r.vehicle_code} · {r.license_plate}</span> },
-              { id: 'ord', header: 'Orden', cell: (r) => <span className="font-mono text-xs">{r.order_id}</span> },
-              { id: 'rec', header: 'Destinatario ePOD', cell: (r) => r.epod_recipient_name ?? '—' },
-              { id: 'st', header: 'Estado', cell: (r) => <StatusBadge label={r.status} tone="success" appearance="dot" /> },
-            ]}
-            data={fleetTrips}
-            getRowId={(r) => r.id}
-            emptyTitle="Sin despachos activos"
-          />
-        </div>
+        <FleetDispatchPanel
+          rpc={rpc}
+          vehicles={vehicles}
+          orders={orders}
+          ops={ops}
+          opsLoading={opsQuery.isLoading}
+          onStatus={setStatusMsg}
+          onError={setErrorMsg}
+        />
       ) : null}
     </section>
   );

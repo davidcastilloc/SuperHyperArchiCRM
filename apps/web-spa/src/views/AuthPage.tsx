@@ -4,6 +4,7 @@ import { AuthBranchGate } from '@shac/ui';
 import { setAuthSession, type AuthSession } from '../lib/authSession';
 import type { createRpcClient } from '../lib/rpc';
 import { DEFAULT_BRANCHES, DEFAULT_PROFILE } from '../nav';
+import { SetupOnboardingCard } from './SetupOnboardingCard';
 
 interface AuthPageProps {
   rpc: ReturnType<typeof createRpcClient>;
@@ -74,6 +75,22 @@ export function AuthPage({ rpc, onAuthenticated }: AuthPageProps) {
     } finally {
       setLoading(false);
     }
+  }
+
+  if (bootstrapQuery.data && 'needsSetup' in bootstrapQuery.data && bootstrapQuery.data.needsSetup) {
+    return (
+      <div className="py-2">
+        <SetupOnboardingCard
+          rpc={rpc}
+          hasProvisionedProfile={Boolean(bootstrapQuery.data.hasProvisionedProfile)}
+          initialPreset={bootstrapQuery.data.editionPreset}
+          onInitialized={() => {
+            void queryClient.invalidateQueries();
+            onAuthenticated();
+          }}
+        />
+      </div>
+    );
   }
 
   return (

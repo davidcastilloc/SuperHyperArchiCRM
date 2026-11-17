@@ -51,16 +51,84 @@ describe('POS Omni-Turbo scanner & integer math', () => {
     expect(remaining).toHaveLength(0);
   });
 
-  it('exposes 6 vertical demo personas, multi-step guided playbooks, and SOP cheat sheets', async () => {
-    const { DEMO_PERSONAS, DEMO_SCENARIOS, SOP_CHEAT_SHEETS, advanceScenarioStep } = await import(
+  it('exposes 6+ vertical demo personas, multi-step guided playbooks, and SOP cheat sheets', async () => {
+    const { DEMO_PERSONAS, DEMO_SCENARIOS, SOP_CHEAT_SHEETS, executeLiveScenarioStep } = await import(
       '../src/lib/demoScenarios.js'
     );
     expect(DEMO_PERSONAS.length).toBeGreaterThanOrEqual(6);
     expect(DEMO_SCENARIOS.length).toBeGreaterThanOrEqual(4);
-    expect(SOP_CHEAT_SHEETS.length).toBeGreaterThanOrEqual(4);
+    expect(SOP_CHEAT_SHEETS.length).toBeGreaterThanOrEqual(6);
 
-    const next = advanceScenarioStep({ currentStep: 0, logs: [] }, DEMO_SCENARIOS[0]!);
-    expect(next.currentStep).toBe(1);
-    expect(next.logs).toHaveLength(1);
+    const mockRpc = {
+      api: {
+        wms: {
+          'catalog-csv-import': {
+            $post: async () => ({ ok: true, json: async () => ({ importedCount: 1 }) }),
+          },
+        },
+      },
+    };
+    const logLine = await executeLiveScenarioStep(mockRpc as never, DEMO_SCENARIOS[0]!.id, 0);
+    expect(logLine).toContain('✓');
+  });
+
+  it('builds POS checkout payload with manualDiscountBps, selected method/accounts, and exchangeRateMicros', async () => {
+    const {
+      buildPosCheckoutPayload,
+      loadPersistedPosState,
+      savePersistedPosState,
+    } = await import('../src/lib/usePosShiftAndCheckout.js');
+    const payload = buildPosCheckoutPayload({
+      shiftId: 'sh_1',
+      orderCurrency: 'USD',
+      cart: [
+        {
+          productId: 'p1',
+          sku: 'AMOX-500',
+          name: 'Amoxicilina',
+          unitPriceMinor: 1000,
+          qty: 1,
+          discountBps: 1000,
+        },
+      ],
+      usdMinor: 500,
+      vesMinor: 21900,
+      rateMicros: 54_750_000,
+      usdAccountId: 'acc_1',
+      vesAccountId: 'acc_2',
+      usdMethod: 'ZELLE',
+    });
+    expect(payload.items[0]?.manualDiscountBps).toBe(1000);
+    expect(payload.payments[0]?.methodCode).toBe('ZELLE');
+    expect(payload.payments[0]?.financialAccountId).toBe('acc_1');
+    expect(payload.payments[1]?.exchangeRateMicros).toBe(54_750_000);
+
+    savePersistedPosState('ten_1:org_1', {
+      shiftId: 'sh_1',
+      registerId: 'CAJA-01',
+      cart: payload.items.map((i) => ({
+        productId: i.productId,
+        sku: 'AMOX-500',
+        name: 'Amoxicilina',
+        unitPriceMinor: 1000,
+        qty: i.qty,
+        discountBps: i.manualDiscountBps,
+      })),
+    });
+    expect(loadPersistedPosState('ten_1:org_1')?.shiftId).toBe('sh_1');
+  });
+
+  it('matches gtin/barcode in findProductByScanCode and computes integer cartTotalMinor with coupon', async () => {
+    const gtinCatalog = [
+      { id: 'p3', sku: 'SKU-3', gtin: '7590001112223', name: 'Harina', basePriceMinor: 200 },
+    ];
+    expect(findProductByScanCode(gtinCatalog, '7590001112223')?.id).toBe('p3');
+
+    const { computeCartTotalWithCouponMinor } = await import('../src/views/PosReceiptPanel.js');
+    const total = computeCartTotalWithCouponMinor(
+      [{ productId: 'p3', sku: 'SKU-3', name: 'Harina', unitPriceMinor: 1000, qty: 2, discountBps: 1000 }],
+      500, // 5% coupon on top of 1800 -> 1710
+    );
+    expect(total).toBe(1710);
   });
 });

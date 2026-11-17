@@ -1,10 +1,47 @@
+import type { TenantMarketProfile } from '@shac/kernel';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, ReceiptText, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { EmptyState, KpiCard, StatusBadge, TimeSeriesChart } from '@shac/ui';
+import { useMarketProfile } from '../lib/marketProfile';
 import { formatMinorUnits, readApiError, type Phase2ViewProps } from './phase2-format';
 
 interface DashboardViewProps extends Phase2ViewProps {
   onNavigate: (href: string) => void;
+}
+
+export function getPresetPrimaryAction(
+  profile: Pick<TenantMarketProfile, 'editionPreset' | 'activeModules' | 'vocabulary'>,
+): { label: string; href: string } {
+  const mods = new Set(profile.activeModules);
+  switch (profile.editionPreset) {
+    case 'retail-pos':
+      if (mods.has('pos')) return { label: 'Abrir POS (F2)', href: '/pos' };
+      break;
+    case 'distro-wms':
+      if (mods.has('pos') || mods.has('catalog')) return { label: 'Órdenes de Despacho', href: '/orders' };
+      break;
+    case 'clinic-practice':
+      if (mods.has('cases')) return { label: 'Nueva Consulta EHR', href: '/clinical-ehr' };
+      break;
+    case 'legal-psa':
+      if (mods.has('cases')) return { label: 'Suite Legal & Expedientes', href: '/legal-hub' };
+      break;
+    case 'hospitality-pms':
+      if (mods.has('spaces')) return { label: 'Rack PMS & Reservas', href: '/spaces' };
+      break;
+    case 'property-condo':
+      if (mods.has('spaces')) return { label: 'Condominio & Leases', href: '/leases' };
+      break;
+    case 'industrial-gate':
+      if (mods.has('physical')) return { label: 'Consola Garita Helios', href: '/physical' };
+      break;
+    case 'tech-service':
+      if (mods.has('services')) return { label: 'Tickets & RMA', href: '/claims' };
+      break;
+  }
+  if (mods.has('pos')) return { label: 'Abrir POS (F2)', href: '/pos' };
+  if (mods.has('customers')) return { label: `Ir a ${profile.vocabulary.partyPlural}`, href: '/parties' };
+  return { label: 'Personalizar', href: '/app-store' };
 }
 
 function formatEpochDate(epochSec: number): string {
@@ -26,8 +63,14 @@ function outcomeTone(outcome: string): 'success' | 'warning' | 'error' | 'info' 
   return 'warning';
 }
 
-/** Open Mercato DS v3 3-column Dashboard: Customer Tasks | New Customers | New Deals. */
+/** Open Mercato DS v3 3-column Dashboard: Customer Tasks | New Parties | New Deals. */
 export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProps) {
+  const profile = useMarketProfile();
+  const primaryAction = getPresetPrimaryAction({
+    editionPreset: profile.editionPreset,
+    activeModules: profile.activeModules,
+    vocabulary,
+  });
   const tasksQuery = useQuery({
     queryKey: ['dashboard', 'tasks'],
     queryFn: async () => {
@@ -80,11 +123,11 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('/pos')}
+            onClick={() => onNavigate(primaryAction.href)}
             className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary-hover"
           >
             <ReceiptText className="size-3.5" />
-            <span>Abrir POS (F2)</span>
+            <span>{primaryAction.label}</span>
           </button>
         </div>
       </header>
@@ -106,19 +149,18 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           title="Pipeline Abierto"
           value={formatMinorUnits(dealsSummary?.openValueMinor ?? 0, 'USD')}
           loading={dealsQuery.isLoading}
-          trend={{ value: 100, direction: 'up' }}
           comparisonLabel="Oportunidades en negociación"
         />
       </div>
 
       <TimeSeriesChart
         title="Actividad Operativa por Módulo"
-        subtitle="Clientes, oportunidades abiertas y tareas registradas"
+        subtitle={`${vocabulary.partyPlural}, oportunidades abiertas y tareas registradas`}
+        showTotalBadge={false}
         series={[
-          { label: 'Clientes', value: partiesQuery.data?.total ?? parties.length, secondaryValue: 10 },
-          { label: 'Tareas', value: tasksQuery.data?.summary.openCount ?? tasks.length, secondaryValue: 8 },
-          { label: 'Deals', value: deals.length, secondaryValue: 6 },
-          { label: 'Pipeline $', value: Math.round((dealsSummary?.openValueMinor ?? 0) / 100), secondaryValue: 500 },
+          { label: vocabulary.partyPlural, value: partiesQuery.data?.total ?? parties.length },
+          { label: 'Tareas', value: tasksQuery.data?.summary.openCount ?? tasks.length },
+          { label: 'Deals', value: deals.length },
         ]}
       />
 
@@ -177,20 +219,13 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                 Últimos clientes agregados para seguimiento rápido.
               </p>
             </div>
-            <button
-              type="button"
-              aria-label="Actualizar clientes"
-              onClick={() => void partiesQuery.refetch()}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
+            <button type="button" aria-label="Actualizar clientes" onClick={() => void partiesQuery.refetch()} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
               <RefreshCw className={`size-3.5 ${partiesQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {parties.length === 0 ? (
-            <div className="p-4">
-              <EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel="Ir a Clientes" onAction={() => onNavigate('/parties')} />
-            </div>
+            <div className="p-4"><EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel={`Ir a ${vocabulary.partyPlural}`} onAction={() => onNavigate('/parties')} /></div>
           ) : (
             <div className="divide-y divide-border/70">
               {parties.map((party) => (
@@ -200,13 +235,8 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                     <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">{formatEpochDate(party.createdAt)}</span>
                   </div>
                   <p className="text-xs text-muted-foreground">{party.rolesMask.join(', ')}</p>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('/parties')}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
-                  >
-                    <span>Ver registro</span>
-                    <ArrowUpRight className="size-3 text-muted-foreground" />
+                  <button type="button" onClick={() => onNavigate('/parties')} className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline">
+                    <span>Ver registro</span><ArrowUpRight className="size-3 text-muted-foreground" />
                   </button>
                 </div>
               ))}
@@ -218,24 +248,15 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           <div className="flex items-start justify-between gap-2 border-b border-border/70 p-4">
             <div className="space-y-0.5">
               <h2 className="text-sm font-semibold tracking-tight">Nuevas Oportunidades</h2>
-              <p className="text-xs text-muted-foreground">
-                Sigue los deals recién creados en tu pipeline comercial.
-              </p>
+              <p className="text-xs text-muted-foreground">Sigue los deals recién creados en tu pipeline comercial.</p>
             </div>
-            <button
-              type="button"
-              aria-label="Actualizar deals"
-              onClick={() => void dealsQuery.refetch()}
-              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
+            <button type="button" aria-label="Actualizar deals" onClick={() => void dealsQuery.refetch()} className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground">
               <RefreshCw className={`size-3.5 ${dealsQuery.isFetching ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
           {deals.length === 0 ? (
-            <div className="p-4">
-              <EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Ir a Kanban Deals" onAction={() => onNavigate('/deals')} />
-            </div>
+            <div className="p-4"><EmptyState size="sm" title="Sin oportunidades aún" actionLabel="Ir a Kanban Deals" onAction={() => onNavigate('/deals')} /></div>
           ) : (
             <div className="divide-y divide-border/70">
               {deals.map((deal) => (
@@ -248,13 +269,8 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
                     <StatusBadge label={deal.outcome} tone={outcomeTone(deal.outcome)} appearance="dot" />
                     <span className="font-mono text-xs font-medium tabular-nums">{formatMinorUnits(deal.valueMinor, deal.currency)}</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('/deals')}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline"
-                  >
-                    <span>Ver registro</span>
-                    <ArrowUpRight className="size-3 text-muted-foreground" />
+                  <button type="button" onClick={() => onNavigate('/deals')} className="inline-flex items-center gap-1 text-xs font-medium text-foreground hover:underline">
+                    <span>Ver registro</span><ArrowUpRight className="size-3 text-muted-foreground" />
                   </button>
                 </div>
               ))}

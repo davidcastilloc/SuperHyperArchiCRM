@@ -144,4 +144,40 @@ describe('@shac/node-worker Phase 2 CRM links, deals, conflicts & labels', () =>
     expect(labelRes.data.rateMicrosSnapshot).toBe(45_500_000);
     expect(labelRes.data.items[0]?.priceSecondaryMinor).toBe(91_000);
   });
+
+  it('executes live v_cf_* DDL idempotently on D1 when creating indexed custom fields', async () => {
+    await env.CONFIG_KV.put('profile:current', JSON.stringify(makeProfile(['core', 'iam', 'customers'])));
+    invalidateProfileCache();
+    const testEnv: WorkerEnv = { ...env, JWT_PUBLIC_KEY_JWK: publicKeyJwkJson };
+
+    const payload = {
+      entityType: 'crm_parties',
+      fieldKey: 'registro_sanitario',
+      label: 'Registro Sanitario',
+      dataType: 'text',
+      isIndexed: true,
+    };
+    const res1 = await callWorkerJson<{ indexExecuted: boolean; virtualColumnName: string }>(
+      workerApp,
+      testEnv,
+      '/api/system/custom-fields',
+      tokenTen1,
+      payload,
+    );
+    expect(res1.status).toBe(201);
+    expect(res1.data.virtualColumnName).toBe('v_cf_registro_sanitario');
+    expect(res1.data.indexExecuted).toBe(true);
+
+    const checkRow = await env.DB.prepare('SELECT v_cf_registro_sanitario FROM crm_parties LIMIT 1').all();
+    expect(checkRow.success).toBe(true);
+
+    const res2 = await callWorkerJson<{ indexExecuted: boolean }>(
+      workerApp,
+      testEnv,
+      '/api/system/custom-fields',
+      tokenTen1,
+      payload,
+    );
+    expect(res2.status).toBe(201);
+  });
 });

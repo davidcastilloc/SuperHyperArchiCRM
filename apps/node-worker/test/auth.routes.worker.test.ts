@@ -4,7 +4,7 @@ import { hashPasswordPbkdf2, sha256Hex } from '@shac/kernel';
 import { beforeAll, describe, expect, it } from 'vitest';
 import phase1Sql from '../../../packages/db-d1/migrations/0001_phase1_iam_core.sql?raw';
 import phase2Sql from '../../../packages/db-d1/migrations/0002_phase2_universal_trunk.sql?raw';
-import { workerApp, type WorkerEnv } from '../src/router.js';
+import { invalidateProfileCache, workerApp, type WorkerEnv } from '../src/router.js';
 import { applySqlScript, seedTenantsAndOrgs } from './test-helpers.js';
 
 describe('Interactive Auth Routes (/api/auth/*)', () => {
@@ -227,5 +227,294 @@ describe('Interactive Auth Routes (/api/auth/*)', () => {
     expect(delegSession.token.startsWith('shac_sess_')).toBe(true);
     expect(delegSession.actor.type).toBe('delegated_staff');
     expect(delegSession.actor.delegatedById).toBe('usr_admin_1');
+  });
+
+  it('enforces defaultOrgId orgPath ceiling on login and POST /api/auth/switch-branch', async () => {
+    const nowSec = Math.floor(Date.now() / 1000);
+    const branchCashierEmail = 'cajero.norte@shac.test';
+    const branchCashierHash = await sha256Hex(branchCashierEmail);
+    const pwHash = await hashPasswordPbkdf2('Norte!2026');
+    const { createD1Client } = await import('@shac/db-d1');
+    const db = createD1Client(env.DB);
+    await db.insert(iamUsers).values({
+      id: 'usr_norte_1',
+      tenantId: 'ten_1',
+      defaultOrgId: 'org_branch_2',
+      realm: 'staff',
+      email: branchCashierEmail,
+      emailHash: branchCashierHash,
+      fullName: 'Cajero Norte',
+      passwordHashWebcrypto: pwHash,
+      isVerified: true,
+      preferencesJson: JSON.stringify({ perms: ['pos.sales.write'] }),
+      isActive: true,
+      createdAt: nowSec,
+      updatedAt: nowSec,
+    });
+
+    const deniedLogin = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: branchCashierEmail,
+          password: 'Norte!2026',
+          branchId: 'org_1',
+        }),
+      }),
+      testEnv,
+    );
+    expect(deniedLogin.status).toBe(403);
+
+    const okLogin = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: branchCashierEmail,
+          password: 'Norte!2026',
+          branchId: 'org_branch_2',
+        }),
+      }),
+      testEnv,
+    );
+    expect(okLogin.status).toBe(200);
+    const branchSession = (await okLogin.json()) as { token: string };
+
+    const deniedSwitch = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/switch-branch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${branchSession.token}`,
+        },
+        body: JSON.stringify({ branchId: 'org_1' }),
+      }),
+      testEnv,
+    );
+    expect(deniedSwitch.status).toBe(403);
+  });
+
+  it('supports Day-1 /api/auth/setup preserving Control Plane profile and fails closed 503 when initialized without KV', async () => {
+    await env.DB.prepare('DELETE FROM iam_users').run();
+    await env.CONFIG_KV.delete('profile:current');
+    invalidateProfileCache();
+
+    const bootEmpty = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/bootstrap'),
+      testEnv,
+    );
+    expect(bootEmpty.status).toBe(200);
+    const bootEmptyBody = (await bootEmpty.json()) as { needsSetup: boolean };
+    expect(bootEmptyBody.needsSetup).toBe(true);
+
+    // Pre-provisioned Control Plane profile must preserve tenantId & entitlements
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify({
+        deploymentId: 'dep_cp_99',
+        tenantId: 'ten_cp_99',
+        editionPreset: 'retail-pos',
+        regionPack: 've',
+        activeModules: ['core', 'iam', 'customers', 'catalog', 'pos', 'regional', 'wms'],
+        vocabulary: {
+          partySingular: 'Cliente',
+          partyPlural: 'Clientes',
+          orderSingular: 'Ticket de Venta',
+          branchSingular: 'Tienda',
+          spaceSingular: 'Caja',
+          caseSingular: 'Reclamo',
+        },
+        currency: {
+          baseCurrency: 'USD',
+          operatingCurrencies: ['USD', 'VES'],
+          rateSource: 'bcv',
+          enforceAccountCurrencyMatch: true,
+        },
+        entitlements: {
+          maxBranches: 2,
+          maxPosRegisters: 3,
+          maxSpacesOrUnits: 5,
+          aiCopilotEnabled: true,
+          customEntitiesLimit: 10,
+        },
+        federation: {
+          enabled: false,
+          nodeDid: 'did:shac:node:dep_cp_99',
+          publishPublicCatalog: false,
+          acceptPeerB2BOrders: false,
+          consolidateLowStockHours: 24,
+          allowedSupplierDids: [],
+        },
+        updatedAt: '2026-11-16T00:00:00.000Z',
+      }),
+    );
+    invalidateProfileCache();
+
+    const setupRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: 'Farmacia Central',
+          branchName: 'Sede Centro',
+          editionPreset: 'omni-enterprise',
+          regionPack: 've',
+          adminName: 'Admin Inicial',
+          email: 'init@farmacia.test',
+          password: 'InitPassword!2026',
+          floorPin: '1234',
+          initialUsdToLocalRate: 54.75,
+        }),
+      }),
+      testEnv,
+    );
+    expect(setupRes.status).toBe(201);
+    const setupBody = (await setupRes.json()) as {
+      token: string;
+      actor: { tenantId: string };
+    };
+    expect(setupBody.token.startsWith('shac_sess_')).toBe(true);
+    expect(setupBody.actor.tenantId).toBe('ten_cp_99');
+
+    const storedProfile = JSON.parse(
+      (await env.CONFIG_KV.get('profile:current', 'text')) || '{}',
+    ) as { entitlements?: { maxBranches?: number } };
+    expect(storedProfile.entitlements?.maxBranches).toBe(2);
+
+    const duplicateSetup = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyName: 'Otro',
+          branchName: 'Otra',
+          editionPreset: 'retail-pos',
+          regionPack: 've',
+          adminName: 'Otro',
+          email: 'otro@farmacia.test',
+          password: 'InitPassword!2026',
+        }),
+      }),
+      testEnv,
+    );
+    expect(duplicateSetup.status).toBe(409);
+
+    await env.CONFIG_KV.delete('profile:current');
+    invalidateProfileCache();
+    const failClosedBoot = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/bootstrap'),
+      testEnv,
+    );
+    expect(failClosedBoot.status).toBe(503);
+  });
+
+  it('rejects cross-tenant defaultOrgId and wildcard escalation in POST /api/iam/users', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify({
+        deploymentId: 'dep_test',
+        tenantId: 'ten_1',
+        editionPreset: 'omni-enterprise',
+        regionPack: 've',
+        activeModules: ['core', 'iam', 'customers'],
+        vocabulary: {
+          partySingular: 'Cliente',
+          partyPlural: 'Clientes',
+          orderSingular: 'Pedido',
+          branchSingular: 'Sucursal',
+          spaceSingular: 'Espacio',
+          caseSingular: 'Expediente',
+        },
+        currency: {
+          baseCurrency: 'USD',
+          operatingCurrencies: ['USD', 'VES'],
+          rateSource: 'bcv',
+          enforceAccountCurrencyMatch: true,
+        },
+        entitlements: {
+          maxBranches: 10,
+          maxPosRegisters: 20,
+          maxSpacesOrUnits: 50,
+          aiCopilotEnabled: true,
+          customEntitiesLimit: 50,
+        },
+        federation: {
+          enabled: false,
+          nodeDid: 'did:web:edge.shac.local',
+          publishPublicCatalog: false,
+          acceptPeerB2BOrders: false,
+          consolidateLowStockHours: 24,
+          allowedSupplierDids: [],
+        },
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    invalidateProfileCache();
+    const { createD1Client } = await import('@shac/db-d1');
+    const db = createD1Client(env.DB);
+    const nowSec = Math.floor(Date.now() / 1000);
+    const mgrEmail = 'limited.mgr@shac.test';
+    const mgrPw = 'Manager!2026';
+    await db.insert(iamUsers).values({
+      id: 'usr_limited_mgr',
+      tenantId: 'ten_1',
+      defaultOrgId: 'org_1',
+      realm: 'staff',
+      email: mgrEmail,
+      emailHash: await sha256Hex(mgrEmail),
+      fullName: 'Limited Manager',
+      passwordHashWebcrypto: await hashPasswordPbkdf2(mgrPw),
+      isVerified: true,
+      preferencesJson: JSON.stringify({ perms: ['iam.orgs.write'] }),
+      isActive: true,
+      createdAt: nowSec,
+      updatedAt: nowSec,
+    });
+    const loginRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: mgrEmail, password: mgrPw, branchId: 'org_1' }),
+      }),
+      testEnv,
+    );
+    expect(loginRes.status).toBe(200);
+    const { token: limitedToken } = (await loginRes.json()) as { token: string };
+
+    const wildcardRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/iam/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${limitedToken}`,
+        },
+        body: JSON.stringify({
+          email: 'esc@shac.test',
+          fullName: 'Esc User',
+          perms: ['*'],
+        }),
+      }),
+      testEnv,
+    );
+    expect(wildcardRes.status).toBe(403);
+
+    const crossOrgRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/iam/users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${limitedToken}`,
+        },
+        body: JSON.stringify({
+          email: 'cross@shac.test',
+          fullName: 'Cross Org',
+          defaultOrgId: 'org_other_tenant',
+          perms: ['customers.read'],
+        }),
+      }),
+      testEnv,
+    );
+    expect(crossOrgRes.status).toBe(403);
   });
 });

@@ -12,6 +12,7 @@ import { applySqlScript, makeProfile, seedTenantsAndOrgs } from './test-helpers.
 
 describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
   let publicKeyJwkJson: string;
+  let privateKeyJwk: JsonWebKey;
   let tokenTen1: string;
 
   beforeAll(async () => {
@@ -32,6 +33,7 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
       ),
     );
     const keys = await generateEd25519KeyPair();
+    privateKeyJwk = keys.privateKeyJwk;
     publicKeyJwkJson = JSON.stringify(keys.publicKeyJwk);
     tokenTen1 = await signJwtEdDsa(
       {
@@ -504,5 +506,349 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
     expect(listBody.ediscoveryHolds).toHaveLength(1);
     expect(listBody.briefs).toHaveLength(1);
     expect(listBody.ethicsAndCitations).toHaveLength(1);
+  });
+
+  it('serves wms_locations, wms vehicles, B2B orders/quotes, and AI copilot under distro-wms preset', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify({
+        deploymentId: 'dep_distro',
+        tenantId: 'ten_1',
+        editionPreset: 'distro-wms',
+        regionPack: 've',
+        activeModules: ['core', 'iam', 'customers', 'catalog', 'wms', 'regional', 'finance', 'portal', 'services'],
+        vocabulary: {
+          partySingular: 'Cuenta Mayorista',
+          partyPlural: 'Cuentas Mayoristas',
+          orderSingular: 'Orden de Despacho',
+          branchSingular: 'CEDI',
+          spaceSingular: 'Andén',
+          caseSingular: 'RMA',
+        },
+        currency: {
+          baseCurrency: 'USD',
+          operatingCurrencies: ['USD', 'VES'],
+          rateSource: 'bcv',
+          enforceAccountCurrencyMatch: true,
+        },
+        entitlements: {
+          maxBranches: 5,
+          maxPosRegisters: 4,
+          maxSpacesOrUnits: 50,
+          aiCopilotEnabled: true,
+          customEntitiesLimit: 20,
+        },
+        federation: {
+          enabled: false,
+          nodeDid: 'did:shac:node:dep_distro',
+          publishPublicCatalog: false,
+          acceptPeerB2BOrders: false,
+          consolidateLowStockHours: 24,
+          allowedSupplierDids: [],
+        },
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+    invalidateProfileCache();
+    const testEnv = makeTestEnv();
+
+    const createLoc = await workerApp.request(
+      'http://localhost/api/wms/locations',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ locationCode: 'BIN-A1-01', name: 'Pasillo A Estante 1', locationKind: 'internal' }),
+      },
+      testEnv,
+    );
+    expect(createLoc.status).toBe(201);
+
+    const listLocs = await workerApp.request(
+      'http://localhost/api/wms/locations',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    expect(listLocs.status).toBe(200);
+    const locsJson = (await listLocs.json()) as { items: Array<{ code: string }> };
+    expect(locsJson.items.some((l) => l.code === 'BIN-A1-01')).toBe(true);
+
+    const createVeh = await workerApp.request(
+      'http://localhost/api/wms/vehicles',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ vehicleCode: 'VEH-FRIO-1', plateNumber: 'AB123CD', driverName: 'Carlos', isColdChain: true }),
+      },
+      testEnv,
+    );
+    expect(createVeh.status).toBe(201);
+
+    const quoteRes = await workerApp.request(
+      'http://localhost/api/pos/quotes',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ currency: 'USD', totalMinor: 25000 }),
+      },
+      testEnv,
+    );
+    expect(quoteRes.status).toBe(201);
+
+    const ordersRes = await workerApp.request(
+      'http://localhost/api/pos/orders',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    expect(ordersRes.status).toBe(200);
+
+    const aiRes = await workerApp.request(
+      'http://localhost/api/automation/ai-chat',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: 'Resumen de inventario' }),
+      },
+      testEnv,
+    );
+    expect(aiRes.status).toBe(200);
+  });
+
+  it('saves AI Scribe SOAP notes as DRAFT, parses JSON cleanly, signs via /notes/:id/sign, and isolates orgPath', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['core', 'iam', 'customers', 'cases', 'services', 'finance', 'portal', 'automation'])),
+    );
+    invalidateProfileCache();
+    const aiMockEnv = {
+      ...makeTestEnv(),
+      AI: {
+        async run() {
+          return {
+            response: JSON.stringify({
+              subjective: 'Cefalea frontal de 48h',
+              objective: 'PA 120/80 mmHg',
+              assessment: 'Migraña sin aura',
+              plan: 'Sumatriptán 50mg PRN',
+              icd10: ['G43.0'],
+            }),
+          };
+        },
+      },
+    } as unknown as WorkerEnv;
+
+    const tokenOrg2 = await signJwtEdDsa(
+      { sub: 'usr_doc_2', tenantId: 'ten_1', orgId: 'org_2', orgPath: '/org_1/org_2', actorType: 'staff', perms: ['*'] },
+      privateKeyJwk as never,
+      600,
+    );
+    const tokenOrg3 = await signJwtEdDsa(
+      { sub: 'usr_doc_3', tenantId: 'ten_1', orgId: 'org_3', orgPath: '/org_1/org_3', actorType: 'staff', perms: ['*'] },
+      privateKeyJwk as never,
+      600,
+    );
+
+    const encRes = await workerApp.request(
+      'http://localhost/api/clinical/encounters',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenOrg2}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          patientPartyId: 'pty_pat_org2',
+          chiefComplaint: 'Cefalea intensa',
+          vitals: { bpSystolic: 120, bpDiastolic: 80, heartRate: 72 },
+          dictationText: 'Paciente refiere cefalea frontal',
+        }),
+      },
+      aiMockEnv,
+    );
+    expect(encRes.status).toBe(201);
+    const encBody = (await encRes.json()) as { noteId: string; soap: { assessment: string } };
+    expect(encBody.soap.assessment).toBe('Migraña sin aura');
+    expect(encBody.soap.assessment).not.toContain('{');
+
+    const org3Overview = await workerApp.request(
+      'http://localhost/api/clinical/overview',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenOrg3}` } },
+      aiMockEnv,
+    );
+    expect(org3Overview.status).toBe(200);
+    const org3Data = (await org3Overview.json()) as { notes: Array<{ id: string; status: string }> };
+    expect(org3Data.notes.some((n) => n.id === encBody.noteId)).toBe(false);
+
+    const org2Overview = await workerApp.request(
+      'http://localhost/api/clinical/overview',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenOrg2}` } },
+      aiMockEnv,
+    );
+    const org2Data = (await org2Overview.json()) as { notes: Array<{ id: string; status: string }> };
+    expect(org2Data.notes.find((n) => n.id === encBody.noteId)?.status).toBe('DRAFT');
+
+    const signRes = await workerApp.request(
+      `http://localhost/api/clinical/notes/${encBody.noteId}/sign`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenOrg2}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ assessment: 'Migraña sin aura confirmada' }),
+      },
+      aiMockEnv,
+    );
+    expect(signRes.status).toBe(200);
+    const signBody = (await signRes.json()) as { status: string };
+    expect(signBody.status).toBe('SIGNED');
+  });
+
+  it('detects legal conflicts on crm_parties.display_name and creates court dockets', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['core', 'iam', 'customers', 'cases', 'finance', 'portal', 'automation'])),
+    );
+    invalidateProfileCache();
+    const testEnv = makeTestEnv();
+
+    const ptyRes = await workerApp.request(
+      'http://localhost/api/customers/parties',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientMutationId: crypto.randomUUID(),
+          displayName: 'Inversiones Orinoco',
+          partyKind: 'company',
+          rolesMask: ['customer'],
+        }),
+      },
+      testEnv,
+    );
+    expect([200, 201]).toContain(ptyRes.status);
+
+    const revRes = await workerApp.request(
+      'http://localhost/api/legal/ai-contract-review',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          opposingPartyName: 'Orinoco',
+          contractText: 'Contrato de suministro con penalidad del 30% y terminación unilateral.',
+        }),
+      },
+      testEnv,
+    );
+    expect(revRes.status).toBe(200);
+    const revBody = (await revRes.json()) as { conflictsFound: Array<{ display_name?: string }> };
+    expect(revBody.conflictsFound.length).toBeGreaterThanOrEqual(1);
+
+    const docketRes = await workerApp.request(
+      'http://localhost/api/legal/dockets',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          matterId: 'mat_demo_1',
+          courtName: 'Juzgado Superior Mercantil',
+          docketNumber: 'DKT-2026-88',
+          summary: 'Audiencia preliminar de conciliación',
+        }),
+      },
+      testEnv,
+    );
+    expect(docketRes.status).toBe(201);
+  });
+
+  it('creates PMS rooms, runs reserve->checkin->folio charge/settle->checkout, and sets PENDING on DIRTY housekeeping', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['core', 'iam', 'customers', 'spaces', 'leases', 'finance'])),
+    );
+    invalidateProfileCache();
+    const testEnv = makeTestEnv();
+
+    const unitRes = await workerApp.request(
+      'http://localhost/api/hospitality/units',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ unitNumber: '101', floorLabel: 'Piso 1', typeName: 'Suite Ejecutiva', baseRateMinor: 12_000, capacity: 2 }),
+      },
+      testEnv,
+    );
+    expect(unitRes.status).toBe(201);
+    const unitBody = (await unitRes.json()) as { id: string };
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const resvRes = await workerApp.request(
+      'http://localhost/api/spaces/bookings/reserve',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          clientMutationId: crypto.randomUUID(),
+          partyId: 'pty_guest_1',
+          unitId: unitBody.id,
+          slotBucket: new Date(nowSec * 1000).toISOString().slice(0, 10),
+          scheduledStart: nowSec + 60,
+          scheduledEnd: nowSec + 86_400,
+        }),
+      },
+      testEnv,
+    );
+    expect(resvRes.status).toBe(200);
+    const resvBody = (await resvRes.json()) as { bookingId: string; folioId?: string };
+
+    const checkinRes = await workerApp.request(
+      'http://localhost/api/spaces/bookings/transition',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ clientMutationId: crypto.randomUUID(), bookingId: resvBody.bookingId, action: 'CHECK_IN' }),
+      },
+      testEnv,
+    );
+    expect(checkinRes.status).toBe(200);
+
+    const ov1 = await workerApp.request(
+      'http://localhost/api/hospitality/overview',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    const ov1Data = (await ov1.json()) as { folios: Array<{ id: string }> };
+    const folioId = resvBody.folioId ?? ov1Data.folios[0]!.id;
+
+    const chargeRes = await workerApp.request(
+      `http://localhost/api/hospitality/folios/${folioId}/charge-or-settle`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'charge', description: 'Minibar Agua + Café', amountMinor: 1500 }),
+      },
+      testEnv,
+    );
+    expect(chargeRes.status).toBe(200);
+
+    const settleRes = await workerApp.request(
+      `http://localhost/api/hospitality/folios/${folioId}/charge-or-settle`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'settle' }),
+      },
+      testEnv,
+    );
+    expect(settleRes.status).toBe(200);
+    const settleData = (await settleRes.json()) as { balanceMinor: number; status: string };
+    expect(settleData.balanceMinor).toBe(0);
+    expect(settleData.status).toBe('CLOSED');
+
+    const hkDirty = await workerApp.request(
+      'http://localhost/api/hospitality/housekeeping',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ unitId: unitBody.id, taskKind: 'TURNOVER', targetUnitStatus: 'DIRTY', priority: 'HIGH' }),
+      },
+      testEnv,
+    );
+    expect(hkDirty.status).toBe(201);
+    const hkDirtyData = (await hkDirty.json()) as { taskStatus: string };
+    expect(hkDirtyData.taskStatus).toBe('PENDING');
   });
 });

@@ -2,6 +2,7 @@ import { AppError, type ProfileLoader } from '@shac/kernel';
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { authenticateWorkerActor, type HonoEnv } from './command-registry.js';
+import { authenticateAnyModule, createWmsVehiclesLocationsRoutes } from './wms-vehicles-locations-routes.js';
 
 const CategorySchema = z.object({
   kind: z.enum(['product_category', 'dictionary', 'brand']).default('product_category'),
@@ -30,13 +31,7 @@ const QuoteSchema = z.object({
   currency: z.string().default('USD'),
 });
 
-const WmsLocationSchema = z.object({
-  locationCode: z.string().min(1).max(48),
-  name: z.string().min(1).max(120),
-  locationKind: z.enum(['warehouse', 'zone', 'bin', 'dock', 'asn']).default('bin'),
-});
-
-/** Mounts Categories, Variants, Promotions/Coupons, Quotes, and WMS Locations/ASNs routes. */
+/** Mounts Categories, Variants, Promotions/Coupons, Quotes, and WMS Locations/Vehicles routes. */
 export function createCatalogExtRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
     .get('/catalog/categories', async (c) => {
@@ -104,7 +99,9 @@ export function createCatalogExtRoutes(profileLoader: ProfileLoader) {
       return c.json({ id, ...d }, 201);
     })
     .post('/pos/quotes', async (c) => {
-      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'pos', 'pos.sales.write');
+      const auth = await authenticateAnyModule(
+        c.env, c.req.raw.headers, profileLoader, ['pos', 'wms', 'catalog'], 'pos.sales.write',
+      );
       const parsed = QuoteSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid quote', parsed.error.flatten());
       const d = parsed.data;
@@ -117,25 +114,5 @@ export function createCatalogExtRoutes(profileLoader: ProfileLoader) {
       ).bind(id, auth.actor.tenantId, auth.actor.orgId, quoteNo, d.partyId ?? null, d.currency, d.totalMinor, nowSec).run();
       return c.json({ id, orderNumber: quoteNo, grandTotalMinor: d.totalMinor, currency: d.currency }, 201);
     })
-    .get('/wms/locations', async (c) => {
-      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'wms', 'wms.pickings.read');
-      const res = await c.env.DB.prepare(
-        `SELECT id, code, name, location_kind, is_active, created_at
-         FROM wms_warehouses_and_locations WHERE tenant_id = ?1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 100`,
-      ).bind(auth.actor.tenantId).all<{ id: string; code: string; name: string; location_kind: string; is_active: number; created_at: number }>();
-      return c.json({ items: (res.results ?? []).map((l) => ({ id: l.id, code: l.code, name: l.name, locationKind: l.location_kind, isActive: Boolean(l.is_active), createdAt: l.created_at })) });
-    })
-    .post('/wms/locations', async (c) => {
-      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'wms', 'wms.pickings.write');
-      const parsed = WmsLocationSchema.safeParse(await c.req.json().catch(() => null));
-      if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid WMS location', parsed.error.flatten());
-      const d = parsed.data;
-      const id = crypto.randomUUID();
-      const nowSec = Math.floor(Date.now() / 1000);
-      await c.env.DB.prepare(
-        `INSERT INTO wms_warehouses_and_locations (id, tenant_id, org_id, code, name, location_kind, is_active, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?7)`,
-      ).bind(id, auth.actor.tenantId, auth.actor.orgId, d.locationCode.trim(), d.name.trim(), d.locationKind, nowSec).run();
-      return c.json({ id, ...d }, 201);
-    });
+    .route('/', createWmsVehiclesLocationsRoutes(profileLoader));
 }

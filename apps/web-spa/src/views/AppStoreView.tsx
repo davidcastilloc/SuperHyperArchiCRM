@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { TenantMarketProfile } from '@shac/kernel';
 import { Blocks, Check, Languages, Zap } from 'lucide-react';
@@ -19,6 +19,7 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
   const queryClient = useQueryClient();
   const [partyPlural, setPartyPlural] = useState(fallbackProfile.vocabulary.partyPlural);
   const [orderSingular, setOrderSingular] = useState(fallbackProfile.vocabulary.orderSingular);
+  const [isolatePreset, setIsolatePreset] = useState(true);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const profileQuery = useQuery({
@@ -30,11 +31,20 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
     },
   });
 
+  useEffect(() => {
+    const v = profileQuery.data?.profile.vocabulary;
+    if (v) {
+      setPartyPlural(v.partyPlural);
+      setOrderSingular(v.orderSingular);
+    }
+  }, [profileQuery.data?.profile.vocabulary]);
+
   const toggleMutation = useMutation({
     mutationFn: async (payload: {
       enableModules?: string[];
       disableModules?: string[];
       switchPreset?: string;
+      presetMode?: 'merge' | 'replace';
       vocabularyOverride?: { partyPlural?: string; orderSingular?: string };
     }) => {
       const res = await rpc.api.system['app-store'].toggle.$post({
@@ -92,10 +102,21 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
       {feedback ? <p className="rounded-md border border-status-info-border bg-status-info-bg px-3 py-2 text-xs font-medium text-status-info-text">{feedback}</p> : null}
 
       <div className="space-y-3">
-        <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
-          <Blocks className="size-4 text-muted-foreground" />
-          <span>9 Presets Verticales Canónicos</span>
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
+            <Blocks className="size-4 text-muted-foreground" />
+            <span>9 Presets Verticales Canónicos</span>
+          </h2>
+          <label className="inline-flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={isolatePreset}
+              onChange={(e) => setIsolatePreset(e.target.checked)}
+              className="size-4 rounded border-border"
+            />
+            <span>Aislar vertical (apagar módulos de otras industrias)</span>
+          </label>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {presets.map((preset) => {
             const isCurrent = preset.id === activeProfile.editionPreset;
@@ -104,7 +125,12 @@ export function AppStoreView({ fallbackProfile, rpc }: AppStoreViewProps) {
                 key={preset.id}
                 type="button"
                 disabled={toggleMutation.isPending}
-                onClick={() => toggleMutation.mutate({ switchPreset: preset.id })}
+                onClick={() =>
+                  toggleMutation.mutate({
+                    switchPreset: preset.id,
+                    presetMode: isolatePreset ? 'replace' : 'merge',
+                  })
+                }
                 className={`rounded-xl border p-4 text-left shadow-xs transition-colors ${
                   isCurrent ? 'border-foreground bg-muted/40' : 'border-border bg-card hover:bg-muted/35'
                 }`}

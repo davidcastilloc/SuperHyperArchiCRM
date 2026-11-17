@@ -280,4 +280,77 @@ describe('@shac/node-worker Phase 7 workerd integration (services, cases, financ
     expect(mcpPortal.attachments.map((a) => a.id)).toEqual(['att_p7_pub']);
     expect(mcpPortal.messages.map((m) => m.id)).toEqual(['msg_p7_pub']);
   });
+
+  it('atomically updates COA current_balance_minor on journal post and persists AP vendorPartyId + dueAt', async () => {
+    await env.CONFIG_KV.put(
+      'profile:current',
+      JSON.stringify(makeProfile(['core', 'iam', 'customers', 'finance'])),
+    );
+    invalidateProfileCache();
+    const testEnv: WorkerEnv = { ...env, JWT_PUBLIC_KEY_JWK: publicKeyJwkJson };
+
+    await callWorkerJson(workerApp, testEnv, '/api/finance/coa', tokenTen1, {
+      accountCode: '1010-CASH',
+      name: 'Caja General',
+      classification: 'asset',
+      normalBalance: 'debit',
+    });
+    await callWorkerJson(workerApp, testEnv, '/api/finance/coa', tokenTen1, {
+      accountCode: '4010-REV',
+      name: 'Ingresos Operativos',
+      classification: 'revenue',
+      normalBalance: 'credit',
+    });
+
+    const jeRes = await callWorkerJson<{ status: string }>(
+      workerApp,
+      testEnv,
+      '/api/finance/journal/post',
+      tokenTen1,
+      {
+        clientMutationId: 'p7-je-coa-1',
+        entryNumber: 'JE-COA-001',
+        entryDate: Math.floor(Date.now() / 1000),
+        fiscalYear: 2026,
+        fiscalPeriod: 11,
+        description: 'Venta al contado',
+        lines: [
+          { accountCode: '1010-CASH', debitMinor: 25_000, creditMinor: 0 },
+          { accountCode: '4010-REV', debitMinor: 0, creditMinor: 25_000 },
+        ],
+      },
+    );
+    expect(jeRes.status).toBe(200);
+
+    const dueAt = Math.floor(Date.now() / 1000) + 86_400 * 15;
+    const apRes = await callWorkerJson<{ id: string }>(
+      workerApp,
+      testEnv,
+      '/api/finance/ap-bills',
+      tokenTen1,
+      {
+        billOrExpenseNo: 'AP-VENDOR-01',
+        vendorPartyId: 'pty_p7_1',
+        dueAt,
+        category: 'SUPPLIES',
+        totalMinor: 10_000,
+        paidMinor: 0,
+        currency: 'USD',
+      },
+    );
+    expect(apRes.status).toBe(201);
+
+    const ov = await callWorkerJson<{
+      accounts: Array<{ account_code: string; current_balance_minor: number }>;
+      apBills: Array<{ bill_or_expense_no: string; vendor_party_id: string | null; due_date: number | null; vendorName: string | null }>;
+      trialBalanceTotals: { totalDebitMinor: number; totalCreditMinor: number; balanced: boolean };
+    }>(workerApp, testEnv, '/api/finance/overview', tokenTen1);
+    expect(ov.status).toBe(200);
+    expect(ov.data.accounts.find((a) => a.account_code === '1010-CASH')?.current_balance_minor).toBe(25_000);
+    expect(ov.data.accounts.find((a) => a.account_code === '4010-REV')?.current_balance_minor).toBe(25_000);
+    expect(ov.data.trialBalanceTotals.balanced).toBe(true);
+    const apRow = ov.data.apBills.find((b) => b.bill_or_expense_no === 'AP-VENDOR-01');
+    expect(apRow?.vendor_party_id).toBe('pty_p7_1');
+    expect(apRow?.due_date).toBe(dueAt);
+  });
 });

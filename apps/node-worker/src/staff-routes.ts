@@ -31,16 +31,19 @@ const ProjectSchema = z.object({
 });
 
 /** Mounts Staff profiles, Leave requests, Timesheets, and PSA Projects routes. */
+const STAFF_ORG_FILTER =
+  `(org_id = ?4 OR org_id IN (SELECT id FROM iam_organizations WHERE tenant_id = ?1 AND (tree_path = ?2 OR tree_path LIKE ?3)))`;
+
 export function createStaffRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
     .get('/profiles', async (c) => {
       const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'iam', 'iam.orgs.read');
       const res = await c.env.DB.prepare(
         `SELECT id, user_id, employee_number, department_name, job_title, specialty, base_rate_minor, is_active, created_at
-         FROM hr_staff_profiles_and_credentials WHERE tenant_id = ?1 AND deleted_at IS NULL
+         FROM hr_staff_profiles_and_credentials WHERE tenant_id = ?1 AND ${STAFF_ORG_FILTER} AND deleted_at IS NULL
          ORDER BY created_at DESC LIMIT 100`,
       )
-        .bind(auth.actor.tenantId)
+        .bind(auth.actor.tenantId, auth.actor.orgPath, `${auth.actor.orgPath}/%`, auth.actor.orgId)
         .all<{
           id: string; user_id: string; employee_number: string | null; department_name: string | null;
           job_title: string | null; specialty: string | null; base_rate_minor: number; is_active: number; created_at: number;
@@ -79,10 +82,10 @@ export function createStaffRoutes(profileLoader: ProfileLoader) {
       const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'iam', 'iam.orgs.read');
       const res = await c.env.DB.prepare(
         `SELECT id, record_type, staff_id, project_or_case_id, duration_minutes, hourly_rate_minor, gross_pay_minor, status, created_at
-         FROM hr_shifts_timesheets_and_payroll WHERE tenant_id = ?1 AND deleted_at IS NULL
+         FROM hr_shifts_timesheets_and_payroll WHERE tenant_id = ?1 AND ${STAFF_ORG_FILTER} AND deleted_at IS NULL
          ORDER BY created_at DESC LIMIT 100`,
       )
-        .bind(auth.actor.tenantId)
+        .bind(auth.actor.tenantId, auth.actor.orgPath, `${auth.actor.orgPath}/%`, auth.actor.orgId)
         .all<{
           id: string; record_type: string; staff_id: string; project_or_case_id: string | null;
           duration_minutes: number; hourly_rate_minor: number; gross_pay_minor: number; status: string; created_at: number;
@@ -122,10 +125,10 @@ export function createStaffRoutes(profileLoader: ProfileLoader) {
       const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'iam', 'iam.orgs.read');
       const res = await c.env.DB.prepare(
         `SELECT id, code, name, budget_kind, budget_value, hourly_rate_minor, status, created_at
-         FROM psa_projects_and_tasks WHERE tenant_id = ?1 AND deleted_at IS NULL
+         FROM psa_projects_and_tasks WHERE tenant_id = ?1 AND ${STAFF_ORG_FILTER} AND deleted_at IS NULL
          ORDER BY created_at DESC LIMIT 100`,
       )
-        .bind(auth.actor.tenantId)
+        .bind(auth.actor.tenantId, auth.actor.orgPath, `${auth.actor.orgPath}/%`, auth.actor.orgId)
         .all<{
           id: string; code: string; name: string; budget_kind: string;
           budget_value: number; hourly_rate_minor: number; status: string; created_at: number;

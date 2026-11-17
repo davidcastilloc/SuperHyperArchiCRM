@@ -13,9 +13,10 @@ const CreateUserSchema = z.object({
   fullName: z.string().min(1).max(120),
   realm: z.enum(['staff', 'portal', 'admin']).default('staff'),
   defaultOrgId: z.string().min(1).optional(),
+  allowedOrgIds: z.array(z.string().min(1)).optional(),
   password: z.string().min(8).max(128).optional(),
   floorPin: z.string().regex(/^\d{4}$/).optional(),
-  perms: z.array(z.string()).default(['*']),
+  perms: z.array(z.string()).default(['customers.read']),
 });
 
 const CustomRecordSchema = z.object({
@@ -66,25 +67,54 @@ export function createIamAdminRoutes(profileLoader: ProfileLoader) {
         throw new AppError('VALIDATION_ERROR', 400, 'Invalid user payload', parsed.error.flatten());
       }
       const d = parsed.data;
+      if (d.perms.includes('*') && !auth.actor.perms.includes('*')) {
+        throw new AppError('FORBIDDEN', 403, 'Cannot grant wildcard permission without holding wildcard access');
+      }
+      const orgId = d.defaultOrgId || auth.actor.orgId;
+      const uniqueOrgIds = Array.from(new Set([orgId, ...(d.allowedOrgIds ?? [])]));
+      for (const candidateOrgId of uniqueOrgIds) {
+        const orgRow = await c.env.DB.prepare(
+          `SELECT id FROM iam_organizations WHERE id = ?1 AND tenant_id = ?2 AND deleted_at IS NULL LIMIT 1`,
+        )
+          .bind(candidateOrgId, auth.actor.tenantId)
+          .first<{ id: string }>();
+        if (!orgRow) {
+          throw new AppError('FORBIDDEN_ORG_SCOPE', 403, `Organization ${candidateOrgId} is outside tenant scope`);
+        }
+      }
       const emailNorm = d.email.trim().toLowerCase();
       const emailHash = await sha256Hex(emailNorm);
       const pwHash = d.password ? await hashPasswordPbkdf2(d.password) : null;
       const pinHash = d.floorPin ? await sha256Hex(d.floorPin) : null;
       const id = crypto.randomUUID();
       const nowSec = Math.floor(Date.now() / 1000);
-      const orgId = d.defaultOrgId || auth.actor.orgId;
 
       await c.env.DB.prepare(
         `INSERT INTO iam_users
           (id, tenant_id, default_org_id, realm, email, email_hash, full_name, password_hash_webcrypto, floor_pin_hash, is_verified, preferences_json, is_active, created_at, updated_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, 1, ?11, ?11)
          ON CONFLICT(tenant_id, email_hash) DO UPDATE SET
+           default_org_id = excluded.default_org_id,
            full_name = excluded.full_name,
            realm = excluded.realm,
+           password_hash_webcrypto = COALESCE(excluded.password_hash_webcrypto, iam_users.password_hash_webcrypto),
+           floor_pin_hash = COALESCE(excluded.floor_pin_hash, iam_users.floor_pin_hash),
            preferences_json = excluded.preferences_json,
            updated_at = excluded.updated_at`,
       )
-        .bind(id, auth.actor.tenantId, orgId, d.realm, emailNorm, emailHash, d.fullName.trim(), pwHash, pinHash, JSON.stringify({ perms: d.perms }), nowSec)
+        .bind(
+          id,
+          auth.actor.tenantId,
+          orgId,
+          d.realm,
+          emailNorm,
+          emailHash,
+          d.fullName.trim(),
+          pwHash,
+          pinHash,
+          JSON.stringify({ perms: d.perms, ...(d.allowedOrgIds ? { allowedOrgIds: d.allowedOrgIds } : {}) }),
+          nowSec,
+        )
         .run();
 
       return c.json({ id, email: emailNorm, fullName: d.fullName.trim(), realm: d.realm, defaultOrgId: orgId }, 201);

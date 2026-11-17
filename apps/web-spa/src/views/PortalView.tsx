@@ -1,12 +1,16 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Check, FileText, Info, MessageSquare, ShieldCheck } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download, FileText, Info, MessageSquare, Send, ShieldCheck } from 'lucide-react';
 import { PageHeader, StatusBadge } from '@shac/ui';
 import { INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** Open Mercato DS v3 Client Portal view enforcing SQL is_confidential = 0 filtering. */
 export function PortalView({ vocabulary, rpc }: Phase2ViewProps) {
+  const queryClient = useQueryClient();
   const [partyFilter, setPartyFilter] = useState('');
+  const [subject, setSubject] = useState('');
+  const [bodyText, setBodyText] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const partiesQuery = useQuery({
     queryKey: ['customers', 'parties', 'portal-select'],
@@ -28,9 +32,40 @@ export function PortalView({ vocabulary, rpc }: Phase2ViewProps) {
     },
   });
 
+  const sendMessageMutation = useMutation({
+    mutationFn: async () => {
+      const targetParty = partyFilter || partiesQuery.data?.items[0]?.id || '';
+      if (!targetParty) throw new Error(`Selecciona un ${vocabulary.partySingular.toLowerCase()} primero.`);
+      const res = await rpc.api.customers.interactions.$post({
+        json: {
+          clientMutationId: crypto.randomUUID(),
+          partyId: targetParty,
+          kind: 'note',
+          title: subject.trim() || 'Mensaje de Portal',
+          body: bodyText.trim(),
+        },
+      });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+    onSuccess: () => {
+      setErrorMsg(null);
+      setSubject('');
+      setBodyText('');
+      void queryClient.invalidateQueries({ queryKey: ['portal', 'records'] });
+    },
+    onError: (err: Error) => setErrorMsg(err.message),
+  });
+
   const parties = partiesQuery.data?.items ?? [];
   const attachments = portalQuery.data?.attachments ?? [];
   const messages = portalQuery.data?.messages ?? [];
+
+  function handleSend(e: FormEvent) {
+    e.preventDefault();
+    if (!bodyText.trim()) return;
+    sendMessageMutation.mutate();
+  }
 
   return (
     <section className="mx-auto max-w-4xl space-y-5" data-slot="portal-view">
@@ -46,7 +81,7 @@ export function PortalView({ vocabulary, rpc }: Phase2ViewProps) {
             value={partyFilter}
             onChange={(e) => setPartyFilter(e.target.value)}
           >
-            <option value="">Todos los clientes</option>
+            <option value="">Todos los {vocabulary.partyPlural.toLowerCase()}</option>
             {parties.map((p) => (
               <option key={p.id} value={p.id}>{p.displayName}</option>
             ))}
@@ -54,66 +89,25 @@ export function PortalView({ vocabulary, rpc }: Phase2ViewProps) {
         }
       />
 
-      <div className="rounded-xl border border-border bg-card shadow-xs divide-y divide-border">
-        <div className="p-6 space-y-5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <StatusBadge
-              label="Portal Externo · Zero-Trust"
-              tone="neutral"
-              icon={<ShieldCheck className="size-3.5" />}
-            />
-            <StatusBadge label="En revisión activa" tone="success" appearance="dot" />
-          </div>
+      {errorMsg ? <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{errorMsg}</div> : null}
 
+      <div className="divide-y divide-border rounded-xl border border-border bg-card shadow-xs">
+        <div className="space-y-3 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <StatusBadge label="Portal Externo · Zero-Trust" tone="neutral" icon={<ShieldCheck className="size-3.5" />} />
+            <StatusBadge label={`${attachments.length} adjuntos · ${messages.length} mensajes`} tone="success" appearance="dot" />
+          </div>
           <div className="flex items-start gap-2.5 rounded-lg border border-status-info-border bg-status-info-bg px-3.5 py-2.5 text-xs text-status-info-text">
             <Info className="mt-0.5 size-4 shrink-0 text-status-info-icon" />
-            <span>
-              Filtro SQL obligatorio <code>is_confidential = 0</code>: ningún registro interno o confidencial sale del borde.
-            </span>
+            <span>Filtro SQL obligatorio <code>is_confidential = 0</code>: ningún registro interno o confidencial sale del borde.</span>
           </div>
-
-          <ol className="space-y-4 pt-1">
-            <li className="flex items-start gap-3">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-status-success-icon text-white">
-                <Check className="size-3.5" />
-              </span>
-              <div>
-                <p className="text-sm font-medium">Identidad de portal validada</p>
-                <p className="text-xs text-muted-foreground">Alcance restringido a registros autorizados de {vocabulary.branchSingular}.</p>
-              </div>
-            </li>
-            <li className="flex items-start justify-between gap-3">
-              <div className="flex items-start gap-3">
-                <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary font-mono text-xs font-semibold text-primary-foreground">
-                  2
-                </span>
-                <div>
-                  <p className="text-sm font-medium">Sincronización de documentos y mensajes públicos</p>
-                  <p className="text-xs text-muted-foreground">
-                    {attachments.length} adjuntos visibles · {messages.length} comunicaciones compartidas.
-                  </p>
-                </div>
-              </div>
-              <span className="text-xs text-muted-foreground">Ahora</span>
-            </li>
-            <li className="flex items-start gap-3 opacity-65">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border font-mono text-xs text-muted-foreground">
-                3
-              </span>
-              <div>
-                <p className="text-sm font-medium">Conformidad o cierre de solicitud</p>
-                <p className="text-xs text-muted-foreground">Notificación automática al titular al actualizar el expediente.</p>
-              </div>
-            </li>
-          </ol>
         </div>
 
         <div className="grid grid-cols-1 divide-y divide-border md:grid-cols-2 md:divide-x md:divide-y-0">
-          <div className="p-5 space-y-3">
+          <div className="space-y-3 p-5">
             <div className="flex items-center justify-between">
               <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                <FileText className="size-4 text-muted-foreground" />
-                <span>Adjuntos Públicos</span>
+                <FileText className="size-4 text-muted-foreground" /><span>Adjuntos Públicos</span>
               </h2>
               <span className="font-mono text-xs text-muted-foreground tabular-nums">{attachments.length}</span>
             </div>
@@ -124,18 +118,24 @@ export function PortalView({ vocabulary, rpc }: Phase2ViewProps) {
                 {attachments.map((att) => (
                   <li key={att.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
                     <span className="truncate font-medium">{att.fileName}</span>
-                    <StatusBadge label={att.entityType} tone="neutral" appearance="dot" />
+                    <a
+                      href={`/api/media/${encodeURIComponent((att as { r2Key?: string }).r2Key ?? att.fileName)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
+                      <Download className="size-3" /><span>Abrir</span>
+                    </a>
                   </li>
                 ))}
               </ul>
             )}
           </div>
 
-          <div className="p-5 space-y-3">
+          <div className="space-y-3 p-5">
             <div className="flex items-center justify-between">
               <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold">
-                <MessageSquare className="size-4 text-muted-foreground" />
-                <span>Mensajes Visibles</span>
+                <MessageSquare className="size-4 text-muted-foreground" /><span>Mensajes Visibles</span>
               </h2>
               <span className="font-mono text-xs text-muted-foreground tabular-nums">{messages.length}</span>
             </div>
@@ -151,6 +151,15 @@ export function PortalView({ vocabulary, rpc }: Phase2ViewProps) {
                 ))}
               </ul>
             )}
+            <form onSubmit={handleSend} className="space-y-2 border-t border-border pt-3">
+              <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Asunto del mensaje público" className={`${INPUT_CLS} w-full`} />
+              <div className="flex gap-2">
+                <input value={bodyText} onChange={(e) => setBodyText(e.target.value)} placeholder="Escribe un mensaje visible en portal..." className={`${INPUT_CLS} flex-1`} required />
+                <button type="submit" disabled={sendMessageMutation.isPending} className="inline-flex h-9 items-center gap-1 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground">
+                  <Send className="size-3" /><span>Enviar</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       </div>

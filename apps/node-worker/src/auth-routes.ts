@@ -6,6 +6,14 @@ import {
 } from '@shac/kernel';
 import { Hono } from 'hono';
 import { z } from 'zod';
+import {
+  assertUserBranchScope,
+  handleBootstrap,
+  handleInitialSetup,
+  handleSwitchBranch,
+  issueSession,
+  parseUserPrefs,
+} from './auth-setup-routes.js';
 import type { HonoEnv } from './command-registry.js';
 
 const LOGIN_TTL_SECONDS = 12 * 3600;
@@ -35,108 +43,16 @@ const delegationSessionSchema = z.object({
   expiresAt: z.number().int(),
 });
 
-function parseUserPerms(preferencesJson: string): string[] {
-  try {
-    const parsed = JSON.parse(preferencesJson) as { perms?: unknown };
-    if (Array.isArray(parsed.perms)) {
-      return parsed.perms.filter((p): p is string => typeof p === 'string');
-    }
-  } catch {
-    // Fail-closed: corrupt preferencesJson grants no permissions
-  }
-  return [];
-}
-
-function generateSessionToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  let hex = '';
-  for (let i = 0; i < bytes.length; i++) {
-    hex += (bytes[i] ?? 0).toString(16).padStart(2, '0');
-  }
-  return `shac_sess_${hex}`;
-}
-
-async function issueSession(
-  kv: KVNamespace,
-  payload: {
-    userId: string;
-    fullName: string;
-    tenantId: string;
-    orgId: string;
-    orgPath: string;
-    branchName: string;
-    actorType: 'staff' | 'delegated_staff';
-    perms: string[];
-    delegatedById?: string;
-  },
-  ttlSeconds: number,
-) {
-  const token = generateSessionToken();
-  const tokenHash = await sha256Hex(token);
-  const nowSec = Math.floor(Date.now() / 1000);
-  const expiresAt = nowSec + ttlSeconds;
-
-  await kv.put(
-    `session:${tokenHash}`,
-    JSON.stringify({
-      userId: payload.userId,
-      tenantId: payload.tenantId,
-      orgId: payload.orgId,
-      orgPath: payload.orgPath,
-      actorType: payload.actorType,
-      perms: payload.perms,
-      ...(payload.delegatedById ? { delegatedById: payload.delegatedById } : {}),
-      expiresAt,
-    }),
-    { expirationTtl: ttlSeconds },
-  );
-
-  return {
-    token,
-    expiresAt,
-    actor: {
-      id: payload.userId,
-      fullName: payload.fullName,
-      type: payload.actorType,
-      tenantId: payload.tenantId,
-      orgId: payload.orgId,
-      orgPath: payload.orgPath,
-      branchName: payload.branchName,
-      perms: payload.perms,
-      ...(payload.delegatedById ? { delegatedById: payload.delegatedById } : {}),
-    },
-  };
-}
-
-/** Mounts /bootstrap, /login, /pin, and /logout under /api/auth. */
+/** Mounts /bootstrap, /setup, /login, /pin, /switch-branch, and /logout under /api/auth. */
 export function createAuthRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
-    .get('/bootstrap', async (c) => {
-      const profile = await profileLoader.load(c.env.CONFIG_KV);
-      const res = await c.env.DB.prepare(
-        'SELECT id, name, tree_path AS orgPath FROM iam_organizations WHERE tenant_id = ? AND is_active = 1 AND deleted_at IS NULL ORDER BY depth ASC, name ASC',
-      )
-        .bind(profile.tenantId)
-        .all<{ id: string; name: string; orgPath: string }>();
-
-      return c.json(
-        {
-          tenantId: profile.tenantId,
-          editionPreset: profile.editionPreset,
-          activeModules: profile.activeModules,
-          vocabulary: profile.vocabulary,
-          branches: res.results ?? [],
-        },
-        200,
-      );
-    })
+    .get('/bootstrap', (c) => handleBootstrap(c, profileLoader))
+    .post('/setup', (c) => handleInitialSetup(c, profileLoader))
+    .post('/switch-branch', (c) => handleSwitchBranch(c, profileLoader))
     .post('/login', async (c) => {
-      let rawBody: unknown;
-      try {
-        rawBody = await c.req.json();
-      } catch {
+      const rawBody = await c.req.json().catch(() => {
         throw new AppError('BAD_REQUEST', 400, 'Invalid JSON request body');
-      }
+      });
       const parsed = loginSchema.safeParse(rawBody);
       if (!parsed.success) {
         throw new AppError('VALIDATION_ERROR', 400, 'Invalid login payload', parsed.error.flatten());
@@ -148,7 +64,7 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
 
       const [userRes, orgRes] = await c.env.DB.batch([
         c.env.DB.prepare(
-          'SELECT id, full_name, password_hash_webcrypto, failed_login_attempts, locked_until, preferences_json FROM iam_users WHERE tenant_id = ? AND email_hash = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1',
+          'SELECT id, default_org_id, full_name, password_hash_webcrypto, failed_login_attempts, locked_until, preferences_json FROM iam_users WHERE tenant_id = ? AND email_hash = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1',
         ).bind(profile.tenantId, emailHash),
         c.env.DB.prepare(
           'SELECT id, name, tree_path FROM iam_organizations WHERE tenant_id = ? AND id = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1',
@@ -157,6 +73,7 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
 
       const user = (userRes?.results?.[0] ?? null) as {
         id: string;
+        default_org_id: string;
         full_name: string;
         password_hash_webcrypto: string | null;
         failed_login_attempts: number;
@@ -172,32 +89,26 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
       if (!user || !user.password_hash_webcrypto || !org) {
         throw new AppError('UNAUTHORIZED', 401, 'Invalid credentials or branch');
       }
-
       if (user.locked_until && user.locked_until > nowSec) {
         throw new AppError('ACCOUNT_LOCKED', 423, 'Account temporarily locked');
       }
 
-      const valid = await verifyPasswordPbkdf2(
-        parsed.data.password,
-        user.password_hash_webcrypto,
-      );
+      const valid = await verifyPasswordPbkdf2(parsed.data.password, user.password_hash_webcrypto);
       if (!valid) {
         const nextAttempts = user.failed_login_attempts + 1;
-        const lockedUntil =
-          nextAttempts >= MAX_FAILED_ATTEMPTS ? nowSec + LOCK_DURATION_SECONDS : null;
+        const lockedUntil = nextAttempts >= MAX_FAILED_ATTEMPTS ? nowSec + LOCK_DURATION_SECONDS : null;
         await c.env.DB.prepare(
           'UPDATE iam_users SET failed_login_attempts = ?, locked_until = ?, updated_at = ? WHERE id = ? AND tenant_id = ?',
-        )
-          .bind(nextAttempts, lockedUntil, nowSec, user.id, profile.tenantId)
-          .run();
+        ).bind(nextAttempts, lockedUntil, nowSec, user.id, profile.tenantId).run();
         throw new AppError('UNAUTHORIZED', 401, 'Invalid credentials');
       }
 
+      const prefs = parseUserPrefs(user.preferences_json);
+      await assertUserBranchScope(c.env.DB, profile.tenantId, user.default_org_id, org, prefs);
+
       await c.env.DB.prepare(
         'UPDATE iam_users SET failed_login_attempts = 0, locked_until = NULL, last_login_at = ?, updated_at = ? WHERE id = ? AND tenant_id = ?',
-      )
-        .bind(nowSec, nowSec, user.id, profile.tenantId)
-        .run();
+      ).bind(nowSec, nowSec, user.id, profile.tenantId).run();
 
       const session = await issueSession(
         c.env.SESSION_KV,
@@ -209,19 +120,16 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
           orgPath: org.tree_path,
           branchName: org.name,
           actorType: 'staff',
-          perms: parseUserPerms(user.preferences_json),
+          perms: prefs.perms,
         },
         LOGIN_TTL_SECONDS,
       );
       return c.json(session, 200);
     })
     .post('/pin', async (c) => {
-      let rawBody: unknown;
-      try {
-        rawBody = await c.req.json();
-      } catch {
+      const rawBody = await c.req.json().catch(() => {
         throw new AppError('BAD_REQUEST', 400, 'Invalid JSON request body');
-      }
+      });
       const parsed = pinSchema.safeParse(rawBody);
       if (!parsed.success) {
         throw new AppError('VALIDATION_ERROR', 400, 'Invalid PIN payload', parsed.error.flatten());
@@ -233,9 +141,7 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
 
       if (parsed.data.mode === 'delegation') {
         const raw = await c.env.SESSION_KV.get(`delegation:${pinHash}`, 'text');
-        if (!raw) {
-          throw new AppError('INVALID_DELEGATION_PIN', 401, 'Invalid delegation PIN');
-        }
+        if (!raw) throw new AppError('INVALID_DELEGATION_PIN', 401, 'Invalid delegation PIN');
         const deleg = delegationSessionSchema.safeParse(JSON.parse(raw));
         if (
           !deleg.success ||
@@ -247,9 +153,7 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
         }
         const orgRow = await c.env.DB.prepare(
           'SELECT name FROM iam_organizations WHERE tenant_id = ? AND id = ? LIMIT 1',
-        )
-          .bind(profile.tenantId, deleg.data.orgId)
-          .first<{ name: string }>();
+        ).bind(profile.tenantId, deleg.data.orgId).first<{ name: string }>();
 
         const session = await issueSession(
           c.env.SESSION_KV,
@@ -271,7 +175,7 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
 
       const [userRes, orgRes] = await c.env.DB.batch([
         c.env.DB.prepare(
-          'SELECT id, full_name, preferences_json FROM iam_users WHERE tenant_id = ? AND floor_pin_hash = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1',
+          'SELECT id, default_org_id, full_name, preferences_json FROM iam_users WHERE tenant_id = ? AND floor_pin_hash = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1',
         ).bind(profile.tenantId, pinHash),
         c.env.DB.prepare(
           'SELECT id, name, tree_path FROM iam_organizations WHERE tenant_id = ? AND id = ? AND is_active = 1 AND deleted_at IS NULL LIMIT 1',
@@ -280,6 +184,7 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
 
       const user = (userRes?.results?.[0] ?? null) as {
         id: string;
+        default_org_id: string;
         full_name: string;
         preferences_json: string;
       } | null;
@@ -289,9 +194,9 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
         tree_path: string;
       } | null;
 
-      if (!user || !org) {
-        throw new AppError('UNAUTHORIZED', 401, 'Invalid cashier PIN or branch');
-      }
+      if (!user || !org) throw new AppError('UNAUTHORIZED', 401, 'Invalid cashier PIN or branch');
+      const prefs = parseUserPrefs(user.preferences_json);
+      await assertUserBranchScope(c.env.DB, profile.tenantId, user.default_org_id, org, prefs);
 
       const session = await issueSession(
         c.env.SESSION_KV,
@@ -303,7 +208,7 @@ export function createAuthRoutes(profileLoader: ProfileLoader) {
           orgPath: org.tree_path,
           branchName: org.name,
           actorType: 'staff',
-          perms: parseUserPerms(user.preferences_json),
+          perms: prefs.perms,
         },
         CASHIER_PIN_TTL_SECONDS,
       );

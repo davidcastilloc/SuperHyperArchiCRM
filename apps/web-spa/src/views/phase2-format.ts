@@ -82,3 +82,30 @@ export async function readApiError(res: {
     return new ShacApiError(res.status, `HTTP_${res.status}`, fallbackMsg);
   }
 }
+
+/** Parses human decimal FX rate ('54.75') into integer micros (54_750_000). */
+export function parseRateToMicros(raw: string): number {
+  const clean = raw.trim().replace(',', '.');
+  const match = /^(\d+)(?:\.(\d+))?$/.exec(clean);
+  if (!match) return 1_000_000;
+  const whole = Number(match[1] ?? '0');
+  const frac = (match[2] ?? '').padEnd(6, '0').slice(0, 6);
+  const micros = whole * 1_000_000 + Number(frac);
+  return Number.isFinite(micros) && micros > 0 ? micros : 1_000_000;
+}
+
+/** Converts USD minor units into VES minor units using BigInt integer rounding. */
+export function usdToVesMinor(usdMinor: number, rateMicros: number): number {
+  const safeMinor = BigInt(Math.max(0, Math.trunc(usdMinor)));
+  const safeRate = BigInt(Math.max(1, Math.trunc(rateMicros)));
+  return Number((safeMinor * safeRate + 500_000n) / 1_000_000n);
+}
+
+/** Parses human percentage string ('15.5' -> 1550 bps), clamping invalid/negative to 0..10000. */
+export function parsePercentToBps(raw: string): number {
+  const clean = raw.trim().replace(',', '.');
+  if (!/^\d+(?:\.\d+)?$/.test(clean)) return 0;
+  const num = Number(clean);
+  if (!Number.isFinite(num) || num < 0) return 0;
+  return Math.min(10_000, Math.round(num * 100));
+}

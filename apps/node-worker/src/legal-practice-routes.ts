@@ -23,28 +23,43 @@ const MatterSchema = z.object({
   title: z.string().min(1).max(160),
 });
 
+const DocketSchema = z.object({
+  matterId: z.string().min(1),
+  courtName: z.string().min(1).max(160),
+  docketNumber: z.string().min(1).max(64),
+  fatalDueAt: z.number().int().optional(),
+  summary: z.string().min(1).max(300),
+});
+
+const ORG_SUBTREE_FILTER =
+  `(org_id = ?4 OR org_id IN (SELECT id FROM iam_organizations WHERE tenant_id = ?1 AND (tree_path = ?2 OR tree_path LIKE ?3)))`;
+
 /** Mounts Legal Practice Suite: Matters, Court Dockets, Billable Time Entries, IOLTA Ledgers & AI Contract/Conflict Review. */
 export function createLegalPracticeRoutes(profileLoader: ProfileLoader) {
   return new Hono<HonoEnv>()
     .get('/legal/overview', async (c) => {
       const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'cases', 'cases.records.read');
+      const tid = auth.actor.tenantId;
+      const op = auth.actor.orgPath;
+      const opLike = `${op}/%`;
+      const oid = auth.actor.orgId;
       const [mattersRes, docketsRes, timeRes, trustRes] = await c.env.DB.batch([
         c.env.DB.prepare(
           `SELECT id, reference_number, client_party_id, practice_area, title, status, opened_at
-           FROM leg_matters WHERE tenant_id = ?1 AND deleted_at IS NULL ORDER BY opened_at DESC LIMIT 40`,
-        ).bind(auth.actor.tenantId),
+           FROM leg_matters WHERE tenant_id = ?1 AND ${ORG_SUBTREE_FILTER} AND deleted_at IS NULL ORDER BY opened_at DESC LIMIT 40`,
+        ).bind(tid, op, opLike, oid),
         c.env.DB.prepare(
           `SELECT id, matter_id, case_number, case_title, court_name, filing_status, created_at
-           FROM leg_dockets_and_events WHERE tenant_id = ?1 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 40`,
-        ).bind(auth.actor.tenantId),
+           FROM leg_dockets_and_events WHERE tenant_id = ?1 AND ${ORG_SUBTREE_FILTER} AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 40`,
+        ).bind(tid, op, opLike, oid),
         c.env.DB.prepare(
           `SELECT id, matter_id, staff_id, duration_minutes, hourly_rate_minor, amount_minor, description, status, entry_date
-           FROM leg_time_entries WHERE tenant_id = ?1 AND deleted_at IS NULL ORDER BY entry_date DESC LIMIT 50`,
-        ).bind(auth.actor.tenantId),
+           FROM leg_time_entries WHERE tenant_id = ?1 AND ${ORG_SUBTREE_FILTER} AND deleted_at IS NULL ORDER BY entry_date DESC LIMIT 50`,
+        ).bind(tid, op, opLike, oid),
         c.env.DB.prepare(
           `SELECT id, party_id, matter_or_lease_id, currency, balance_minor, status, updated_at
-           FROM fin_trust_escrow_ledgers WHERE tenant_id = ?1 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 40`,
-        ).bind(auth.actor.tenantId),
+           FROM fin_trust_escrow_ledgers WHERE tenant_id = ?1 AND ${ORG_SUBTREE_FILTER} AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 40`,
+        ).bind(tid, op, opLike, oid),
       ]);
       return c.json({
         matters: mattersRes?.results ?? [],
@@ -67,6 +82,21 @@ export function createLegalPracticeRoutes(profileLoader: ProfileLoader) {
       ).bind(id, auth.actor.tenantId, auth.actor.orgId, d.referenceNumber.trim(), d.clientPartyId, auth.actor.id || 'usr_attorney', d.practiceArea, d.title.trim(), nowSec).run();
       return c.json({ ok: true, id, ...d }, 201);
     })
+    .post('/legal/dockets', async (c) => {
+      const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'cases', 'cases.records.write');
+      const parsed = DocketSchema.safeParse(await c.req.json().catch(() => null));
+      if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid docket input', parsed.error.flatten());
+      const d = parsed.data;
+      const id = crypto.randomUUID();
+      const nowSec = Math.floor(Date.now() / 1000);
+      const entries = d.fatalDueAt ? JSON.stringify([{ dueAt: d.fatalDueAt, summary: d.summary.trim() }]) : '[]';
+      await c.env.DB.prepare(
+        `INSERT INTO leg_dockets_and_events
+          (id, tenant_id, org_id, matter_id, case_number, case_title, court_name, filing_status, entries_and_deadlines_json, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'ACTIVE', ?8, ?9, ?9)`,
+      ).bind(id, auth.actor.tenantId, auth.actor.orgId, d.matterId, d.docketNumber.trim(), d.summary.trim(), d.courtName.trim(), entries, nowSec).run();
+      return c.json({ ok: true, id, ...d }, 201);
+    })
     .post('/legal/time-entries', async (c) => {
       const auth = await authenticateWorkerActor(c.env, c.req.raw.headers, profileLoader, 'cases', 'cases.records.write');
       const parsed = TimeEntrySchema.safeParse(await c.req.json().catch(() => null));
@@ -87,13 +117,39 @@ export function createLegalPracticeRoutes(profileLoader: ProfileLoader) {
       const parsed = ContractReviewSchema.safeParse(await c.req.json().catch(() => null));
       if (!parsed.success) throw new AppError('VALIDATION_ERROR', 400, 'Invalid contract review payload', parsed.error.flatten());
       const { opposingPartyName, contractText } = parsed.data;
+      const term = opposingPartyName.trim().toLowerCase();
 
-      const conflictsRes = opposingPartyName.trim()
-        ? await c.env.DB.prepare(
-            `SELECT id, legal_name, party_kind FROM crm_parties
-             WHERE tenant_id = ?1 AND LOWER(legal_name) LIKE ?2 AND deleted_at IS NULL LIMIT 10`,
-          ).bind(auth.actor.tenantId, `%${opposingPartyName.trim().toLowerCase()}%`).all()
-        : { results: [] };
+      const conflicts: unknown[] = [];
+      if (term) {
+        const likeTerm = `%${term}%`;
+        const [partyConflicts, matterConflicts] = await c.env.DB.batch([
+          c.env.DB.prepare(
+            `SELECT id, display_name, legal_name, party_kind FROM crm_parties
+             WHERE tenant_id = ?1 AND (LOWER(display_name) LIKE ?2 OR LOWER(COALESCE(legal_name, '')) LIKE ?2 OR LOWER(COALESCE(tax_id_number, '')) LIKE ?2) AND deleted_at IS NULL LIMIT 10`,
+          ).bind(auth.actor.tenantId, likeTerm),
+          c.env.DB.prepare(
+            `SELECT id, reference_number, title FROM leg_matters
+             WHERE tenant_id = ?1 AND LOWER(title) LIKE ?2 AND deleted_at IS NULL LIMIT 10`,
+          ).bind(auth.actor.tenantId, likeTerm),
+        ]);
+        conflicts.push(...(partyConflicts?.results ?? []), ...(matterConflicts?.results ?? []));
+        const nowSec = Math.floor(Date.now() / 1000);
+        await c.env.DB.prepare(
+          `INSERT INTO crm_conflict_checks
+            (id, tenant_id, org_id, matter_title, searched_terms_json, matched_parties_json, risk_status, reviewed_by_user_id, reviewed_at, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?9, ?9)`,
+        ).bind(
+          crypto.randomUUID(),
+          auth.actor.tenantId,
+          auth.actor.orgId,
+          opposingPartyName.trim(),
+          JSON.stringify([term]),
+          JSON.stringify(conflicts),
+          conflicts.length > 0 ? 'conflict_detected' : 'clear',
+          auth.actor.id || 'usr_attorney',
+          nowSec,
+        ).run();
+      }
 
       const lower = contractText.toLowerCase();
       const flaggedClauses: string[] = [];
@@ -102,7 +158,7 @@ export function createLegalPracticeRoutes(profileLoader: ProfileLoader) {
       if (lower.includes('renuncia') || lower.includes('waiver')) flaggedClauses.push('Renuncia de derechos o jurisdicción');
       if (flaggedClauses.length === 0) flaggedClauses.push('Sin cláusulas críticas de riesgo inmediato detectadas');
 
-      const riskScore = Math.min(100, flaggedClauses.length * 25 + ((conflictsRes.results?.length ?? 0) > 0 ? 25 : 0));
+      const riskScore = Math.min(100, flaggedClauses.length * 25 + (conflicts.length > 0 ? 25 : 0));
       let summary = `Análisis legal: ${flaggedClauses.length} observación(es), riesgo ${riskScore}/100.`;
 
       if (c.env.AI) {
@@ -123,7 +179,7 @@ export function createLegalPracticeRoutes(profileLoader: ProfileLoader) {
         ok: true,
         riskScore,
         flaggedClauses,
-        conflictsFound: conflictsRes.results ?? [],
+        conflictsFound: conflicts,
         summary,
       });
     });
