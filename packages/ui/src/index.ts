@@ -1,5 +1,9 @@
 export { cn } from './lib/cn.js';
 export {
+  ExternalPortalShell,
+  type ExternalPortalShellProps,
+} from './components/ExternalPortalShell.js';
+export {
   ShacAppShell,
   SyncStatusPill,
   type ShacAppShellProps,

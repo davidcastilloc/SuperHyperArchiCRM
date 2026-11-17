@@ -397,4 +397,34 @@ describe('@shac/ui smoke tests', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Auditar glosas RCM' }));
     expect(onRunPrompt).toHaveBeenCalledWith('Auditar glosas RCM');
   });
+
+  it('renders ExternalPortalShell without ERP sidebar and SegmentedTabs with no-scrollbar', async () => {
+    const uiModule = (await import('../src/index.js')) as Record<string, unknown>;
+    expect('ExternalPortalShell' in uiModule).toBe(true);
+    const ExternalPortalShell = uiModule.ExternalPortalShell as React.ComponentType<{
+      title?: string;
+      subtitle?: string;
+      theme?: 'light' | 'dark';
+      density?: 'touch' | 'compact';
+      children: React.ReactNode;
+    }>;
+    const { SegmentedTabs } = await import('../src/index.js');
+
+    const { container } = render(
+      <ExternalPortalShell title="Portal Externo" theme="dark" density="touch">
+        <SegmentedTabs
+          activeId="a"
+          onSelect={() => {}}
+          tabs={[{ id: 'a', label: 'Tab A' }]}
+        />
+      </ExternalPortalShell>,
+    );
+
+    const ext = container.querySelector('[data-slot="external-portal-shell"]');
+    expect(ext).toBeInTheDocument();
+    expect(ext).toHaveAttribute('data-density', 'touch');
+    expect(ext).toHaveClass('dark');
+    expect(container.querySelector('[data-slot="app-shell-sidebar"]')).toBeNull();
+    expect(container.querySelector('[data-slot="segmented-tabs"]')?.className).toContain('no-scrollbar');
+  });
 });

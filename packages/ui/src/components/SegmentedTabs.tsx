@@ -23,7 +23,7 @@ export function SegmentedTabs({ tabs, activeId, onSelect, className }: Segmented
       aria-orientation="horizontal"
       data-slot="segmented-tabs"
       className={cn(
-        'inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border bg-muted/50 p-1',
+        'no-scrollbar inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-border bg-muted/50 p-1',
         className,
       )}
     >
@@ -37,7 +37,7 @@ export function SegmentedTabs({ tabs, activeId, onSelect, className }: Segmented
             aria-selected={active}
             onClick={() => onSelect(tab.id)}
             className={cn(
-              'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all',
+              'inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all touch:min-h-12 touch:px-4 touch:text-sm',
               active
                 ? 'bg-background text-foreground shadow-xs'
                 : 'text-muted-foreground hover:bg-background/60 hover:text-foreground',
