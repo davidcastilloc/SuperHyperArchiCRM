@@ -18,7 +18,7 @@ import type { HonoEnv } from './command-registry.js';
 
 const LOGIN_TTL_SECONDS = 12 * 3600;
 
-export const SetupSchema = z.object({
+const SetupSchema = z.object({
   companyName: z.string().min(1).max(120),
   branchName: z.string().min(1).max(120),
   editionPreset: EditionPresetIdSchema,

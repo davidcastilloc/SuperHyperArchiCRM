@@ -257,17 +257,3 @@ export async function executeLiveScenarioStep(
   await assertStepOk(res, step.endpointSummary);
   return `[${stamp}] ✓ ${step.label} (${step.endpointSummary})`;
 }
-
-/** Pure step-advancer for guided DemoScenarioRunner playbooks. */
-export function advanceScenarioStep(
-  state: ScenarioProgressState,
-  scenario: DemoScenario,
-): ScenarioProgressState {
-  const step = scenario.steps[state.currentStep];
-  if (!step) return state;
-  const stamp = new Date().toLocaleTimeString('es', { hour12: false });
-  return {
-    currentStep: Math.min(scenario.steps.length, state.currentStep + 1),
-    logs: [`[${stamp}] ✓ ${step.label} (${step.endpointSummary})`, ...state.logs],
-  };
-}

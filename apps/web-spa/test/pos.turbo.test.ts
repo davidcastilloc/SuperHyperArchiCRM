@@ -51,17 +51,25 @@ describe('POS Omni-Turbo scanner & integer math', () => {
     expect(remaining).toHaveLength(0);
   });
 
-  it('exposes 6 vertical demo personas, multi-step guided playbooks, and SOP cheat sheets', async () => {
-    const { DEMO_PERSONAS, DEMO_SCENARIOS, SOP_CHEAT_SHEETS, advanceScenarioStep } = await import(
+  it('exposes 6+ vertical demo personas, multi-step guided playbooks, and SOP cheat sheets', async () => {
+    const { DEMO_PERSONAS, DEMO_SCENARIOS, SOP_CHEAT_SHEETS, executeLiveScenarioStep } = await import(
       '../src/lib/demoScenarios.js'
     );
     expect(DEMO_PERSONAS.length).toBeGreaterThanOrEqual(6);
     expect(DEMO_SCENARIOS.length).toBeGreaterThanOrEqual(4);
-    expect(SOP_CHEAT_SHEETS.length).toBeGreaterThanOrEqual(4);
+    expect(SOP_CHEAT_SHEETS.length).toBeGreaterThanOrEqual(6);
 
-    const next = advanceScenarioStep({ currentStep: 0, logs: [] }, DEMO_SCENARIOS[0]!);
-    expect(next.currentStep).toBe(1);
-    expect(next.logs).toHaveLength(1);
+    const mockRpc = {
+      api: {
+        wms: {
+          'catalog-csv-import': {
+            $post: async () => ({ ok: true, json: async () => ({ importedCount: 1 }) }),
+          },
+        },
+      },
+    };
+    const logLine = await executeLiveScenarioStep(mockRpc as never, DEMO_SCENARIOS[0]!.id, 0);
+    expect(logLine).toContain('✓');
   });
 
   it('builds POS checkout payload with manualDiscountBps, selected method/accounts, and exchangeRateMicros', async () => {

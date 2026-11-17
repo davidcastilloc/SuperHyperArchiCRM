@@ -7,7 +7,8 @@
   "workspaces": {
     "apps/node-worker": {
       "entry": ["src/index.ts!", "src/__tests__/**/*.test.ts", "test/**/*.test.ts"],
-      "project": ["src/**/*.ts!", "test/**/*.ts"]
+      "project": ["src/**/*.ts!", "test/**/*.ts"],
+      "ignoreExportsUsedInFile": true
     },
     "apps/control-plane": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
@@ -19,7 +20,8 @@
     },
     "apps/web-spa": {
       "entry": ["src/main.tsx!", "test/**/*.test.ts"],
-      "project": ["src/**/*.{ts,tsx}!", "test/**/*.{ts,tsx}"]
+      "project": ["src/**/*.{ts,tsx}!", "test/**/*.{ts,tsx}"],
+      "ignoreExportsUsedInFile": true
     },
     "editions/presets": {
       "entry": ["src/index.ts!", "test/**/*.test.ts"],
