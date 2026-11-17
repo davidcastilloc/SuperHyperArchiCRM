@@ -3,6 +3,7 @@ import { EDITION_PRESETS } from '../../../editions/presets/src/presets-catalog';
 import { describe, expect, it } from 'vitest';
 import { resolveRouteDensity } from '../src/lib/marketProfile';
 import { buildNavItems } from '../src/nav';
+import { getPresetPrimaryAction } from '../src/views/DashboardView';
 
 function visibleItemsForPreset(presetId: EditionPresetId) {
   const def = EDITION_PRESETS[presetId];
@@ -65,5 +66,27 @@ describe('@shac/web-spa MarketProfile, 5 Workstations & Route Density', () => {
     expect(resolveRouteDensity('/kiosk/price-check')).toBe('touch');
     expect(resolveRouteDensity('/auth')).toBe('touch');
     expect(resolveRouteDensity('/finance')).toBe('compact');
+  });
+
+  it('computes preset-aware Dashboard primary CTA without pointing to disabled modules', () => {
+    const cases: Array<[EditionPresetId, string, string]> = [
+      ['retail-pos', 'Abrir POS (F2)', '/pos'],
+      ['distro-wms', 'Órdenes de Despacho', '/orders'],
+      ['clinic-practice', 'Nueva Consulta EHR', '/clinical-ehr'],
+      ['legal-psa', 'Suite Legal & Expedientes', '/legal-hub'],
+      ['hospitality-pms', 'Rack PMS & Reservas', '/spaces'],
+      ['property-condo', 'Condominio & Leases', '/leases'],
+      ['industrial-gate', 'Consola Garita Helios', '/physical'],
+    ];
+    for (const [presetId, expectedLabel, expectedHref] of cases) {
+      const def = EDITION_PRESETS[presetId];
+      expect(
+        getPresetPrimaryAction({
+          editionPreset: def.id,
+          activeModules: [...def.activeModules],
+          vocabulary: def.vocabulary,
+        }),
+      ).toEqual({ label: expectedLabel, href: expectedHref });
+    }
   });
 });

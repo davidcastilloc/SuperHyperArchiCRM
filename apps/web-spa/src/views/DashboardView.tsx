@@ -1,10 +1,47 @@
+import type { TenantMarketProfile } from '@shac/kernel';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, ReceiptText, RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { EmptyState, KpiCard, StatusBadge, TimeSeriesChart } from '@shac/ui';
+import { useMarketProfile } from '../lib/marketProfile';
 import { formatMinorUnits, readApiError, type Phase2ViewProps } from './phase2-format';
 
 interface DashboardViewProps extends Phase2ViewProps {
   onNavigate: (href: string) => void;
+}
+
+export function getPresetPrimaryAction(
+  profile: Pick<TenantMarketProfile, 'editionPreset' | 'activeModules' | 'vocabulary'>,
+): { label: string; href: string } {
+  const mods = new Set(profile.activeModules);
+  switch (profile.editionPreset) {
+    case 'retail-pos':
+      if (mods.has('pos')) return { label: 'Abrir POS (F2)', href: '/pos' };
+      break;
+    case 'distro-wms':
+      if (mods.has('pos') || mods.has('catalog')) return { label: 'Órdenes de Despacho', href: '/orders' };
+      break;
+    case 'clinic-practice':
+      if (mods.has('cases')) return { label: 'Nueva Consulta EHR', href: '/clinical-ehr' };
+      break;
+    case 'legal-psa':
+      if (mods.has('cases')) return { label: 'Suite Legal & Expedientes', href: '/legal-hub' };
+      break;
+    case 'hospitality-pms':
+      if (mods.has('spaces')) return { label: 'Rack PMS & Reservas', href: '/spaces' };
+      break;
+    case 'property-condo':
+      if (mods.has('spaces')) return { label: 'Condominio & Leases', href: '/leases' };
+      break;
+    case 'industrial-gate':
+      if (mods.has('physical')) return { label: 'Consola Garita Helios', href: '/physical' };
+      break;
+    case 'tech-service':
+      if (mods.has('services')) return { label: 'Tickets & RMA', href: '/claims' };
+      break;
+  }
+  if (mods.has('pos')) return { label: 'Abrir POS (F2)', href: '/pos' };
+  if (mods.has('customers')) return { label: `Ir a ${profile.vocabulary.partyPlural}`, href: '/parties' };
+  return { label: 'Personalizar', href: '/app-store' };
 }
 
 function formatEpochDate(epochSec: number): string {
@@ -26,8 +63,14 @@ function outcomeTone(outcome: string): 'success' | 'warning' | 'error' | 'info' 
   return 'warning';
 }
 
-/** Open Mercato DS v3 3-column Dashboard: Customer Tasks | New Customers | New Deals. */
+/** Open Mercato DS v3 3-column Dashboard: Customer Tasks | New Parties | New Deals. */
 export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProps) {
+  const profile = useMarketProfile();
+  const primaryAction = getPresetPrimaryAction({
+    editionPreset: profile.editionPreset,
+    activeModules: profile.activeModules,
+    vocabulary,
+  });
   const tasksQuery = useQuery({
     queryKey: ['dashboard', 'tasks'],
     queryFn: async () => {
@@ -80,11 +123,11 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('/pos')}
+            onClick={() => onNavigate(primaryAction.href)}
             className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs transition-colors hover:bg-primary-hover"
           >
             <ReceiptText className="size-3.5" />
-            <span>Abrir POS (F2)</span>
+            <span>{primaryAction.label}</span>
           </button>
         </div>
       </header>
@@ -106,19 +149,18 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
           title="Pipeline Abierto"
           value={formatMinorUnits(dealsSummary?.openValueMinor ?? 0, 'USD')}
           loading={dealsQuery.isLoading}
-          trend={{ value: 100, direction: 'up' }}
           comparisonLabel="Oportunidades en negociación"
         />
       </div>
 
       <TimeSeriesChart
         title="Actividad Operativa por Módulo"
-        subtitle="Clientes, oportunidades abiertas y tareas registradas"
+        subtitle={`${vocabulary.partyPlural}, oportunidades abiertas y tareas registradas`}
+        showTotalBadge={false}
         series={[
-          { label: 'Clientes', value: partiesQuery.data?.total ?? parties.length, secondaryValue: 10 },
-          { label: 'Tareas', value: tasksQuery.data?.summary.openCount ?? tasks.length, secondaryValue: 8 },
-          { label: 'Deals', value: deals.length, secondaryValue: 6 },
-          { label: 'Pipeline $', value: Math.round((dealsSummary?.openValueMinor ?? 0) / 100), secondaryValue: 500 },
+          { label: vocabulary.partyPlural, value: partiesQuery.data?.total ?? parties.length },
+          { label: 'Tareas', value: tasksQuery.data?.summary.openCount ?? tasks.length },
+          { label: 'Deals', value: deals.length },
         ]}
       />
 
@@ -189,7 +231,7 @@ export function DashboardView({ vocabulary, rpc, onNavigate }: DashboardViewProp
 
           {parties.length === 0 ? (
             <div className="p-4">
-              <EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel="Ir a Clientes" onAction={() => onNavigate('/parties')} />
+              <EmptyState size="sm" title={`Sin ${vocabulary.partyPlural.toLowerCase()}`} actionLabel={`Ir a ${vocabulary.partyPlural}`} onAction={() => onNavigate('/parties')} />
             </div>
           ) : (
             <div className="divide-y divide-border/70">
