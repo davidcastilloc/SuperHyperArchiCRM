@@ -47,6 +47,8 @@
     "binding": "AI"
   },
   "vars": {
-    "CORS_ALLOWED_ORIGINS": ""
+    "CORS_ALLOWED_ORIGINS": "",
+    "FEDERATION_HUB_URL": "https://shac-federation-hub.pc911itservices.workers.dev",
+    "CONTROL_PLANE_URL": "https://shac-control-plane.pc911itservices.workers.dev"
   }
 }

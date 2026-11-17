@@ -5,9 +5,11 @@ import {
   type CommandSpec,
   type ProfileLoader,
 } from '@shac/kernel';
-import type { z } from 'zod';
+import { z } from 'zod';
+import { AUDIT_CHAIN_STREAMS, verifyAuditChainStream } from './audit-chain-routes.js';
 import {
   ALL_COMMANDS,
+  authenticateWorkerActor,
   executeCommand,
   type WorkerEnv,
 } from './command-registry.js';
@@ -77,6 +79,59 @@ export function buildMcpServerForRequest(
       },
     );
   }
+
+  const verifyAuditInputSchema = z.object({
+    streamKey: z.enum(AUDIT_CHAIN_STREAMS),
+    limit: z.number().int().min(1).max(500).default(500),
+  });
+  server.registerTool(
+    'audit_verify_hash_chain',
+    {
+      title: 'audit_verify_hash_chain',
+      description:
+        'Verify SHA-256 hash-chain integrity of immutable_audit_chain_ledger for a regulated stream.',
+      inputSchema: zod3ToStandardSchema(verifyAuditInputSchema),
+      annotations: { readOnlyHint: true, idempotentHint: true },
+    },
+    async (args: Record<string, unknown>) => {
+      try {
+        const auth = await authenticateWorkerActor(
+          env,
+          rawHeaders,
+          profileLoader,
+          'iam',
+          'iam.orgs.read',
+        );
+        const parsed = verifyAuditInputSchema.parse(args ?? {});
+        const result = await verifyAuditChainStream(
+          env.DB,
+          auth.actor.orgId,
+          parsed.streamKey,
+          parsed.limit,
+        );
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+          structuredContent: result as Record<string, unknown>,
+        };
+      } catch (err) {
+        const appErr =
+          err instanceof AppError
+            ? err
+            : new AppError('INTERNAL_ERROR', 500, 'Unexpected MCP audit verify error');
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: { code: appErr.code, status: appErr.status, message: appErr.message },
+              }),
+            },
+          ],
+        };
+      }
+    },
+  );
 
   return server;
 }
