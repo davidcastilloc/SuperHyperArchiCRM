@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { assertOrgScope, wrapD1WithCounter } from '../src/index.js';
+import {
+  assertBranchScope,
+  assertOrgScope,
+  assertTenantScope,
+  wrapD1WithCounter,
+} from '../src/index.js';
 
 describe('@shac/db-d1 tenant & org subtree guard', () => {
   it('allows exact org and child orgs, blocks sibling orgs and cross-tenant access', () => {
@@ -54,5 +59,29 @@ describe('@shac/db-d1 wrapD1WithCounter', () => {
 
     await db.exec('SELECT 1');
     expect(getQueryCount()).toBe(4);
+  });
+});
+
+describe('@shac/db-d1 tenant and branch scope guards', () => {
+  it('enforces orgId and branchId presence', () => {
+    expect(() => assertTenantScope(null)).toThrow('TENANT_SCOPE_MISSING_ORG_ID');
+    expect(() => assertTenantScope({ orgId: '   ' })).toThrow('TENANT_SCOPE_MISSING_ORG_ID');
+
+    expect(assertTenantScope({ orgId: ' org_1 ' })).toEqual({
+      orgId: 'org_1',
+      branchId: null,
+      actorId: 'system',
+      roles: [],
+    });
+
+    expect(() => assertBranchScope({ orgId: 'org_1' })).toThrow(
+      'TENANT_SCOPE_MISSING_BRANCH_ID',
+    );
+    expect(assertBranchScope({ orgId: 'org_1', branchId: 'br_1', actorId: 'usr_1' })).toEqual({
+      orgId: 'org_1',
+      branchId: 'br_1',
+      actorId: 'usr_1',
+      roles: [],
+    });
   });
 });

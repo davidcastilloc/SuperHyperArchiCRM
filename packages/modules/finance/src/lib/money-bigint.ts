@@ -1,4 +1,4 @@
-import { AppError } from '@shac/kernel';
+import { AppError, assertZeroSumBalanced } from '@shac/kernel';
 
 export function toBigIntMinor(value: number | bigint, fieldName: string): bigint {
   if (typeof value === 'bigint') {
@@ -78,8 +78,8 @@ export interface JournalBalanceSummary {
 export function sumJournalLinesBigInt(
   lines: readonly JournalLineInput[],
 ): JournalBalanceSummary {
-  let totalDebitMinor = 0n;
-  let totalCreditMinor = 0n;
+  const debits: bigint[] = [];
+  const credits: bigint[] = [];
 
   for (const line of lines) {
     const debit = toBigIntMinor(line.debitMinor, 'debitMinor');
@@ -91,13 +91,23 @@ export function sumJournalLinesBigInt(
         'Journal line debitMinor and creditMinor must be non-negative',
       );
     }
-    totalDebitMinor += debit;
-    totalCreditMinor += credit;
+    debits.push(debit);
+    credits.push(credit);
+  }
+
+  const totalDebitMinor = debits.reduce((a, b) => a + b, 0n);
+  const totalCreditMinor = credits.reduce((a, b) => a + b, 0n);
+  let isBalanced = false;
+  try {
+    assertZeroSumBalanced(debits, credits);
+    isBalanced = true;
+  } catch {
+    isBalanced = false;
   }
 
   return {
     totalDebitMinor,
     totalCreditMinor,
-    isBalanced: totalDebitMinor === totalCreditMinor && totalDebitMinor > 0n,
+    isBalanced,
   };
 }

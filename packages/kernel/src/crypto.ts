@@ -237,3 +237,80 @@ export async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', encoder.encode(input));
   return toHex(new Uint8Array(digest));
 }
+
+export function canonicalizeJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalizeJson).join(',')}]`;
+  }
+  const record = value as Record<string, unknown>;
+  const keys = Object.keys(record).sort();
+  const pairs = keys
+    .filter((k) => record[k] !== undefined)
+    .map((k) => `${JSON.stringify(k)}:${canonicalizeJson(record[k])}`);
+  return `{${pairs.join(',')}}`;
+}
+
+export async function canonicalJsonSha256Hex(payload: unknown): Promise<string> {
+  const raw = encoder.encode(canonicalizeJson(payload));
+  const digest = await crypto.subtle.digest('SHA-256', raw);
+  return toHex(new Uint8Array(digest));
+}
+
+function hexToBytesStrict(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(hex)) {
+    throw new Error('INVALID_HEX_SIGNATURE');
+  }
+  return fromHex(hex);
+}
+
+export async function signHmacSha256Hex(secret: string, message: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(message));
+  return toHex(new Uint8Array(sig));
+}
+
+/**
+ * Verificación en tiempo constante delegada a WebCrypto `crypto.subtle.verify`.
+ */
+export async function verifyHmacSha256ConstantTime(
+  secret: string,
+  message: string,
+  signatureHex: string,
+): Promise<boolean> {
+  try {
+    const sigBytes = hexToBytesStrict(signatureHex);
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    );
+    return await crypto.subtle.verify(
+      'HMAC',
+      key,
+      sigBytes as Uint8Array<ArrayBuffer>,
+      encoder.encode(message),
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function verifyTimestampWindow(
+  issuedAtMs: number,
+  nowMs: number = Date.now(),
+  maxSkewMs: number = 300_000,
+): boolean {
+  if (!Number.isFinite(issuedAtMs)) return false;
+  return Math.abs(nowMs - issuedAtMs) <= maxSkewMs;
+}

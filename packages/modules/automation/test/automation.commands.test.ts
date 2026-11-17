@@ -8,6 +8,7 @@ import {
   automationRulesEvaluateCommand,
   modAutomationManifest,
 } from '../src/index.js';
+import { evaluateConditionAst } from '../src/rule-evaluator.js';
 import { makeAutomationCtx, setupAutomationD1 } from './test-helpers.js';
 
 describe('@shac/mod-automation commands on workerd', () => {
@@ -175,5 +176,22 @@ describe('@shac/mod-automation commands on workerd', () => {
         humanConfirmed: false,
       }),
     ).rejects.toMatchObject({ status: 404 } satisfies Partial<AppError>);
+  });
+
+  it('enforces AST depth and visited-node budgets in evaluateConditionAst', () => {
+    let deepAst: Record<string, unknown> = { field: 'x', op: 'eq', value: 1 };
+    for (let i = 0; i < 10; i++) {
+      deepAst = { all: [deepAst] };
+    }
+    expect(() => evaluateConditionAst(deepAst, { x: 1 })).toThrow(
+      /AUTOMATION_RULE_MAX_DEPTH_EXCEEDED/,
+    );
+
+    const wideAst = {
+      all: Array.from({ length: 260 }, () => ({ field: 'x', op: 'eq', value: 1 })),
+    };
+    expect(() => evaluateConditionAst(wideAst, { x: 1 })).toThrow(
+      /AUTOMATION_RULE_NODE_BUDGET_EXCEEDED/,
+    );
   });
 });

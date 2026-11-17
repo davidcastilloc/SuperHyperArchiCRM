@@ -8,7 +8,7 @@ import {
   useNavigate, useParams, useRouterState,
 } from '@tanstack/react-router';
 import { Bot, LogOut, UserRound } from 'lucide-react';
-import { ExternalPortalShell, ShacAppShell } from '@shac/ui';
+import { ExternalPortalShell, ShacAppShell, ViewErrorBoundary } from '@shac/ui';
 import { clearAuthSession, setAuthSession, useAuthSession, type AuthSession } from './lib/authSession';
 import {
   MarketProfileProvider, resolveRouteDensity, useMarketVocabulary,
@@ -189,7 +189,9 @@ function RootLayout() {
         </div>
       }
     >
-      {content}
+      <ViewErrorBoundary viewId={pathname} key={pathname}>
+        {content}
+      </ViewErrorBoundary>
       <AiAssistantDrawer open={aiOpen} onClose={() => setAiOpen(false)} rpc={rpcClient} />
     </ShacAppShell>
   );

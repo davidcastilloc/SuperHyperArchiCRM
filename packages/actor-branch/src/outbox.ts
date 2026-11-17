@@ -94,3 +94,79 @@ export function drainOutboxInTx(
   }
   return rows.map(mapOutboxRow);
 }
+
+export type OutboxDeliveryStatus = 'PENDING' | 'DELIVERED' | 'DLQ';
+
+export const OUTBOX_MAX_ATTEMPTS = 8;
+
+export function computeOutboxBackoffMs(
+  attemptCount: number,
+  randomFloat: number = Math.random(),
+): number {
+  const baseMs = Math.min(60_000, 250 * Math.pow(2, Math.max(0, attemptCount)));
+  const jitterMs = Math.floor(randomFloat * Math.min(1_000, baseMs * 0.25));
+  return baseMs + jitterMs;
+}
+
+export function classifyOutboxFailure(attemptCount: number): {
+  nextStatus: OutboxDeliveryStatus;
+  nextDelayMs: number;
+} {
+  const nextAttempt = attemptCount + 1;
+  if (nextAttempt >= OUTBOX_MAX_ATTEMPTS) {
+    return { nextStatus: 'DLQ', nextDelayMs: 0 };
+  }
+  return {
+    nextStatus: 'PENDING',
+    nextDelayMs: computeOutboxBackoffMs(nextAttempt),
+  };
+}
+
+export function listReadyOutboxInTx(
+  sql: SqlStorage,
+  nowMs: number = Date.now(),
+  limit = 100,
+): OutboxEvent[] {
+  const safeLimit = parseInput(z.number().int().positive().max(500), limit);
+  const rows = sql
+    .exec<OutboxRow>(
+      `SELECT seq_id, event_type, aggregate_id, payload_json,
+              attempts, next_attempt_ms, created_at_ms
+       FROM hot_outbox
+       WHERE attempts < ? AND next_attempt_ms <= ?
+       ORDER BY seq_id ASC
+       LIMIT ?`,
+      OUTBOX_MAX_ATTEMPTS,
+      nowMs,
+      safeLimit,
+    )
+    .toArray();
+  return rows.map(mapOutboxRow);
+}
+
+export function recordOutboxAttemptFailureInTx(
+  sql: SqlStorage,
+  seqId: number,
+  nowMs: number = Date.now(),
+): { nextStatus: OutboxDeliveryStatus; nextAttemptAtMs: number } {
+  const row = sql
+    .exec<{ attempts: number }>(
+      `SELECT attempts FROM hot_outbox WHERE seq_id = ? LIMIT 1`,
+      seqId,
+    )
+    .toArray()[0];
+  if (!row) {
+    return { nextStatus: 'DELIVERED', nextAttemptAtMs: 0 };
+  }
+  const decision = classifyOutboxFailure(row.attempts);
+  const nextAttemptAtMs =
+    decision.nextStatus === 'DLQ' ? Number.MAX_SAFE_INTEGER : nowMs + decision.nextDelayMs;
+  sql.exec(
+    `UPDATE hot_outbox
+     SET attempts = attempts + 1, next_attempt_ms = ?
+     WHERE seq_id = ?`,
+    nextAttemptAtMs,
+    seqId,
+  );
+  return { nextStatus: decision.nextStatus, nextAttemptAtMs };
+}

@@ -30,11 +30,25 @@ export type OfflineMutationSender = (
   item: OfflineMutationItem,
 ) => Promise<Pick<Response, 'status' | 'json'>>;
 
+export interface QuarantinedOfflineMutation {
+  readonly id: string;
+  readonly command: string;
+  readonly payload: unknown;
+  readonly statusCode: number;
+  readonly errorMessage: string;
+  readonly quarantinedAtIso: string;
+}
+
+export function isPermanentDomainRejection(statusCode: number): boolean {
+  return statusCode === 400 || statusCode === 409 || statusCode === 422;
+}
+
 export interface FlushOfflineQueueResult {
   processed: number;
   settled: number;
   retained: number;
   remainingItems: OfflineMutationItem[];
+  quarantinedMutations: QuarantinedOfflineMutation[];
 }
 
 /** In-memory IDBObjectStore shim backing idb-keyval when IndexedDB is unavailable (e.g. Node Vitest). */
@@ -175,9 +189,20 @@ async function readErrorCode(
   }
 }
 
+/** Lists quarantined offline mutations that failed with permanent 400/409/422 errors. */
+export async function listQuarantinedOfflineMutations(
+  options: OfflineQueueOptions = {},
+): Promise<QuarantinedOfflineMutation[]> {
+  const store = resolveStore(options.store);
+  const queueKey = `${options.queueKey ?? OFFLINE_QUEUE_KEY}:quarantine`;
+  const current = await get<QuarantinedOfflineMutation[]>(queueKey, store);
+  return Array.isArray(current) ? current : [];
+}
+
 /**
  * Flushes queued offline mutations in FIFO order.
- * Removes settled 2xx and 409 IDEMPOTENCY_CONFLICT items; retains 503/network failures for retry.
+ * Removes settled 2xx and 409 IDEMPOTENCY_CONFLICT items; quarantines permanent 400/409/422 rejections;
+ * retains 503/network failures for retry.
  */
 export async function flushOfflineQueue(
   sender: OfflineMutationSender,
@@ -185,8 +210,11 @@ export async function flushOfflineQueue(
 ): Promise<FlushOfflineQueueResult> {
   const store = resolveStore(options.store);
   const queueKey = options.queueKey ?? OFFLINE_QUEUE_KEY;
+  const quarantineKey = `${queueKey}:quarantine`;
   const queue = await listOfflineQueue({ store, queueKey });
+  const existingQuarantine = await listQuarantinedOfflineMutations(options);
   const remainingItems: OfflineMutationItem[] = [];
+  const newlyQuarantined: QuarantinedOfflineMutation[] = [];
   let settled = 0;
 
   for (const item of queue) {
@@ -199,6 +227,17 @@ export async function flushOfflineQueue(
       const errCode = await readErrorCode(res);
       if (res.status === 409 && errCode === 'IDEMPOTENCY_CONFLICT') {
         settled += 1;
+        continue;
+      }
+      if (isPermanentDomainRejection(res.status)) {
+        newlyQuarantined.push({
+          id: item.clientMutationId,
+          command: item.kind,
+          payload: item.payload,
+          statusCode: res.status,
+          errorMessage: errCode ?? `HTTP_${res.status}`,
+          quarantinedAtIso: new Date().toISOString(),
+        });
         continue;
       }
       remainingItems.push({
@@ -217,10 +256,14 @@ export async function flushOfflineQueue(
   }
 
   await set(queueKey, remainingItems, store);
+  if (newlyQuarantined.length > 0) {
+    await set(quarantineKey, [...existingQuarantine, ...newlyQuarantined], store);
+  }
   return {
     processed: queue.length,
     settled,
     retained: remainingItems.length,
     remainingItems,
+    quarantinedMutations: newlyQuarantined,
   };
 }

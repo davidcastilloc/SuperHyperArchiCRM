@@ -1,4 +1,4 @@
-import { AppError } from '@shac/kernel';
+import { allocateByRatios, AppError } from '@shac/kernel';
 
 export const SPLIT_RENT_TOTAL_BPS = 10_000;
 
@@ -67,41 +67,13 @@ export function computeSplitRentShares<T extends SplitRentShareInput>(
     );
   }
 
-  const totalBig = BigInt(totalMinor);
-  const bpsScale = BigInt(SPLIT_RENT_TOTAL_BPS);
+  const allocated = allocateByRatios(
+    BigInt(totalMinor),
+    shares.map((s) => BigInt(s.shareBps)),
+  );
 
-  const prelim = shares.map((share, index) => {
-    const numerator = totalBig * BigInt(share.shareBps);
-    const base = numerator / bpsScale;
-    const rem = numerator % bpsScale;
-    return { index, share, base, rem };
-  });
-
-  let allocated = 0n;
-  for (const item of prelim) {
-    allocated += item.base;
-  }
-
-  const remainderCount = Number(totalBig - allocated);
-  const ranked = [...prelim].sort((a, b) => {
-    if (b.rem > a.rem) return 1;
-    if (b.rem < a.rem) return -1;
-    return a.index - b.index;
-  });
-
-  const bonusIndices = new Set<number>();
-  for (let i = 0; i < remainderCount; i++) {
-    const entry = ranked[i];
-    if (entry) {
-      bonusIndices.add(entry.index);
-    }
-  }
-
-  return prelim.map((item) => {
-    const finalMinor = item.base + (bonusIndices.has(item.index) ? 1n : 0n);
-    return {
-      ...item.share,
-      amountMinor: Number(finalMinor),
-    };
-  });
+  return shares.map((share, index) => ({
+    ...share,
+    amountMinor: Number(allocated[index] ?? 0n),
+  }));
 }

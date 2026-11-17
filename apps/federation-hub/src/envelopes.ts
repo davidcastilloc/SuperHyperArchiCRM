@@ -5,7 +5,7 @@ import {
   verifyFederationEnvelope,
   type FederationEnvelope,
 } from '@shac/federation-sdk';
-import { AppError } from '@shac/kernel';
+import { AppError, verifyTimestampWindow } from '@shac/kernel';
 import { and, eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
@@ -184,6 +184,20 @@ async function handleEnvelopeEffect(
   }
 
   return { action: 'rfq_recorded', envelopeId: envelope.envelopeId };
+}
+
+export function assertEnvelopeTimestampWindow(
+  issuedAtMs: number,
+  nowMs: number = Date.now(),
+  maxSkewMs: number = 300_000,
+): void {
+  if (!verifyTimestampWindow(issuedAtMs, nowMs, maxSkewMs)) {
+    throw new AppError(
+      'ENVELOPE_TIMESTAMP_SKEW',
+      409,
+      'Federation envelope timestamp is outside the allowed 300s skew window',
+    );
+  }
 }
 
 export async function processHubEnvelope(

@@ -169,3 +169,35 @@ export function wrapD1WithCounter(d1: D1Database): CountedD1 {
     },
   };
 }
+
+export interface TenantScopeContext {
+  readonly orgId: string;
+  readonly branchId?: string | null;
+  readonly actorId?: string | null;
+  readonly roles?: readonly string[];
+}
+
+export function assertTenantScope(
+  ctx: Partial<TenantScopeContext> | null | undefined,
+): TenantScopeContext {
+  const orgId = ctx?.orgId?.trim();
+  if (!orgId) {
+    throw new Error('TENANT_SCOPE_MISSING_ORG_ID');
+  }
+  return {
+    orgId,
+    branchId: ctx?.branchId?.trim() || null,
+    actorId: ctx?.actorId?.trim() || 'system',
+    roles: ctx?.roles ?? [],
+  };
+}
+
+export function assertBranchScope(
+  ctx: Partial<TenantScopeContext> | null | undefined,
+): TenantScopeContext & { readonly branchId: string } {
+  const scoped = assertTenantScope(ctx);
+  if (!scoped.branchId) {
+    throw new Error('TENANT_SCOPE_MISSING_BRANCH_ID');
+  }
+  return { ...scoped, branchId: scoped.branchId };
+}
