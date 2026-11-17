@@ -57,3 +57,19 @@ export {
   type AuthenticatedActor,
   type ProfileLoader,
 } from './pipeline.js';
+
+export {
+  computeAuditEntryHashHex,
+  GENESIS_AUDIT_HASH,
+  verifyAuditHashChain,
+  type AuditChainEntryInput,
+  type VerifiedAuditChainResult,
+} from './audit-chain.js';
+
+export {
+  buildCursorPage,
+  decodeKeysetCursor,
+  encodeKeysetCursor,
+  type CursorPageResult,
+  type KeysetCursor,
+} from './cursor-pagination.js';
