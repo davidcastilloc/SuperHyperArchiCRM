@@ -14,10 +14,11 @@ export interface TimeSeriesChartProps {
   valuePrefix?: string;
   primaryLabel?: string;
   secondaryLabel?: string;
+  showTotalBadge?: boolean;
   className?: string;
 }
 
-/** Deterministic SVG bar + comparison chart styled with Open Mercato DS v3 tokens. */
+/** Deterministic SVG bar + comparison chart styled with DESIGN.md tokens. */
 export function TimeSeriesChart({
   title,
   subtitle,
@@ -25,6 +26,7 @@ export function TimeSeriesChart({
   valuePrefix = '',
   primaryLabel = 'Actual',
   secondaryLabel = 'Objetivo',
+  showTotalBadge = true,
   className,
 }: TimeSeriesChartProps) {
   const maxVal = Math.max(
@@ -51,13 +53,18 @@ export function TimeSeriesChart({
             <p className="text-xs text-muted-foreground">{subtitle}</p>
           ) : null}
         </div>
-        <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-          <TrendingUp className="size-3" />
-          <span className="font-mono">
-            {valuePrefix}
-            {totalPrimary.toLocaleString('en-US')}
-          </span>
-        </div>
+        {showTotalBadge ? (
+          <div
+            data-slot="chart-total-badge"
+            className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300"
+          >
+            <TrendingUp className="size-3" />
+            <span className="font-mono tabular-nums">
+              {valuePrefix}
+              {totalPrimary.toLocaleString('en-US')}
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <div className="overflow-x-auto">

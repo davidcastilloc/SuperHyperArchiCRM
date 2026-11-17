@@ -295,6 +295,15 @@ describe('@shac/ui smoke tests', () => {
     expect(screen.getByText('Ingresos por Canal (Últimos 7 días)')).toBeInTheDocument();
     expect(screen.getByText('Lun')).toBeInTheDocument();
     expect(document.querySelector('svg')).toBeTruthy();
+
+    const { container: noBadgeContainer } = render(
+      <TimeSeriesChart
+        title="Conteos"
+        series={[{ label: 'Hoy', value: 5 }]}
+        showTotalBadge={false}
+      />,
+    );
+    expect(noBadgeContainer.querySelector('[data-slot="chart-total-badge"]')).toBeNull();
   });
 
   it('encodes ESC/POS receipt bytes and renders ThermalReceiptModal', async () => {
@@ -341,6 +350,19 @@ describe('@shac/ui smoke tests', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
+
+    const key5 = screen.getByRole('button', { name: '5' });
+    expect(key5.className).toContain('min-h-14');
+
+    const onReplace = vi.fn();
+    render(<PosVirtualKeypad value="10.00" onChange={onReplace} replaceOnFirstInput />);
+    const keys2 = screen.getAllByRole('button', { name: '2' });
+    fireEvent.click(keys2[keys2.length - 1]!);
+    expect(onReplace).toHaveBeenCalledWith('2');
+
+    const clears = screen.getAllByRole('button', { name: 'Limpiar' });
+    fireEvent.click(clears[clears.length - 1]!);
+    expect(onReplace).toHaveBeenCalledWith('');
   });
 
   it('renders deterministic Code-128B BarcodeSvg, SegmentedTabs with counts, and AiCopilotBanner prompt chips', async () => {
