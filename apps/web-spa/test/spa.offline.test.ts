@@ -345,4 +345,21 @@ describe('@shac/web-spa offlineFirst, RPC client & IndexedDB offline queue', () 
     expect(mod.parseMajorToMinor!('25')).toBe(2500);
     expect(mod.parseMajorToMinor!('0.05')).toBe(5);
   });
+
+  it('exposes auth setup/switch-branch RPC URLs and scoped STAFF_ROLE_PRESETS in IamAdminView', async () => {
+    const rpc = createRpcClient('https://edge.shac.local');
+    expect(rpc.api.auth.setup.$url().toString()).toBe('https://edge.shac.local/api/auth/setup');
+    expect(rpc.api.auth['switch-branch'].$url().toString()).toBe(
+      'https://edge.shac.local/api/auth/switch-branch',
+    );
+    const iamMod = (await import('../src/views/IamAdminView')) as {
+      STAFF_ROLE_PRESETS?: Record<string, { label: string; perms: string[] }>;
+    };
+    expect(iamMod.STAFF_ROLE_PRESETS).toBeDefined();
+    expect(iamMod.STAFF_ROLE_PRESETS!.cashier!.perms).not.toContain('*');
+    expect(iamMod.STAFF_ROLE_PRESETS!.warehouse!.perms).not.toContain('*');
+    expect(iamMod.STAFF_ROLE_PRESETS!.clinician!.perms).not.toContain('*');
+    expect(iamMod.STAFF_ROLE_PRESETS!.guard!.perms).not.toContain('*');
+    expect(iamMod.STAFF_ROLE_PRESETS!.admin!.perms).toEqual(['*']);
+  });
 });
