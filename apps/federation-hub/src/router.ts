@@ -37,6 +37,25 @@ export function createFederationHubApp(
 ): Hono<{ Bindings: FederationHubEnv }> {
   const app = new Hono<{ Bindings: FederationHubEnv }>();
 
+  app.get('/', (c) =>
+    c.json({
+      ok: true,
+      service: 'shac-federation-hub',
+      endpoints: [
+        '/api/health',
+        '/api/hub/nodes',
+        '/api/hub/envelopes',
+        '/api/hub/marketplace/search',
+        '/api/hub/marketplace/best-offers',
+        '/api/hub/marketplace/holds',
+      ],
+    }),
+  );
+
+  app.get('/api/health', (c) =>
+    c.json({ ok: true, service: 'shac-federation-hub' }, 200),
+  );
+
   app.onError((err, c) => {
     if (err instanceof AppError) {
       return c.json(

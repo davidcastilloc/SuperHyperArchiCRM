@@ -20,3 +20,7 @@ export {
   type FederationHubAppOptions,
   type FederationHubEnv,
 } from './router.js';
+
+import { createFederationHubApp } from './router.js';
+
+export default createFederationHubApp();

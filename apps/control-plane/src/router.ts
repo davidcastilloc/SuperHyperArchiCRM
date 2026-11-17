@@ -41,6 +41,23 @@ export function createControlPlaneApp(
     );
   });
 
+  app.get('/', (c) =>
+    c.json({
+      ok: true,
+      service: 'shac-control-plane',
+      endpoints: [
+        '/api/health',
+        '/api/cp/deployments',
+        '/api/cp/deployments/:id/profile',
+        '/api/cp/deployments/:id/app-store/toggle',
+      ],
+    }),
+  );
+
+  app.get('/api/health', (c) =>
+    c.json({ ok: true, service: 'shac-control-plane' }, 200),
+  );
+
   app.post('/api/cp/deployments', async (c) => {
     const body = ProvisionDeploymentSchema.parse(await c.req.json());
     const db = drizzle(c.env.CP_DB);

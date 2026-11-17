@@ -33,3 +33,7 @@ export {
   type ControlPlaneAppOptions,
   type ControlPlaneEnv,
 } from './router.js';
+
+import { createControlPlaneApp } from './router.js';
+
+export default createControlPlaneApp();
