@@ -1,81 +1,107 @@
 import '@shac/ui/globals.css';
 
-import { StrictMode, useState } from 'react';
+import { lazy, StrictMode, Suspense, useEffect, useState, type ComponentType } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { QueryClientProvider, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Outlet, RouterProvider, createRootRoute, createRoute, createRouter,
   useNavigate, useParams, useRouterState,
 } from '@tanstack/react-router';
 import { Bot, LogOut, UserRound } from 'lucide-react';
-import { ShacAppShell } from '@shac/ui';
-import { clearAuthSession, useAuthSession } from './lib/authSession';
+import { ExternalPortalShell, ShacAppShell } from '@shac/ui';
+import { clearAuthSession, setAuthSession, useAuthSession, type AuthSession } from './lib/authSession';
+import {
+  MarketProfileProvider, resolveRouteDensity, useMarketVocabulary,
+  useNetworkOnline, usePersistedTheme,
+} from './lib/marketProfile';
 import { listOfflineQueue } from './lib/offlineQueue';
 import { createShacQueryClient } from './lib/queryClient';
 import { createRpcClient } from './lib/rpc';
 import { useBranchRealtimeSync } from './lib/useBranchRealtimeSync';
-import { DEFAULT_BRANCHES, DEFAULT_PROFILE, NAV_ITEMS } from './nav';
+import { buildNavItems, DEFAULT_BRANCHES, DEFAULT_PROFILE, getDefaultCollapsedGroups } from './nav';
 import { AiAssistantDrawer } from './views/AiAssistantDrawer';
-import { AppStoreView } from './views/AppStoreView';
-import { AuditLogsView } from './views/AuditLogsView';
 import { AuthPage } from './views/AuthPage';
-import { AutomationView } from './views/AutomationView';
-import { CasesView } from './views/CasesView';
-import { CatalogStructureView } from './views/CatalogStructureView';
-import { ClaimsAndServicesView } from './views/ClaimsAndServicesView';
-import { ClinicalEhrView } from './views/ClinicalEhrView';
-import { CondoResidentHubView } from './views/CondoResidentHubView';
-import { CustomerTasksView } from './views/CustomerTasksView';
-import { CustomFieldsView } from './views/CustomFieldsView';
-import { DashboardView } from './views/DashboardView';
-import { DealsKanbanView } from './views/DealsKanbanView';
-import { DemoAndSopCenterView } from './views/DemoAndSopCenterView';
-import { EudrComplianceView } from './views/EudrComplianceView';
-import { FinanceView } from './views/FinanceView';
-import { FormsBuilderView } from './views/FormsBuilderView';
-import { HeliosSecurityView } from './views/HeliosSecurityView';
-import { HospitalityPmsView } from './views/HospitalityPmsView';
-import { IamAdminView } from './views/IamAdminView';
-import { IntegrationsHubView } from './views/IntegrationsHubView';
-import { LabelsAndFleetView } from './views/LabelsAndFleetView';
-import { LegalPracticeView } from './views/LegalPracticeView';
-import { CatalogView, PartiesView } from './views/Phase2Views';
-import { PortalView } from './views/PortalView';
-import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
-import { ProjectsBoardView } from './views/ProjectsBoardView';
-import { PromotionsView } from './views/PromotionsView';
 import { PublicFormView, PublicQuoteView } from './views/PublicFormAndQuoteView';
-import { QuotesView } from './views/QuotesView';
-import { SalesOrdersView } from './views/SalesOrdersView';
-import { StaffHubView } from './views/StaffHubView';
-import { WmsLocationsView } from './views/WmsLocationsView';
-import { WorkflowsVisualView } from './views/WorkflowsVisualView';
+import type { Phase2ViewProps } from './views/phase2-format';
+
+const lazyView = <K extends string>(
+  loader: () => Promise<Record<K, ComponentType<Phase2ViewProps>>>,
+  key: K,
+) => lazy(() => loader().then((m) => ({ default: m[key] })));
+
+const DashboardView = lazy(() => import('./views/DashboardView').then((m) => ({ default: m.DashboardView })));
+const SalesOrdersView = lazy(() => import('./views/SalesOrdersView').then((m) => ({ default: m.SalesOrdersView })));
+const DemoAndSopCenterView = lazy(() => import('./views/DemoAndSopCenterView').then((m) => ({ default: m.DemoAndSopCenterView })));
+const AppStoreView = lazy(() => import('./views/AppStoreView').then((m) => ({ default: m.AppStoreView })));
+const AuditLogsView = lazyView(() => import('./views/AuditLogsView'), 'AuditLogsView');
+const AutomationView = lazyView(() => import('./views/AutomationView'), 'AutomationView');
+const CatalogStructureView = lazyView(() => import('./views/CatalogStructureView'), 'CatalogStructureView');
+const ClaimsAndServicesView = lazyView(() => import('./views/ClaimsAndServicesView'), 'ClaimsAndServicesView');
+const ClinicalEhrView = lazyView(() => import('./views/ClinicalEhrView'), 'ClinicalEhrView');
+const CondoResidentHubView = lazyView(() => import('./views/CondoResidentHubView'), 'CondoResidentHubView');
+const CustomerTasksView = lazyView(() => import('./views/CustomerTasksView'), 'CustomerTasksView');
+const CustomFieldsView = lazyView(() => import('./views/CustomFieldsView'), 'CustomFieldsView');
+const DealsKanbanView = lazyView(() => import('./views/DealsKanbanView'), 'DealsKanbanView');
+const EudrComplianceView = lazyView(() => import('./views/EudrComplianceView'), 'EudrComplianceView');
+const FinanceView = lazyView(() => import('./views/FinanceView'), 'FinanceView');
+const FormsBuilderView = lazyView(() => import('./views/FormsBuilderView'), 'FormsBuilderView');
+const HeliosSecurityView = lazyView(() => import('./views/HeliosSecurityView'), 'HeliosSecurityView');
+const HospitalityPmsView = lazyView(() => import('./views/HospitalityPmsView'), 'HospitalityPmsView');
+const IamAdminView = lazyView(() => import('./views/IamAdminView'), 'IamAdminView');
+const IntegrationsHubView = lazyView(() => import('./views/IntegrationsHubView'), 'IntegrationsHubView');
+const LabelsAndFleetView = lazyView(() => import('./views/LabelsAndFleetView'), 'LabelsAndFleetView');
+const LegalPracticeView = lazyView(() => import('./views/LegalPracticeView'), 'LegalPracticeView');
+const CatalogView = lazyView(() => import('./views/CatalogView'), 'CatalogView');
+const PartiesView = lazyView(() => import('./views/PartiesView'), 'PartiesView');
+const PortalView = lazyView(() => import('./views/PortalView'), 'PortalView');
+const PosView = lazyView(() => import('./views/PosView'), 'PosView');
+const SmartCheckKioskView = lazyView(() => import('./views/SmartCheckKioskView'), 'SmartCheckKioskView');
+const WmsView = lazyView(() => import('./views/WmsView'), 'WmsView');
+const ProjectsBoardView = lazyView(() => import('./views/ProjectsBoardView'), 'ProjectsBoardView');
+const PromotionsView = lazyView(() => import('./views/PromotionsView'), 'PromotionsView');
+const QuotesView = lazyView(() => import('./views/QuotesView'), 'QuotesView');
+const StaffHubView = lazyView(() => import('./views/StaffHubView'), 'StaffHubView');
+const WmsLocationsView = lazyView(() => import('./views/WmsLocationsView'), 'WmsLocationsView');
+const WorkflowsVisualView = lazyView(() => import('./views/WorkflowsVisualView'), 'WorkflowsVisualView');
 
 const queryClient = createShacQueryClient();
 export const rpcClient = createRpcClient(
   typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8787',
 );
 
+const ROUTE_FALLBACK = <div className="p-6 text-xs text-muted-foreground">Cargando módulo...</div>;
+
 function RootLayout() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, toggleTheme] = usePersistedTheme(pathname);
   const [aiOpen, setAiOpen] = useState(false);
+  const isOnline = useNetworkOnline();
   const session = useAuthSession();
+
+  const isPublicPortalRoute = pathname.startsWith('/f/') || pathname.startsWith('/quote/');
+  const isExternalShell = isPublicPortalRoute || pathname === '/kiosk/price-check' || !session;
+
   const bootstrapQuery = useQuery({
     queryKey: ['auth', 'bootstrap'],
+    enabled: !isPublicPortalRoute,
     queryFn: async () => {
       const res = await rpcClient.api.auth.bootstrap.$get();
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
   });
-  useBranchRealtimeSync(bootstrapQuery.data?.branches[0]?.id, session?.actor.tenantId);
+
+  const activeBranchId = session?.actor.orgId ?? bootstrapQuery.data?.branches[0]?.id;
+  useBranchRealtimeSync(session && !isPublicPortalRoute ? activeBranchId : undefined, session?.actor.tenantId);
+
   const queueQuery = useQuery({
     queryKey: ['pos', 'offlineQueue'],
+    enabled: Boolean(session),
     queryFn: () => listOfflineQueue(),
   });
-  const pendingMutations = queueQuery.data?.length ?? 0;
+
   const activeProfile = bootstrapQuery.data
     ? {
         tenantId: bootstrapQuery.data.tenantId,
@@ -84,8 +110,40 @@ function RootLayout() {
         vocabulary: bootstrapQuery.data.vocabulary,
       }
     : DEFAULT_PROFILE;
-  const activeBranchName =
-    session?.actor.branchName ?? bootstrapQuery.data?.branches[0]?.name ?? DEFAULT_BRANCHES[0]?.name ?? 'Casa Matriz';
+
+  useEffect(() => {
+    if (!session) return undefined;
+    function onKeyDown(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || pathname === '/pos') return;
+      if (e.key === 'F2' && activeProfile.activeModules.includes('pos')) {
+        e.preventDefault();
+        void navigate({ to: '/pos' });
+      } else if (e.key === 'F4' && activeProfile.activeModules.includes('pos')) {
+        e.preventDefault();
+        void navigate({ to: '/kiosk/price-check' });
+      } else if (e.key === 'F6' && activeProfile.activeModules.includes('wms')) {
+        e.preventDefault();
+        void navigate({ to: '/wms' });
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [session, pathname, activeProfile.activeModules, navigate]);
+
+  const pendingMutations = queueQuery.data?.length ?? 0;
+  const syncStatus = !isOnline || pendingMutations > 0 ? 'offline' : 'online';
+  const branches = bootstrapQuery.data?.branches ?? DEFAULT_BRANCHES;
+  const activeBranchName = session?.actor.branchName ?? branches[0]?.name ?? 'Casa Matriz';
+  const density = resolveRouteDensity(pathname);
+
+  async function handleSwitchBranch(branchId: string) {
+    const res = await rpcClient.api.auth['switch-branch'].$post({ json: { branchId } });
+    if (!res.ok) return;
+    const nextSession = (await res.json()) as AuthSession;
+    setAuthSession(nextSession);
+    void qc.invalidateQueries();
+  }
 
   async function handleLogout() {
     await rpcClient.api.auth.logout.$post().catch(() => undefined);
@@ -93,113 +151,146 @@ function RootLayout() {
     void navigate({ to: '/auth' });
   }
 
+  const content = (
+    <MarketProfileProvider profile={activeProfile}>
+      <Suspense fallback={ROUTE_FALLBACK}>
+        {session || pathname === '/auth' || isPublicPortalRoute ? (
+          <Outlet />
+        ) : (
+          <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />
+        )}
+      </Suspense>
+    </MarketProfileProvider>
+  );
+
+  if (isExternalShell) {
+    return (
+      <ExternalPortalShell
+        title={isPublicPortalRoute ? 'Portal de Atención' : 'SuperHyperArchi'}
+        subtitle={activeBranchName}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        density={density}
+      >
+        {content}
+      </ExternalPortalShell>
+    );
+  }
+
   return (
     <ShacAppShell
       profile={activeProfile}
       branchName={activeBranchName}
-      navItems={NAV_ITEMS}
+      activeBranchId={activeBranchId}
+      branches={branches}
+      onSwitchBranch={(id) => void handleSwitchBranch(id)}
+      navItems={buildNavItems(activeProfile)}
+      defaultCollapsedGroups={getDefaultCollapsedGroups(activeProfile.editionPreset)}
       activeHref={pathname}
       onNavigate={(href) => void navigate({ to: href })}
-      syncState={{ status: pendingMutations > 0 ? 'offline' : 'online', pendingMutations }}
+      syncState={{ status: syncStatus, pendingMutations }}
+      density={density}
       theme={theme}
-      onToggleTheme={() => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))}
+      onToggleTheme={toggleTheme}
       headerActions={
-        session ? (
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              aria-label="Abrir AI Chat"
-              onClick={() => setAiOpen((prev) => !prev)}
-              className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground"
-            >
-              <Bot className="size-3.5" />
-              <span className="hidden lg:inline">Chat IA</span>
-            </button>
-            <span className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground sm:inline-flex">
-              <UserRound className="size-3.5" />
-              <span className="max-w-28 truncate">{session.actor.fullName}</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => void handleLogout()}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground"
-            >
-              <LogOut className="size-3.5" />
-              <span>Salir</span>
-            </button>
-          </div>
-        ) : null
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            aria-label="Abrir AI Chat"
+            onClick={() => setAiOpen((prev) => !prev)}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground"
+          >
+            <Bot className="size-3.5" />
+            <span className="hidden lg:inline">Chat IA</span>
+          </button>
+          <span className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground xl:inline-flex">
+            <UserRound className="size-3.5" />
+            <span className="max-w-28 truncate">{session.actor.fullName}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium text-muted-foreground shadow-xs hover:bg-muted hover:text-foreground"
+          >
+            <LogOut className="size-3.5" />
+            <span className="hidden sm:inline">Salir</span>
+          </button>
+        </div>
       }
     >
-      {session || pathname === '/auth' || pathname.startsWith('/f/') || pathname.startsWith('/quote/') ? (
-        <Outlet />
-      ) : (
-        <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />
-      )}
-      {session ? <AiAssistantDrawer open={aiOpen} onClose={() => setAiOpen(false)} rpc={rpcClient} /> : null}
+      {content}
+      <AiAssistantDrawer open={aiOpen} onClose={() => setAiOpen(false)} rpc={rpcClient} />
     </ShacAppShell>
   );
 }
 
-const voc = DEFAULT_PROFILE.vocabulary;
+function ViewWrap({ Component }: { Component: ComponentType<Phase2ViewProps> }) {
+  const voc = useMarketVocabulary();
+  return <Component vocabulary={voc} rpc={rpcClient} />;
+}
 
 function HomePage() {
   const navigate = useNavigate();
+  const voc = useMarketVocabulary();
   return <DashboardView vocabulary={voc} rpc={rpcClient} onNavigate={(href) => void navigate({ to: href })} />;
 }
 
 function OrdersPage() {
   const navigate = useNavigate();
+  const voc = useMarketVocabulary();
   return <SalesOrdersView vocabulary={voc} rpc={rpcClient} onNavigate={(href) => void navigate({ to: href })} />;
 }
 
 function DemoSopPage() {
   const navigate = useNavigate();
+  const voc = useMarketVocabulary();
   return <DemoAndSopCenterView vocabulary={voc} rpc={rpcClient} onNavigate={(href) => void navigate({ to: href })} />;
 }
 
-function LoginPage() {
+function CasesRedirectPage() {
   const navigate = useNavigate();
-  return <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />;
+  const voc = useMarketVocabulary();
+  return <ClinicalEhrView vocabulary={voc} rpc={rpcClient} />;
+  void navigate;
 }
 
 const rootRoute = createRootRoute({ component: RootLayout });
 const routeSpecs: Array<[string, () => ReturnType<typeof HomePage>]> = [
   ['/', HomePage],
-  ['/auth', LoginPage],
+  ['/auth', () => <AuthPage rpc={rpcClient} onAuthenticated={() => void router.navigate({ to: '/' })} />],
   ['/demo-sop', DemoSopPage],
-  ['/tasks', () => <CustomerTasksView vocabulary={voc} rpc={rpcClient} />],
-  ['/parties', () => <PartiesView vocabulary={voc} rpc={rpcClient} />],
-  ['/deals', () => <DealsKanbanView vocabulary={voc} rpc={rpcClient} />],
-  ['/catalog', () => <CatalogView vocabulary={voc} rpc={rpcClient} />],
-  ['/categories', () => <CatalogStructureView vocabulary={voc} rpc={rpcClient} />],
-  ['/promotions', () => <PromotionsView vocabulary={voc} rpc={rpcClient} />],
-  ['/pos', () => <PosView vocabulary={voc} rpc={rpcClient} />],
+  ['/tasks', () => <ViewWrap Component={CustomerTasksView} />],
+  ['/parties', () => <ViewWrap Component={PartiesView} />],
+  ['/deals', () => <ViewWrap Component={DealsKanbanView} />],
+  ['/catalog', () => <ViewWrap Component={CatalogView} />],
+  ['/categories', () => <ViewWrap Component={CatalogStructureView} />],
+  ['/promotions', () => <ViewWrap Component={PromotionsView} />],
+  ['/pos', () => <ViewWrap Component={PosView} />],
   ['/orders', OrdersPage],
-  ['/quotes', () => <QuotesView vocabulary={voc} rpc={rpcClient} />],
-  ['/kiosk/price-check', () => <SmartCheckKioskView vocabulary={voc} rpc={rpcClient} />],
-  ['/wms', () => <WmsView vocabulary={voc} rpc={rpcClient} />],
-  ['/wms-locations', () => <WmsLocationsView vocabulary={voc} rpc={rpcClient} />],
-  ['/labels-fleet', () => <LabelsAndFleetView vocabulary={voc} rpc={rpcClient} />],
-  ['/eudr', () => <EudrComplianceView vocabulary={voc} rpc={rpcClient} />],
-  ['/claims', () => <ClaimsAndServicesView vocabulary={voc} rpc={rpcClient} />],
-  ['/spaces', () => <HospitalityPmsView vocabulary={voc} rpc={rpcClient} />],
-  ['/leases', () => <CondoResidentHubView vocabulary={voc} rpc={rpcClient} />],
-  ['/clinical-ehr', () => <ClinicalEhrView vocabulary={voc} rpc={rpcClient} />],
-  ['/legal-hub', () => <LegalPracticeView vocabulary={voc} rpc={rpcClient} />],
-  ['/cases', () => <CasesView vocabulary={voc} rpc={rpcClient} />],
-  ['/staff', () => <StaffHubView vocabulary={voc} rpc={rpcClient} />],
-  ['/projects', () => <ProjectsBoardView vocabulary={voc} rpc={rpcClient} />],
-  ['/finance', () => <FinanceView vocabulary={voc} rpc={rpcClient} />],
-  ['/portal', () => <PortalView vocabulary={voc} rpc={rpcClient} />],
-  ['/forms', () => <FormsBuilderView vocabulary={voc} rpc={rpcClient} />],
-  ['/iam-admin', () => <IamAdminView vocabulary={voc} rpc={rpcClient} />],
-  ['/audit-logs', () => <AuditLogsView vocabulary={voc} rpc={rpcClient} />],
-  ['/custom-fields', () => <CustomFieldsView vocabulary={voc} rpc={rpcClient} />],
-  ['/workflows', () => <WorkflowsVisualView vocabulary={voc} rpc={rpcClient} />],
-  ['/automation', () => <AutomationView vocabulary={voc} rpc={rpcClient} />],
-  ['/integrations', () => <IntegrationsHubView vocabulary={voc} rpc={rpcClient} />],
-  ['/physical', () => <HeliosSecurityView vocabulary={voc} rpc={rpcClient} />],
+  ['/quotes', () => <ViewWrap Component={QuotesView} />],
+  ['/kiosk/price-check', () => <ViewWrap Component={SmartCheckKioskView} />],
+  ['/wms', () => <ViewWrap Component={WmsView} />],
+  ['/wms-locations', () => <ViewWrap Component={WmsLocationsView} />],
+  ['/labels-fleet', () => <ViewWrap Component={LabelsAndFleetView} />],
+  ['/eudr', () => <ViewWrap Component={EudrComplianceView} />],
+  ['/claims', () => <ViewWrap Component={ClaimsAndServicesView} />],
+  ['/spaces', () => <ViewWrap Component={HospitalityPmsView} />],
+  ['/leases', () => <ViewWrap Component={CondoResidentHubView} />],
+  ['/clinical-ehr', () => <ViewWrap Component={ClinicalEhrView} />],
+  ['/legal-hub', () => <ViewWrap Component={LegalPracticeView} />],
+  ['/cases', CasesRedirectPage],
+  ['/staff', () => <ViewWrap Component={StaffHubView} />],
+  ['/projects', () => <ViewWrap Component={ProjectsBoardView} />],
+  ['/finance', () => <ViewWrap Component={FinanceView} />],
+  ['/portal', () => <ViewWrap Component={PortalView} />],
+  ['/forms', () => <ViewWrap Component={FormsBuilderView} />],
+  ['/iam-admin', () => <ViewWrap Component={IamAdminView} />],
+  ['/audit-logs', () => <ViewWrap Component={AuditLogsView} />],
+  ['/custom-fields', () => <ViewWrap Component={CustomFieldsView} />],
+  ['/workflows', () => <ViewWrap Component={WorkflowsVisualView} />],
+  ['/automation', () => <ViewWrap Component={AutomationView} />],
+  ['/integrations', () => <ViewWrap Component={IntegrationsHubView} />],
+  ['/physical', () => <ViewWrap Component={HeliosSecurityView} />],
   ['/app-store', () => <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />],
   ['/f/$slug', () => <PublicFormRoutePage />],
   ['/quote/$orderNumber', () => <PublicQuoteRoutePage />],
