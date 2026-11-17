@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState, type FormEvent } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Plus } from 'lucide-react';
 import {
   DataTable,
@@ -11,10 +11,19 @@ import {
   StatusBadge,
   type DataTableColumn,
 } from '@shac/ui';
-import { formatMinorUnits, readApiError, type Phase2ViewProps } from './phase2-format';
+import { formatMinorUnits, INPUT_CLS, parseMajorToMinor, readApiError, type Phase2ViewProps } from './phase2-format';
 
 interface SalesOrdersViewProps extends Phase2ViewProps {
   onNavigate: (href: string) => void;
+}
+
+export function formatOrderStatusEs(status: string, fulfillment?: string): string {
+  if (status === 'cancelled') return 'Cancelada';
+  if (fulfillment === 'fulfilled' || status === 'fulfilled' || status === 'completed' || status === 'settled') {
+    return 'Despachada';
+  }
+  if (status === 'confirmed' || status === 'paid') return 'Confirmada';
+  return 'Pendiente';
 }
 
 function formatOrderDate(epochSec: number): string {
@@ -36,20 +45,22 @@ function resolveOrderBadge(status: string, fulfillment: string): {
   tone: 'success' | 'warning' | 'info' | 'error';
   confirmed?: boolean;
 } {
-  if (status === 'cancelled') return { label: 'Cancelada', tone: 'error' };
-  if (fulfillment === 'fulfilled' || status === 'completed' || status === 'settled') {
-    return { label: 'Fulfilled', tone: 'success' };
-  }
-  if (status === 'confirmed' || status === 'paid') {
-    return { label: 'Confirmed', tone: 'info', confirmed: true };
-  }
-  return { label: 'Pending Approval', tone: 'warning' };
+  const label = formatOrderStatusEs(status, fulfillment);
+  if (label === 'Cancelada') return { label, tone: 'error' };
+  if (label === 'Despachada') return { label, tone: 'success' };
+  if (label === 'Confirmada') return { label, tone: 'info', confirmed: true };
+  return { label, tone: 'warning' };
 }
 
-/** Open Mercato DS v3 Sales Orders & Quotes back-office table with SavedViews & CSV export. */
+/** Open Mercato DS v3 Sales Orders & B2B Dispatch Orders table. */
 export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersViewProps) {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [activeView, setActiveView] = useState('all');
+  const [showCreate, setShowCreate] = useState(false);
+  const [partyId, setPartyId] = useState('');
+  const [totalMajor, setTotalMajor] = useState('120.00');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const ordersQuery = useQuery({
     queryKey: ['pos', 'orders', search],
@@ -61,6 +72,36 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
       if (!res.ok) throw await readApiError(res);
       return res.json();
     },
+  });
+
+  const partiesQuery = useQuery({
+    queryKey: ['customers', 'parties', 'orders-select'],
+    queryFn: async () => {
+      const res = await rpc.api.customers.parties.$get({ query: { limit: '50' } });
+      if (!res.ok) return { items: [] as Array<{ id: string; displayName: string }> };
+      return res.json();
+    },
+    enabled: showCreate,
+  });
+
+  const createOrderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await rpc.api.pos.quotes.$post({
+        json: {
+          partyId: partyId || partiesQuery.data?.items[0]?.id,
+          totalMinor: Math.max(100, parseMajorToMinor(totalMajor)),
+          currency: 'USD',
+        },
+      });
+      if (!res.ok) throw await readApiError(res);
+      return res.json();
+    },
+    onSuccess: () => {
+      setErrorMsg(null);
+      setShowCreate(false);
+      void queryClient.invalidateQueries({ queryKey: ['pos', 'orders'] });
+    },
+    onError: (err: Error) => setErrorMsg(err.message),
   });
 
   const allItems = ordersQuery.data?.items ?? [];
@@ -120,7 +161,7 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
       header: 'Canal',
       cell: (o) => (
         <span className="text-xs text-muted-foreground">
-          {o.channelId ?? (o.orderKind === 'pos_sale' ? 'POS Sucursal' : 'Wholesale')}
+          {o.channelId ?? (o.orderKind === 'pos_sale' ? 'POS Sucursal' : 'Wholesale B2B')}
         </span>
       ),
     },
@@ -129,18 +170,14 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
       header: 'Total (neto)',
       align: 'right',
       sortValue: (o) => o.netSubtotalMinor,
-      cell: (o) => (
-        <span className="font-mono tabular-nums">{formatMinorUnits(o.netSubtotalMinor, o.currency)}</span>
-      ),
+      cell: (o) => <span className="font-mono tabular-nums">{formatMinorUnits(o.netSubtotalMinor, o.currency)}</span>,
     },
     {
       id: 'gross',
       header: 'Total (bruto)',
       align: 'right',
       sortValue: (o) => o.grandTotalMinor,
-      cell: (o) => (
-        <span className="font-mono font-semibold tabular-nums">{formatMinorUnits(o.grandTotalMinor, o.currency)}</span>
-      ),
+      cell: (o) => <span className="font-mono font-semibold tabular-nums">{formatMinorUnits(o.grandTotalMinor, o.currency)}</span>,
     },
     {
       id: 'date',
@@ -158,7 +195,7 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
         o.orderNumber,
         o.partyName ?? 'Mostrador',
         o.channelId ?? o.orderKind,
-        o.status,
+        formatOrderStatusEs(o.status, o.fulfillmentStatus),
         o.currency,
         o.netSubtotalMinor,
         o.grandTotalMinor,
@@ -166,10 +203,15 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
     );
   }
 
+  function handleCreateSubmit(e: FormEvent) {
+    e.preventDefault();
+    createOrderMutation.mutate();
+  }
+
   return (
     <section className="space-y-5" data-slot="sales-orders-view">
       <PageHeader
-        title="Órdenes de Venta"
+        title={vocabulary.orderSingular}
         description={`Revisa documentos con contexto de ${vocabulary.partySingular.toLowerCase()}, totales neto/bruto y canales de cobro.`}
         onRefresh={() => void ordersQuery.refetch()}
         refreshing={ordersQuery.isFetching}
@@ -177,8 +219,8 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
           <>
             <SavedViewsBar
               views={[
-                { id: 'all', label: 'Todas las órdenes' },
-                { id: 'fulfilled', label: 'Completadas' },
+                { id: 'all', label: 'Todas' },
+                { id: 'fulfilled', label: 'Despachadas' },
                 { id: 'pending', label: 'Pendientes' },
                 { id: 'pos', label: 'Mostrador POS' },
               ]}
@@ -188,20 +230,48 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
             />
             <button
               type="button"
-              onClick={() => onNavigate('/pos')}
+              onClick={() => setShowCreate((v) => !v)}
               className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-xs hover:bg-primary-hover"
             >
               <Plus className="size-3.5" />
-              <span>Crear documento</span>
+              <span>{showCreate ? 'Cerrar' : 'Nueva Orden B2B'}</span>
             </button>
           </>
         }
       />
 
+      {errorMsg ? (
+        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {errorMsg}
+        </div>
+      ) : null}
+
+      {showCreate ? (
+        <form onSubmit={handleCreateSubmit} className="grid grid-cols-1 items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-xs md:grid-cols-3">
+          <label className="space-y-1 text-xs">
+            <span className="font-medium text-muted-foreground">{vocabulary.partySingular}</span>
+            <select value={partyId || partiesQuery.data?.items[0]?.id || ''} onChange={(e) => setPartyId(e.target.value)} className={`${INPUT_CLS} w-full`}>
+              <option value="">General</option>
+              {(partiesQuery.data?.items ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.displayName}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1 text-xs">
+            <span className="font-medium text-muted-foreground">Monto Total (USD)</span>
+            <input value={totalMajor} onChange={(e) => setTotalMajor(e.target.value)} className={`${INPUT_CLS} w-full font-mono tabular-nums`} />
+          </label>
+          <button type="submit" disabled={createOrderMutation.isPending} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-primary px-4 text-xs font-medium text-primary-foreground">
+            <Plus className="size-3.5" />
+            <span>Crear Documento</span>
+          </button>
+        </form>
+      ) : null}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard title="Documentos" value={summary?.totalCount ?? allItems.length} loading={ordersQuery.isLoading} />
         <KpiCard title="Facturación Bruta" value={formatMinorUnits(summary?.grossRevenueMinor ?? 0, 'USD')} loading={ordersQuery.isLoading} />
-        <KpiCard title="Fulfilled" value={summary?.fulfilledCount ?? 0} loading={ordersQuery.isLoading} />
+        <KpiCard title="Despachadas" value={summary?.fulfilledCount ?? 0} loading={ordersQuery.isLoading} />
         <KpiCard title="Pendientes" value={summary?.pendingCount ?? 0} loading={ordersQuery.isLoading} />
       </div>
 
@@ -217,9 +287,9 @@ export function SalesOrdersView({ vocabulary, rpc, onNavigate }: SalesOrdersView
         getRowId={(o) => o.id}
         loading={ordersQuery.isLoading}
         emptyTitle="Sin órdenes registradas"
-        emptyDescription="Emite la primera venta desde POS para ver el historial comercial completo."
-        emptyActionLabel="Ir a Caja POS"
-        onEmptyAction={() => onNavigate('/pos')}
+        emptyDescription="Crea una orden B2B o emite la primera venta desde POS."
+        emptyActionLabel="Nueva Orden B2B"
+        onEmptyAction={() => setShowCreate(true)}
         rowActions={() => [
           { id: 'pos', label: 'Nueva venta en POS', onSelect: () => onNavigate('/pos') },
           { id: 'wms', label: 'Ver picking WMS', onSelect: () => onNavigate('/wms') },

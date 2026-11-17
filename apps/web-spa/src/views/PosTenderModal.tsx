@@ -1,5 +1,5 @@
 import { CheckCircle2, Wallet, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { PosVirtualKeypad } from '@shac/ui';
 import { computeDualChangeMinor } from '../lib/usePosScanner';
 import { formatMinorToInput, formatMinorUnits, INPUT_CLS, parseMajorToMinor } from './phase2-format';
@@ -16,11 +16,13 @@ interface PosTenderModalProps {
   onFillRestante: () => void;
   onConfirmCheckout: () => void;
   submitting: boolean;
+  usdMethod?: 'USD_CASH' | 'ZELLE' | 'POS_DEBIT';
+  onChangeUsdMethod?: (method: 'USD_CASH' | 'ZELLE' | 'POS_DEBIT') => void;
 }
 
 const QUICK_USD_BILLS = [100, 500, 1000, 2000, 5000, 10000] as const;
 
-/** Quick-Tender modal with denomination pills, touch keypad, and live USD/VES change calculation. */
+/** Quick-Tender modal with denomination pills, replaceOnFirstInput keypad, and live USD/VES change. */
 export function PosTenderModal({
   open,
   onClose,
@@ -33,9 +35,22 @@ export function PosTenderModal({
   onFillRestante,
   onConfirmCheckout,
   submitting,
+  usdMethod: controlledMethod,
+  onChangeUsdMethod,
 }: PosTenderModalProps) {
   const [activeField, setActiveField] = useState<'usd' | 'ves'>('usd');
-  const [usdMethod, setUsdMethod] = useState<'USD_CASH' | 'ZELLE' | 'POS_DEBIT'>('USD_CASH');
+  const [localMethod, setLocalMethod] = useState<'USD_CASH' | 'ZELLE' | 'POS_DEBIT'>('USD_CASH');
+  const usdMethod = controlledMethod ?? localMethod;
+  const setUsdMethod = onChangeUsdMethod ?? setLocalMethod;
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !submitting) onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, submitting, onClose]);
 
   if (!open) return null;
 
@@ -61,7 +76,13 @@ export function PosTenderModal({
               </p>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Cerrar cobro" className="rounded-md p-1 text-muted-foreground hover:bg-muted">
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={onClose}
+            aria-label="Cerrar cobro"
+            className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-40"
+          >
             <X className="size-4" />
           </button>
         </div>
@@ -72,7 +93,7 @@ export function PosTenderModal({
               <button
                 type="button"
                 onClick={() => onUsdChange(formatMinorToInput(totalUsdMinor))}
-                className="rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-xs font-semibold text-primary hover:bg-primary/15"
+                className="min-h-9 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 font-mono text-xs font-semibold text-primary hover:bg-primary/15"
               >
                 Exacto
               </button>
@@ -81,7 +102,7 @@ export function PosTenderModal({
                   key={minor}
                   type="button"
                   onClick={() => onUsdChange(formatMinorToInput(minor))}
-                  className="rounded-md border border-border bg-background px-2 py-1 font-mono text-xs font-medium hover:bg-muted"
+                  className="min-h-9 rounded-md border border-border bg-background px-2.5 py-1 font-mono text-xs font-medium hover:bg-muted"
                 >
                   ${minor / 100}
                 </button>
@@ -107,7 +128,7 @@ export function PosTenderModal({
                   value={usdInput}
                   onFocus={() => setActiveField('usd')}
                   onChange={(e) => onUsdChange(e.target.value)}
-                  className={`${INPUT_CLS} w-full font-mono tabular-nums ${activeField === 'usd' ? 'ring-2 ring-primary/40' : ''}`}
+                  className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums ${activeField === 'usd' ? 'ring-2 ring-primary/40' : ''}`}
                 />
               </label>
 
@@ -123,12 +144,12 @@ export function PosTenderModal({
                   value={vesInput}
                   onFocus={() => setActiveField('ves')}
                   onChange={(e) => onVesChange(e.target.value)}
-                  className={`${INPUT_CLS} w-full font-mono tabular-nums ${activeField === 'ves' ? 'ring-2 ring-primary/40' : ''}`}
+                  className={`${INPUT_CLS} h-11 w-full font-mono tabular-nums ${activeField === 'ves' ? 'ring-2 ring-primary/40' : ''}`}
                 />
               </label>
             </div>
 
-            <div className="rounded-lg border border-border bg-muted/35 p-3 font-mono text-xs tabular-nums space-y-1">
+            <div className="space-y-1 rounded-lg border border-border bg-muted/35 p-3 font-mono text-xs tabular-nums">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Restante:</span>
                 <span className={summary.remainingUsdMinor > 0 ? 'font-semibold text-amber-600' : 'text-muted-foreground'}>
@@ -149,20 +170,19 @@ export function PosTenderModal({
           <div className="flex flex-col justify-between gap-3">
             <PosVirtualKeypad
               value={activeField === 'usd' ? usdInput : vesInput}
+              replaceOnFirstInput={true}
               onChange={(next) => (activeField === 'usd' ? onUsdChange(next) : onVesChange(next))}
               onSubmit={() => {
-                onConfirmCheckout();
-                onClose();
+                if (summary.remainingUsdMinor === 0 && !submitting) {
+                  onConfirmCheckout();
+                }
               }}
             />
             <button
               type="button"
               disabled={submitting || summary.remainingUsdMinor > 0}
-              onClick={() => {
-                onConfirmCheckout();
-                onClose();
-              }}
-              className="inline-flex h-10 w-full items-center justify-center gap-1.5 rounded-md bg-checkout px-4 text-sm font-semibold text-checkout-foreground shadow-xs hover:opacity-95 disabled:opacity-45"
+              onClick={onConfirmCheckout}
+              className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-md bg-checkout px-4 text-sm font-semibold text-checkout-foreground shadow-xs hover:opacity-95 disabled:opacity-45"
             >
               <CheckCircle2 className="size-4" />
               <span>{submitting ? 'Procesando...' : 'Confirmar y Cobrar'}</span>

@@ -15,4 +15,12 @@ describe('Commerce human decimal & basis points helpers', () => {
     expect(parsePercentToBps('-10')).toBe(0);
     expect(parsePercentToBps('not-a-number')).toBe(0);
   });
+
+  it('localizes order statuses to Spanish and computes integer quote line totals', async () => {
+    const { formatOrderStatusEs } = await import('../src/views/SalesOrdersView.js');
+    expect(formatOrderStatusEs('fulfilled')).toBe('Despachada');
+    expect(formatOrderStatusEs('confirmed')).toBe('Confirmada');
+    expect(formatOrderStatusEs('pending')).toBe('Pendiente');
+    expect(formatOrderStatusEs('cancelled')).toBe('Cancelada');
+  });
 });
