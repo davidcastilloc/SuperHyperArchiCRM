@@ -27,6 +27,8 @@ export {
   consolidatePendingRestocks,
   evaluateReorderTrigger,
   type ConsolidatedRestockBatch,
+  type FederatedDeliveryReceipt,
+  type FederatedSettlementState,
   type PendingRestockItem,
   type ReorderTriggerDecision,
   type ReorderTriggerInput,

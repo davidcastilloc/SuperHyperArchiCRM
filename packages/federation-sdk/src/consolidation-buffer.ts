@@ -140,3 +140,19 @@ export function consolidatePendingRestocks(
   }
   return result;
 }
+
+export type FederatedSettlementState =
+  | 'ENVELOPE_QUEUED'
+  | 'HUB_ACCEPTED'
+  | 'COUNTERPARTY_ACKED'
+  | 'COUNTERPARTY_REJECTED';
+
+export interface FederatedDeliveryReceipt {
+  readonly envelopeId: string;
+  readonly senderOrgId: string;
+  readonly recipientOrgId: string;
+  readonly state: FederatedSettlementState;
+  readonly ackedAtMs: number;
+  readonly payloadSha256Hex: string;
+  readonly counterpartySignatureHex: string;
+}
