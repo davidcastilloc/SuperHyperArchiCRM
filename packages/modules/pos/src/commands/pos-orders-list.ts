@@ -4,8 +4,8 @@ import {
   iamOrganizations,
   type ShacD1Database,
 } from '@shac/db-d1';
-import { defineCommand } from '@shac/kernel';
-import { and, desc, eq, inArray, isNull, like, or } from 'drizzle-orm';
+import { buildCursorPage, decodeKeysetCursor, defineCommand } from '@shac/kernel';
+import { and, desc, eq, inArray, isNull, like, lt, or } from 'drizzle-orm';
 import { z } from 'zod';
 
 const listOrdersInputSchema = z.object({
@@ -13,6 +13,7 @@ const listOrdersInputSchema = z.object({
   orderKind: z.string().min(1).optional(),
   search: z.string().trim().min(1).max(80).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().min(1).optional(),
 });
 
 const orderRowSchema = z.object({
@@ -36,6 +37,8 @@ const orderRowSchema = z.object({
 
 const listOrdersOutputSchema = z.object({
   items: z.array(orderRowSchema),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean().optional(),
   summary: z.object({
     totalCount: z.number().int().nonnegative(),
     grossRevenueMinor: z.number().int().nonnegative(),
@@ -104,6 +107,11 @@ export const posOrdersListCommand = defineCommand<
       filterConds.push(like(comOrders.orderNumber, `%${escaped}%`));
     }
 
+    const decodedCursor = decodeKeysetCursor(input.cursor);
+    if (decodedCursor && typeof decodedCursor.sortValue === 'number') {
+      filterConds.push(lt(comOrders.createdAt, decodedCursor.sortValue));
+    }
+
     const rowsQuery = ctx.db
       .select({
         id: comOrders.id,
@@ -138,7 +146,7 @@ export const posOrdersListCommand = defineCommand<
       )
       .where(and(...filterConds))
       .orderBy(desc(comOrders.createdAt))
-      .limit(input.limit);
+      .limit(input.limit + 1);
 
     const summaryQuery = ctx.db
       .select({
@@ -190,8 +198,15 @@ export const posOrdersListCommand = defineCommand<
       };
     });
 
+    const page = buildCursorPage(items, input.limit, (o) => ({
+      sortValue: o.createdAt,
+      id: o.id,
+    }));
+
     return {
-      items,
+      items: [...page.items],
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
       summary: {
         totalCount: allOrders.length,
         grossRevenueMinor: Number(grossMinor),

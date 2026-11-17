@@ -2,6 +2,7 @@ import type { CheckoutPosSaleResult } from '@shac/actor-branch';
 import {
   buildActionLogInsert,
   buildIdempotencyInsert,
+  chunkRowsForD1Insert,
   comOrderLines,
   comOrders,
   comPayments,
@@ -154,9 +155,10 @@ export async function persistCheckoutBatch(params: {
         ),
   );
 
+  const lineChunks = chunkRowsForD1Insert(lineInserts, 23);
   await db.batch([
     orderInsert,
-    ...lineInserts,
+    ...(lineChunks[0] ?? []),
     ...paymentInserts,
     ...accountUpdates,
     buildIdempotencyInsert(db, {
@@ -180,4 +182,9 @@ export async function persistCheckoutBatch(params: {
       nowSec,
     }),
   ]);
+  for (const extraChunk of lineChunks.slice(1)) {
+    if (extraChunk.length > 0) {
+      await db.batch(extraChunk as [typeof extraChunk[0], ...typeof extraChunk]);
+    }
+  }
 }

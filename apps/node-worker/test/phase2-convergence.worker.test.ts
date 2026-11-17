@@ -77,6 +77,21 @@ describe('@shac/node-worker Phase 2 audit-chain verify & realtime WS passthrough
     expect(json.valid).toBe(true);
     expect(json.checkedCount).toBe(1);
 
+    const streamsRes = await workerApp.fetch(
+      new Request('https://edge.shac.local/api/audit-chain/streams', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      }),
+      workerEnv,
+    );
+    expect(streamsRes.status).toBe(200);
+    const streamsJson = (await streamsRes.json()) as {
+      streams: Array<{ streamKey: string; entryCount: number }>;
+    };
+    expect(streamsJson.streams).toEqual([
+      expect.objectContaining({ streamKey: 'finance:trust', entryCount: 1 }),
+    ]);
+
     const wsRes = await workerApp.fetch(
       new Request('https://edge.shac.local/api/branch/org_1/realtime/ws', {
         method: 'GET',

@@ -5,14 +5,15 @@ import {
   srvWorkOrders,
   type ShacD1Database,
 } from '@shac/db-d1';
-import { defineCommand } from '@shac/kernel';
-import { and, desc, eq, inArray, isNull, like, or, type AnyColumn } from 'drizzle-orm';
+import { buildCursorPage, decodeKeysetCursor, defineCommand } from '@shac/kernel';
+import { and, desc, eq, inArray, isNull, like, lt, or, type AnyColumn } from 'drizzle-orm';
 import { z } from 'zod';
 
 const listClaimsInputSchema = z.object({
   partyId: z.string().min(1).optional(),
   status: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().min(1).optional(),
 });
 
 const claimRowSchema = z.object({
@@ -47,6 +48,8 @@ const workOrderRowSchema = z.object({
 const listClaimsOutputSchema = z.object({
   claims: z.array(claimRowSchema),
   workOrders: z.array(workOrderRowSchema),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean().optional(),
 });
 
 function buildServicesOrgFilter(
@@ -113,6 +116,11 @@ export const servicesClaimsListCommand = defineCommand<
       woConds.push(eq(srvWorkOrders.status, input.status));
     }
 
+    const decodedCursor = decodeKeysetCursor(input.cursor);
+    if (decodedCursor && typeof decodedCursor.sortValue === 'number') {
+      claimConds.push(lt(srvWarrantyClaimsRma.createdAt, decodedCursor.sortValue));
+    }
+
     const claimsQuery = ctx.db
       .select({
         id: srvWarrantyClaimsRma.id,
@@ -137,7 +145,7 @@ export const servicesClaimsListCommand = defineCommand<
       )
       .where(and(...claimConds))
       .orderBy(desc(srvWarrantyClaimsRma.createdAt))
-      .limit(input.limit);
+      .limit(input.limit + 1);
 
     const workOrdersQuery = ctx.db
       .select({
@@ -168,7 +176,16 @@ export const servicesClaimsListCommand = defineCommand<
       .orderBy(desc(srvWorkOrders.createdAt))
       .limit(input.limit);
 
-    const [claims, workOrders] = await ctx.db.batch([claimsQuery, workOrdersQuery]);
-    return { claims, workOrders };
+    const [claimsPlusOne, workOrders] = await ctx.db.batch([claimsQuery, workOrdersQuery]);
+    const page = buildCursorPage(claimsPlusOne, input.limit, (c) => ({
+      sortValue: c.createdAt,
+      id: c.id,
+    }));
+    return {
+      claims: [...page.items],
+      workOrders,
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
+    };
   },
 });

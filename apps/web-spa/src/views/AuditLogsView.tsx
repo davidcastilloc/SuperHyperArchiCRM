@@ -5,9 +5,18 @@ import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn } f
 import { getAuthSession } from '../lib/authSession';
 import { readApiError, type Phase2ViewProps } from './phase2-format';
 
+const AUDIT_STREAMS = [
+  'finance:trust',
+  'finance:journal',
+  'clinical:soap',
+  'legal:docket',
+  'physical:tamper',
+] as const;
+
 /** Open Mercato DS v3 Immutable Action & Audit Logs viewer (kernel_action_logs). */
 export function AuditLogsView({ rpc }: Phase2ViewProps) {
   const [search, setSearch] = useState('');
+  const [selectedStream, setSelectedStream] = useState<string>('finance:trust');
 
   const logsQuery = useQuery({
     queryKey: ['system', 'audit-logs'],
@@ -27,7 +36,7 @@ export function AuditLogsView({ rpc }: Phase2ViewProps) {
           'Content-Type': 'application/json',
           ...(session ? { Authorization: `Bearer ${session.token}`, 'X-Org-Id': session.actor.orgId } : {}),
         },
-        body: JSON.stringify({ streamKey: 'finance:trust' }),
+        body: JSON.stringify({ streamKey: selectedStream }),
       });
       if (!res.ok) throw await readApiError(res);
       return (await res.json()) as { valid: boolean; checkedCount: number };
@@ -92,6 +101,18 @@ export function AuditLogsView({ rpc }: Phase2ViewProps) {
         refreshing={logsQuery.isFetching}
         actions={
           <div className="flex items-center gap-2">
+            <select
+              aria-label="Stream criptográfico"
+              value={selectedStream}
+              onChange={(e) => setSelectedStream(e.target.value)}
+              className="h-8 rounded-md border border-border bg-background px-2 font-mono text-xs"
+            >
+              {AUDIT_STREAMS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={() => verifyMutation.mutate()}

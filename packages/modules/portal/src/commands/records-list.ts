@@ -3,8 +3,8 @@ import {
   docAttachments,
   type ShacD1Database,
 } from '@shac/db-d1';
-import { defineCommand } from '@shac/kernel';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { buildCursorPage, decodeKeysetCursor, defineCommand } from '@shac/kernel';
+import { and, desc, eq, isNull, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import { resolveScopedTargetOrg } from '../lib/scope-helpers.js';
 
@@ -13,6 +13,7 @@ const portalRecordsListInputSchema = z.object({
   partyId: z.string().min(1).optional(),
   entityType: z.string().min(1).optional(),
   limit: z.number().int().min(1).max(100).default(50),
+  cursor: z.string().min(1).optional(),
 });
 
 const portalAttachmentSchema = z.object({
@@ -46,6 +47,8 @@ const portalRecordsListOutputSchema = z.object({
   orgId: z.string(),
   attachments: z.array(portalAttachmentSchema),
   messages: z.array(portalMessageSchema),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean().optional(),
 });
 
 export const portalRecordsListCommand = defineCommand<
@@ -95,7 +98,12 @@ export const portalRecordsListCommand = defineCommand<
       msgConditions.push(eq(commThreadsAndMessages.partyId, input.partyId));
     }
 
-    const [attachmentRows, messageRows] = await ctx.db.batch([
+    const decodedCursor = decodeKeysetCursor(input.cursor);
+    if (decodedCursor && typeof decodedCursor.sortValue === 'number') {
+      docConditions.push(lt(docAttachments.createdAt, decodedCursor.sortValue));
+    }
+
+    const [attachmentRowsPlusOne, messageRows] = await ctx.db.batch([
       ctx.db
         .select({
           id: docAttachments.id,
@@ -113,7 +121,7 @@ export const portalRecordsListCommand = defineCommand<
         .from(docAttachments)
         .where(and(...docConditions))
         .orderBy(desc(docAttachments.createdAt))
-        .limit(input.limit),
+        .limit(input.limit + 1),
       ctx.db
         .select({
           id: commThreadsAndMessages.id,
@@ -133,9 +141,14 @@ export const portalRecordsListCommand = defineCommand<
         .limit(input.limit),
     ]);
 
+    const page = buildCursorPage(attachmentRowsPlusOne, input.limit, (a) => ({
+      sortValue: a.createdAt,
+      id: a.id,
+    }));
+
     return {
       orgId: targetOrgId,
-      attachments: attachmentRows.map((row) => ({
+      attachments: page.items.map((row) => ({
         ...row,
         isConfidential: false as const,
       })),
@@ -143,6 +156,8 @@ export const portalRecordsListCommand = defineCommand<
         ...row,
         isConfidential: false as const,
       })),
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
     };
   },
 });
