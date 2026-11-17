@@ -356,4 +356,153 @@ describe('@shac/node-worker Omni-Vertical SuperCRM routes', () => {
     expect(ov.devices).toHaveLength(1);
     expect(ov.devices[0]?.lock_state).toBe('UNLOCKED');
   });
+
+  it('manages GAAP Chart of Accounts, AP Vendor Bills, and Bank Reconciliations with exact integer balances', async () => {
+    const testEnv = makeTestEnv();
+
+    const coaRes = await workerApp.request(
+      'http://localhost/api/finance/coa',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          accountCode: '1100-AR-TRADE',
+          name: 'Cuentas por Cobrar Comerciales',
+          classification: 'asset',
+          normalBalance: 'debit',
+          currentBalanceMinor: 450000,
+        }),
+      },
+      testEnv,
+    );
+    expect(coaRes.status).toBe(201);
+
+    const billRes = await workerApp.request(
+      'http://localhost/api/finance/ap-bills',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          billOrExpenseNo: 'BILL-2026-088',
+          category: 'INVENTORY_SUPPLY',
+          totalMinor: 125000,
+          paidMinor: 25000,
+          currency: 'USD',
+        }),
+      },
+      testEnv,
+    );
+    expect(billRes.status).toBe(201);
+    const billBody = (await billRes.json()) as { balanceDueMinor: number; status: string };
+    expect(billBody.balanceDueMinor).toBe(100000);
+    expect(billBody.status).toBe('PARTIAL');
+
+    const reconRes = await workerApp.request(
+      'http://localhost/api/finance/reconciliations',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          financialAccountId: 'acc_usd_main',
+          statementBalanceMinor: 890000,
+          bookBalanceMinor: 890000,
+        }),
+      },
+      testEnv,
+    );
+    expect(reconRes.status).toBe(201);
+    const reconBody = (await reconRes.json()) as { differenceMinor: number; status: string };
+    expect(reconBody.differenceMinor).toBe(0);
+    expect(reconBody.status).toBe('RECONCILED');
+
+    const ovRes = await workerApp.request(
+      'http://localhost/api/finance/overview',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    expect(ovRes.status).toBe(200);
+    const ov = (await ovRes.json()) as {
+      accounts: unknown[];
+      apBills: unknown[];
+      reconciliations: unknown[];
+    };
+    expect(ov.accounts.length).toBeGreaterThanOrEqual(1);
+    expect(ov.apBills).toHaveLength(1);
+    expect(ov.reconciliations).toHaveLength(1);
+  });
+
+  it('manages Legal e-Discovery Bates holds, AI briefs, citations, and attorney Bar/CLE ethics renewals', async () => {
+    const testEnv = makeTestEnv();
+
+    const holdRes = await workerApp.request(
+      'http://localhost/api/legal/ediscovery-hold',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          matterId: 'EXP-2026-01',
+          title: 'Correos Junta Directiva Q3',
+          custodian: 'Carlos Mendoza (CFO)',
+          privilegeTag: 'PRIVILEGED',
+          snippetText: 'Acuerdo confidencial de precios y exclusividad territorial.',
+        }),
+      },
+      testEnv,
+    );
+    expect(holdRes.status).toBe(201);
+    const holdBody = (await holdRes.json()) as { batesNumber: string; sha256Hash: string };
+    expect(holdBody.batesNumber).toMatch(/^BATES-2026-/);
+    expect(holdBody.sha256Hash).toHaveLength(64);
+
+    const briefRes = await workerApp.request(
+      'http://localhost/api/legal/ai-brief',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          matterId: 'EXP-2026-01',
+          title: 'Escrito de Medidas Cautelares',
+          courtName: 'Juzgado Superior Mercantil',
+          keyArguments: 'Fumus boni iuris y periculum in mora por incumplimiento de entrega.',
+        }),
+      },
+      testEnv,
+    );
+    expect(briefRes.status).toBe(201);
+    const briefBody = (await briefRes.json()) as { id: string; draftedBrief: string };
+    expect(briefBody.draftedBrief.toUpperCase()).toContain('JUZGADO SUPERIOR MERCANTIL');
+
+    const ethRes = await workerApp.request(
+      'http://localhost/api/legal/citations-and-ethics',
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${tokenTen1}`, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          recordKind: 'ethics_license',
+          title: 'Dra. Elena Santander · Inpreabogado #94821',
+          jurisdiction: 'Nacional / Sala Civil',
+          statusTag: 'COMPLIANT',
+          cleCompletedHours: 24,
+          cleRequiredHours: 20,
+        }),
+      },
+      testEnv,
+    );
+    expect(ethRes.status).toBe(201);
+
+    const listRes = await workerApp.request(
+      'http://localhost/api/legal/ediscovery-ethics',
+      { method: 'GET', headers: { authorization: `Bearer ${tokenTen1}` } },
+      testEnv,
+    );
+    expect(listRes.status).toBe(200);
+    const listBody = (await listRes.json()) as {
+      ediscoveryHolds: unknown[];
+      briefs: unknown[];
+      ethicsAndCitations: unknown[];
+    };
+    expect(listBody.ediscoveryHolds).toHaveLength(1);
+    expect(listBody.briefs).toHaveLength(1);
+    expect(listBody.ethicsAndCitations).toHaveLength(1);
+  });
 });

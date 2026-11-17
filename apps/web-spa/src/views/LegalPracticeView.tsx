@@ -1,11 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Briefcase, Clock, Gavel, Landmark, Pause, Play, Plus, Scale } from 'lucide-react';
+import { Briefcase, Clock, FileSearch, Gavel, Landmark, Pause, Play, Plus, Scale, ShieldCheck, Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AiCopilotBanner, DataTable, KpiCard, PageHeader, SegmentedTabs, StatusBadge } from '@shac/ui';
 import { LegalAiContractModal } from './LegalAiContractModal';
+import { LegalEdiscoveryAndEthicsPanel } from './LegalEdiscoveryAndEthicsPanel';
 import { formatMinorUnits, INPUT_CLS, readApiError, type Phase2ViewProps } from './phase2-format';
 
-type LegalTab = 'matters' | 'time' | 'iolta' | 'dockets';
+type LegalTab = 'matters' | 'time' | 'iolta' | 'dockets' | 'ediscovery' | 'briefs' | 'ethics';
 
 /** Legal Practice Suite: Matters, Court Dockets, Live Billable Stopwatch, IOLTA Trust & AI Contract Review. */
 export function LegalPracticeView({ rpc }: Phase2ViewProps) {
@@ -138,6 +139,9 @@ export function LegalPracticeView({ rpc }: Phase2ViewProps) {
           { id: 'time', label: 'Horas Facturables', count: timeEntries.length, icon: <Clock className="size-3.5" /> },
           { id: 'iolta', label: 'Trust IOLTA', count: trustLedgers.length, icon: <Landmark className="size-3.5" /> },
           { id: 'dockets', label: 'Dockets', count: dockets.length, icon: <Gavel className="size-3.5" /> },
+          { id: 'ediscovery', label: 'e-Discovery', icon: <FileSearch className="size-3.5" /> },
+          { id: 'briefs', label: 'Escritos IA', icon: <Sparkles className="size-3.5" /> },
+          { id: 'ethics', label: 'Ética & CLE', icon: <ShieldCheck className="size-3.5" /> },
         ]}
       />
 
@@ -204,6 +208,10 @@ export function LegalPracticeView({ rpc }: Phase2ViewProps) {
           getRowId={(r) => r.id}
           emptyTitle="Sin dockets judiciales"
         />
+      ) : null}
+
+      {tab === 'ediscovery' || tab === 'briefs' || tab === 'ethics' ? (
+        <LegalEdiscoveryAndEthicsPanel rpc={rpc} tab={tab} onStatus={setStatusMsg} />
       ) : null}
 
       <LegalAiContractModal open={aiModalOpen} onClose={() => setAiModalOpen(false)} rpc={rpc} />

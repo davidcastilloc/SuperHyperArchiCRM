@@ -2,7 +2,7 @@ import { createElement, type ComponentType } from 'react';
 import type { TenantMarketProfile } from '@shac/kernel';
 import type { BranchOption, ShacNavItem } from '@shac/ui';
 import {
-  BedDouble, Blocks, BriefcaseMedical, Building2, ClipboardCheck, ClipboardList,
+  BedDouble, Blocks, BookOpenCheck, BriefcaseMedical, Building2, ClipboardCheck, ClipboardList,
   Columns3, Database, FileSignature, FileSpreadsheet, FileText, FolderKanban,
   FolderTree, GitBranch, History, KeyRound, Landmark, LayoutDashboard, Leaf,
   MapPin, Package, Percent, Plug, QrCode, ReceiptText, Scale, ScanBarcode, ShieldCheck,
@@ -36,6 +36,7 @@ export const DEFAULT_BRANCHES: BranchOption[] = [
 export const NAV_ITEMS: ShacNavItem[] = [
   { id: 'home', label: 'Dashboard', href: '/', group: 'GENERAL', icon: navIcon(LayoutDashboard) },
   { id: 'auth', label: 'Acceso Sucursal', href: '/auth', group: 'GENERAL', icon: navIcon(KeyRound) },
+  { id: 'demo-sop', label: 'Simulador Demo & SOP', href: '/demo-sop', group: 'GENERAL', icon: navIcon(BookOpenCheck) },
   { id: 'tasks', label: 'Tareas & Agenda', href: '/tasks', group: 'CUSTOMERS', moduleId: 'customers', icon: navIcon(ClipboardCheck) },
   { id: 'parties', label: DEFAULT_PROFILE.vocabulary.partyPlural, href: '/parties', group: 'CUSTOMERS', moduleId: 'customers', icon: navIcon(Building2) },
   { id: 'deals', label: 'Deals (Kanban & Mapa)', href: '/deals', group: 'CUSTOMERS', moduleId: 'customers', icon: navIcon(Columns3) },

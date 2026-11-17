@@ -29,6 +29,7 @@ import { CustomerTasksView } from './views/CustomerTasksView';
 import { CustomFieldsView } from './views/CustomFieldsView';
 import { DashboardView } from './views/DashboardView';
 import { DealsKanbanView } from './views/DealsKanbanView';
+import { DemoAndSopCenterView } from './views/DemoAndSopCenterView';
 import { EudrComplianceView } from './views/EudrComplianceView';
 import { FinanceView } from './views/FinanceView';
 import { FormsBuilderView } from './views/FormsBuilderView';
@@ -152,6 +153,11 @@ function OrdersPage() {
   return <SalesOrdersView vocabulary={voc} rpc={rpcClient} onNavigate={(href) => void navigate({ to: href })} />;
 }
 
+function DemoSopPage() {
+  const navigate = useNavigate();
+  return <DemoAndSopCenterView vocabulary={voc} rpc={rpcClient} onNavigate={(href) => void navigate({ to: href })} />;
+}
+
 function LoginPage() {
   const navigate = useNavigate();
   return <AuthPage rpc={rpcClient} onAuthenticated={() => void navigate({ to: '/' })} />;
@@ -161,6 +167,7 @@ const rootRoute = createRootRoute({ component: RootLayout });
 const routeSpecs: Array<[string, () => ReturnType<typeof HomePage>]> = [
   ['/', HomePage],
   ['/auth', LoginPage],
+  ['/demo-sop', DemoSopPage],
   ['/tasks', () => <CustomerTasksView vocabulary={voc} rpc={rpcClient} />],
   ['/parties', () => <PartiesView vocabulary={voc} rpc={rpcClient} />],
   ['/deals', () => <DealsKanbanView vocabulary={voc} rpc={rpcClient} />],
