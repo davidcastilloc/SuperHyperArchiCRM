@@ -119,3 +119,24 @@ Registro cronológico destilado para sincronización entre sesiones e instancias
   1. Endurecer `POST /api/iam/users` (`apps/node-worker/src/iam-admin-routes.ts`) bloqueando con `403` la escalación a `perms: ['*']` sin poseer wildcard previo y validando que `defaultOrgId` y `allowedOrgIds` pertenezcan a `auth.actor.tenantId` en `iam_organizations`, respaldado por pruebas de integración en `auth.routes.worker.test.ts` (`6/6` passing).
   2. Modularizar los 12 archivos que superaban `300` LOC extrayendo `lazyViews.ts`, `PublicQuoteView.tsx`, `FleetDispatchPanel.tsx` y `ClinicalLabsRcmPanel.tsx`, eliminando barriles legados (`CasesView.tsx`, `Phase2Views.tsx`, `PosWmsViews.tsx`) y cerrando `pnpm -r typecheck` (`0` errores), `pnpm dlx knip --strict` (`0` problemas), `pnpm -r test:run` (`49` tests en `node-worker`, `32` en `web-spa`), `vite build` (`97.44 kB` gzip inicial) y `wrangler deploy` (`267.73 KiB` gzip total).
   3. Integrar en `main` (`747eef9`) y desplegar a producción en `https://shac-node-worker.pc911itservices.workers.dev` (Version ID `34885324-a0a6-4e44-b66c-f5285b952bd0`), verificado con `GET /` (`200`) y `GET /api/auth/bootstrap` (`200`).
+
+
+## ADR-101 (2026-11-17): Primitiva Universal `Money` (`BigInt` Half-Even) y Aislamiento Multi-Tenant `ScopedD1Database`
+
+- **Contexto:** Eliminar discrepancias de centavos IEEE-754 entre contabilidad, POS, WMS, precios y rentas, y consolidar la verificación multi-tenant.
+- **Decisión:** Estandarizar `roundHalfEvenBigInt`, `allocateByRatios` y `assertZeroSumBalanced` en `@shac/kernel` (`packages/kernel/src/money.ts`) y centralizar `assertTenantScope`/`assertBranchScope` junto con `assertOrgScope` en `@shac/db-d1` (`packages/db-d1/src/scope.ts`).
+
+## ADR-102 (2026-11-17): Outbox con Alarma, Backoff Exponencial, DLQ y Fencing Tokens en `BranchInventoryDO`
+
+- **Contexto:** Evitar eventos huérfanos en la sincronización `BranchInventoryDO` -> D1 y prevenir condiciones de carrera por expiración de locks de espacios.
+- **Decisión:** Incorporar `computeOutboxBackoffMs`, transición a `DLQ` tras `OUTBOX_MAX_ATTEMPTS = 8` y barrido autónomo en `alarm()` (`packages/actor-branch/src/outbox.ts`, `index.ts`), más `validateFencingToken` en `space-lock.ts` y cuarentena anti-bloqueo (`400`/`409`/`422`) en `apps/web-spa/src/lib/offlineQueue.ts`.
+
+## ADR-103 (2026-11-17): Chunker D1 ($\le 90$ Parámetros), Paginación Keyset $O(1)$ y Ledger Criptográfico SHA-256
+
+- **Contexto:** Respetar el límite físico de 100 variables SQL ligadas en Cloudflare D1, eliminar scans lineales por `OFFSET` y dotar de evidencia criptográfica anti-manipulación a flujos clínicos, fiduciarios, legales y físicos.
+- **Decisión:** Implementar `chunkRowsForD1Insert` / `chunkIdsForD1InClause` (`SAFE_D1_PARAMETER_CEILING = 90`) en `@shac/db-d1`, `encodeKeysetCursor`/`buildCursorPage` y `computeAuditEntryHashHex`/`verifyAuditHashChain` en `@shac/kernel`, y la migración ortogonal `0008_hash_chain_audit_and_cf_indexes.sql` (`immutable_audit_chain_ledger`, `custom_field_search_projections`).
+
+## ADR-104 (2026-11-17): WebSockets Hibernados con `sinceSeq` y Virtualización Automática en `DataTable`
+
+- **Contexto:** Sincronizar cajas POS, recepción y despacho en $< 15\text{ ms}$ sin costo en reposo y mantener 60 FPS en tablas de $+10,000$ filas.
+- **Decisión:** Implementar `realtime-hub.ts` en `@shac/actor-branch` con tags por tópico (`topic:*`) y replay desde `sinceSeq` sobre `/api/branch/:branchId/realtime/ws` (con fallback a polling 30s en `useBranchRealtimeSync.ts`), y activar `computeVirtualWindowSlice` + navegación por teclado en `DataTable.tsx` cuando `rows.length > 80`.
