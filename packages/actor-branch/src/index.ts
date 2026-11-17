@@ -103,6 +103,19 @@ export {
   type SpaceLockResult,
 } from './space-and-shift.js';
 
+export {
+  classifyOutboxFailure,
+  computeOutboxBackoffMs,
+  listReadyOutboxInTx,
+  OUTBOX_MAX_ATTEMPTS,
+  recordOutboxAttemptFailureInTx,
+  type OutboxDeliveryStatus,
+} from './outbox.js';
+export {
+  validateFencingToken,
+  type SpaceLockGrant,
+} from './space-lock.js';
+
 /**
  * Per-branch transactional Durable Object owning the 8 hot SQLite tables.
  */
@@ -218,6 +231,28 @@ export class BranchInventoryDO extends DurableObject<unknown> {
     return this.ctx.storage.transactionSync(() =>
       drainOutboxInTx(this.ctx.storage.sql, options),
     );
+  }
+
+  override async alarm(): Promise<void> {
+    const nowMs = Date.now();
+    const pending = this.ctx.storage.transactionSync(() =>
+      listOutboxInTx(this.ctx.storage.sql, 100),
+    );
+    const ready = pending.filter(
+      (ev) => ev.attempts < 8 && ev.nextAttemptMs <= nowMs,
+    );
+    if (ready.length > 0) {
+      this.broadcastBranchEvent('outbox.ready', { count: ready.length });
+    }
+    const nextFuture = pending
+      .filter((ev) => ev.attempts < 8 && ev.nextAttemptMs > nowMs)
+      .reduce<number | null>(
+        (min, ev) => (min === null || ev.nextAttemptMs < min ? ev.nextAttemptMs : min),
+        null,
+      );
+    if (nextFuture !== null) {
+      await this.ctx.storage.setAlarm(nextFuture);
+    }
   }
 
   async fetch(request: Request): Promise<Response> {

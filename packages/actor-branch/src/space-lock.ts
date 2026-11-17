@@ -191,3 +191,18 @@ export function listSpaceLocksInTx(
     expiresAtMs: row.expires_at_ms,
   }));
 }
+
+export interface SpaceLockGrant {
+  readonly spaceId: string;
+  readonly holderId: string;
+  readonly fencingToken: number;
+  readonly expiresAtMs: number;
+}
+
+export function validateFencingToken(
+  currentToken: number,
+  incomingToken?: number,
+): boolean {
+  if (incomingToken === undefined) return true;
+  return Number.isInteger(incomingToken) && incomingToken >= currentToken;
+}
