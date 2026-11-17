@@ -31,6 +31,7 @@ import {
   createBranchRoutes,
 } from './branch-routes.js';
 import { createCatalogExtRoutes } from './catalog-ext-routes.js';
+import { createClinicalEhrRoutes } from './clinical-ehr-routes.js';
 import {
   authenticateWorkerActor,
   jsonCommandHandler,
@@ -43,10 +44,14 @@ import { createAdaptiveCorsMiddleware } from './cors.js';
 import { createCustomFieldsRoutes } from './custom-fields-routes.js';
 import { createFederationRoutes } from './federation-routes.js';
 import { createFormsWorkflowsRoutes } from './forms-workflows-routes.js';
+import { createHospitalityCondoRoutes } from './hospitality-condo-routes.js';
 import { createIamAdminRoutes } from './iam-admin-routes.js';
+import { createLegalPracticeRoutes } from './legal-practice-routes.js';
 import { createMediaAndWebhooksRoutes } from './media-and-webhooks-routes.js';
+import { createPhysicalHeliosRoutes } from './physical-helios-routes.js';
 import { createPublicPortalRoutes } from './public-portal-routes.js';
 import { createStaffRoutes } from './staff-routes.js';
+import { createWmsFleetLabelsRoutes } from './wms-fleet-labels-routes.js';
 import { buildMcpServerForRequest } from './mcp-server.js';
 import {
   createPosRoutes,
@@ -191,6 +196,11 @@ function createWorkerApp(
     )
     .route('/api/system', createCustomFieldsRoutes(profileLoader))
     .route('/api', createMediaAndWebhooksRoutes(profileLoader))
+    .route('/api', createWmsFleetLabelsRoutes(profileLoader))
+    .route('/api', createClinicalEhrRoutes(profileLoader))
+    .route('/api', createLegalPracticeRoutes(profileLoader))
+    .route('/api', createHospitalityCondoRoutes(profileLoader))
+    .route('/api', createPhysicalHeliosRoutes(profileLoader))
     .route('/api/staff', createStaffRoutes(profileLoader))
     .route('/api', createIamAdminRoutes(profileLoader))
     .route('/api', createCatalogExtRoutes(profileLoader))

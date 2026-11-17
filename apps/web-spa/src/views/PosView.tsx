@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, Clock, Lock, Play, RefreshCw, Search } from 'lucide-react';
+import { Camera, Clock, KeyRound, Lock, Play, RefreshCw, RotateCcw, Search } from 'lucide-react';
 import { PageHeader, StatusBadge } from '@shac/ui';
 import { listOfflineQueue } from '../lib/offlineQueue';
 import { PosAudio } from '../lib/posAudio';
@@ -20,6 +20,7 @@ import {
   type HeldPosOrder,
 } from './PosHoldOrdersModal';
 import { PosReceiptPanel, type PosCartLine } from './PosReceiptPanel';
+import { PosProModals } from './PosProModals';
 import { PosTenderModal } from './PosTenderModal';
 import {
   formatMinorToInput, formatMinorUnits, INPUT_CLS, parseMajorToMinor, readApiError, type Phase2ViewProps,
@@ -58,6 +59,8 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   const [heldOpen, setHeldOpen] = useState(false);
   const [tenderOpen, setTenderOpen] = useState(false);
   const [closingOpen, setClosingOpen] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
 
   const productsQuery = useQuery({
     queryKey: ['catalog', 'products', 'pos-grid'],
@@ -74,12 +77,7 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
   });
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(`shac_pos_held_${registerId}`, JSON.stringify(heldOrders));
-    } catch {
-      // Ignore storage quota errors
-    }
+    try { window.localStorage?.setItem(`shac_pos_held_${registerId}`, JSON.stringify(heldOrders)); } catch { /* ignore */ }
   }, [heldOrders, registerId]);
 
   const { openShiftMutation, closeShiftMutation, checkoutMutation, syncMutation } = usePosShiftAndCheckout({
@@ -214,9 +212,17 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
               </button>
             ) : null}
             {shiftId ? (
-              <button type="button" onClick={() => setClosingOpen(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted">
-                <Lock className="size-3.5 text-muted-foreground" /><span>Cerrar Caja</span>
-              </button>
+              <>
+                <button type="button" onClick={() => setPinOpen(true)} title="Relevo de Cajero (PIN)" className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs font-medium shadow-xs hover:bg-muted">
+                  <KeyRound className="size-3.5 text-primary" /><span>{cashierName}</span>
+                </button>
+                <button type="button" onClick={() => setReturnOpen(true)} title="Devolución Rápida" className="inline-flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-xs font-medium shadow-xs hover:bg-muted">
+                  <RotateCcw className="size-3.5 text-amber-500" /><span>Devolución</span>
+                </button>
+                <button type="button" onClick={() => setClosingOpen(true)} className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-muted">
+                  <Lock className="size-3.5 text-muted-foreground" /><span>Cerrar Caja</span>
+                </button>
+              </>
             ) : null}
           </>
         }
@@ -283,6 +289,8 @@ export function PosView({ vocabulary, rpc }: Phase2ViewProps) {
         onFillRestante={handleRestante} onConfirmCheckout={() => handleCheckout()} submitting={checkoutMutation.isPending} />
       <PosCashClosingModal open={closingOpen} onClose={() => setClosingOpen(false)} registerId={registerId} cashierName={cashierName}
         onConfirmClose={(counted) => closeShiftMutation.mutate(counted)} submitting={closeShiftMutation.isPending} />
+      <PosProModals rpc={rpc} pinOpen={pinOpen} onClosePin={() => setPinOpen(false)} onSwitchCashier={(n) => { setCashierName(n); setStatusMsg(`Relevo activo: ${n}`); }}
+        returnOpen={returnOpen} onCloseReturn={() => setReturnOpen(false)} onReturnSuccess={(m) => setStatusMsg(m)} />
     </section>
   );
 }

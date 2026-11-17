@@ -65,3 +65,17 @@ export {
   PosVirtualKeypad,
   type PosVirtualKeypadProps,
 } from './components/PosVirtualKeypad.js';
+export {
+  BarcodeSvg,
+  encodeCode128Bars,
+  type BarcodeSvgProps,
+} from './components/BarcodeSvg.js';
+export {
+  SegmentedTabs,
+  type SegmentedTabItem,
+  type SegmentedTabsProps,
+} from './components/SegmentedTabs.js';
+export {
+  AiCopilotBanner,
+  type AiCopilotBannerProps,
+} from './components/AiCopilotBanner.js';

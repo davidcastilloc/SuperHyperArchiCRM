@@ -23,6 +23,8 @@ import { AutomationView } from './views/AutomationView';
 import { CasesView } from './views/CasesView';
 import { CatalogStructureView } from './views/CatalogStructureView';
 import { ClaimsAndServicesView } from './views/ClaimsAndServicesView';
+import { ClinicalEhrView } from './views/ClinicalEhrView';
+import { CondoResidentHubView } from './views/CondoResidentHubView';
 import { CustomerTasksView } from './views/CustomerTasksView';
 import { CustomFieldsView } from './views/CustomFieldsView';
 import { DashboardView } from './views/DashboardView';
@@ -30,10 +32,13 @@ import { DealsKanbanView } from './views/DealsKanbanView';
 import { EudrComplianceView } from './views/EudrComplianceView';
 import { FinanceView } from './views/FinanceView';
 import { FormsBuilderView } from './views/FormsBuilderView';
+import { HeliosSecurityView } from './views/HeliosSecurityView';
+import { HospitalityPmsView } from './views/HospitalityPmsView';
 import { IamAdminView } from './views/IamAdminView';
 import { IntegrationsHubView } from './views/IntegrationsHubView';
+import { LabelsAndFleetView } from './views/LabelsAndFleetView';
+import { LegalPracticeView } from './views/LegalPracticeView';
 import { CatalogView, PartiesView } from './views/Phase2Views';
-import { PhysicalView } from './views/PhysicalView';
 import { PortalView } from './views/PortalView';
 import { PosView, SmartCheckKioskView, WmsView } from './views/PosWmsViews';
 import { ProjectsBoardView } from './views/ProjectsBoardView';
@@ -41,7 +46,6 @@ import { PromotionsView } from './views/PromotionsView';
 import { PublicFormView, PublicQuoteView } from './views/PublicFormAndQuoteView';
 import { QuotesView } from './views/QuotesView';
 import { SalesOrdersView } from './views/SalesOrdersView';
-import { LeasesView, SpacesView } from './views/SpacesLeasesViews';
 import { StaffHubView } from './views/StaffHubView';
 import { WmsLocationsView } from './views/WmsLocationsView';
 import { WorkflowsVisualView } from './views/WorkflowsVisualView';
@@ -169,10 +173,13 @@ const routeSpecs: Array<[string, () => ReturnType<typeof HomePage>]> = [
   ['/kiosk/price-check', () => <SmartCheckKioskView vocabulary={voc} rpc={rpcClient} />],
   ['/wms', () => <WmsView vocabulary={voc} rpc={rpcClient} />],
   ['/wms-locations', () => <WmsLocationsView vocabulary={voc} rpc={rpcClient} />],
+  ['/labels-fleet', () => <LabelsAndFleetView vocabulary={voc} rpc={rpcClient} />],
   ['/eudr', () => <EudrComplianceView vocabulary={voc} rpc={rpcClient} />],
   ['/claims', () => <ClaimsAndServicesView vocabulary={voc} rpc={rpcClient} />],
-  ['/spaces', () => <SpacesView vocabulary={voc} rpc={rpcClient} />],
-  ['/leases', () => <LeasesView vocabulary={voc} rpc={rpcClient} />],
+  ['/spaces', () => <HospitalityPmsView vocabulary={voc} rpc={rpcClient} />],
+  ['/leases', () => <CondoResidentHubView vocabulary={voc} rpc={rpcClient} />],
+  ['/clinical-ehr', () => <ClinicalEhrView vocabulary={voc} rpc={rpcClient} />],
+  ['/legal-hub', () => <LegalPracticeView vocabulary={voc} rpc={rpcClient} />],
   ['/cases', () => <CasesView vocabulary={voc} rpc={rpcClient} />],
   ['/staff', () => <StaffHubView vocabulary={voc} rpc={rpcClient} />],
   ['/projects', () => <ProjectsBoardView vocabulary={voc} rpc={rpcClient} />],
@@ -185,7 +192,7 @@ const routeSpecs: Array<[string, () => ReturnType<typeof HomePage>]> = [
   ['/workflows', () => <WorkflowsVisualView vocabulary={voc} rpc={rpcClient} />],
   ['/automation', () => <AutomationView vocabulary={voc} rpc={rpcClient} />],
   ['/integrations', () => <IntegrationsHubView vocabulary={voc} rpc={rpcClient} />],
-  ['/physical', () => <PhysicalView vocabulary={voc} rpc={rpcClient} />],
+  ['/physical', () => <HeliosSecurityView vocabulary={voc} rpc={rpcClient} />],
   ['/app-store', () => <AppStoreView fallbackProfile={DEFAULT_PROFILE} rpc={rpcClient} />],
   ['/f/$slug', () => <PublicFormRoutePage />],
   ['/quote/$orderNumber', () => <PublicQuoteRoutePage />],

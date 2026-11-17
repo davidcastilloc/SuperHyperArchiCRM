@@ -342,4 +342,37 @@ describe('@shac/ui smoke tests', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar' }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
   });
+
+  it('renders deterministic Code-128B BarcodeSvg, SegmentedTabs with counts, and AiCopilotBanner prompt chips', async () => {
+    const { BarcodeSvg, SegmentedTabs, AiCopilotBanner } = await import('../src/index.js');
+    const onSelectTab = vi.fn();
+    const onRunPrompt = vi.fn();
+
+    render(
+      <div>
+        <BarcodeSvg value="AMOX-500" label="Amoxicilina 500mg" priceLabel="$12.50 · Bs 684.38" />
+        <SegmentedTabs
+          activeId="vitals"
+          onSelect={onSelectTab}
+          tabs={[
+            { id: 'vitals', label: 'Signos Vitales', count: 4 },
+            { id: 'soap', label: 'Notas SOAP', count: 12 },
+          ]}
+        />
+        <AiCopilotBanner
+          title="Copiloto Clínico IA"
+          summary="Transcribe consulta a SOAP y sugiere códigos CIE-10."
+          prompts={['Resumir signos vitales críticos', 'Auditar glosas RCM']}
+          onRunPrompt={onRunPrompt}
+        />
+      </div>,
+    );
+
+    expect(screen.getByText('AMOX-500')).toBeInTheDocument();
+    expect(screen.getByText('$12.50 · Bs 684.38')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /Notas SOAP/i }));
+    expect(onSelectTab).toHaveBeenCalledWith('soap');
+    fireEvent.click(screen.getByRole('button', { name: 'Auditar glosas RCM' }));
+    expect(onRunPrompt).toHaveBeenCalledWith('Auditar glosas RCM');
+  });
 });
