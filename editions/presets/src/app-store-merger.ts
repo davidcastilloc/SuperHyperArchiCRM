@@ -50,6 +50,7 @@ export const AppStoreToggleSchema = z.object({
   enableModules: z.array(z.string().min(1)).optional(),
   disableModules: z.array(z.string().min(1)).optional(),
   switchPreset: EditionPresetIdSchema.optional(),
+  presetMode: z.enum(['merge', 'replace']).optional(),
   vocabularyOverride: MarketVocabularyOverrideSchema.optional(),
   updatedAt: z.string().min(1).optional(),
 });
@@ -149,17 +150,24 @@ export function applyAppStoreToggle(
     (toggle.disableModules ?? []).filter((mod) => !protectedSet.has(mod)),
   );
 
-  const presetModules = toggle.switchPreset
-    ? getEditionPreset(toggle.switchPreset).activeModules
-    : [];
+  const isReplace = toggle.presetMode === 'replace' && Boolean(toggle.switchPreset);
+  const targetPreset = toggle.switchPreset ? getEditionPreset(toggle.switchPreset) : null;
+
+  const baseModules =
+    isReplace && targetPreset
+      ? targetPreset.activeModules
+      : [...currentProfile.activeModules, ...(targetPreset?.activeModules ?? [])];
 
   const mergedModules = normalizeActiveModules([
-    ...currentProfile.activeModules,
-    ...presetModules,
+    ...baseModules,
     ...(toggle.enableModules ?? []),
   ]).filter((mod) => protectedSet.has(mod) || !disabledSet.has(mod));
 
   const nextPreset: EditionPresetId = toggle.switchPreset ?? currentProfile.editionPreset;
+  const baseVocabulary =
+    isReplace && targetPreset ? targetPreset.vocabulary : currentProfile.vocabulary;
+  const nextEntitlements =
+    isReplace && targetPreset ? { ...targetPreset.entitlements } : { ...currentProfile.entitlements };
 
   return {
     deploymentId: currentProfile.deploymentId,
@@ -168,16 +176,14 @@ export function applyAppStoreToggle(
     regionPack: currentProfile.regionPack,
     activeModules: mergedModules,
     vocabulary: {
-      ...currentProfile.vocabulary,
+      ...baseVocabulary,
       ...toggle.vocabularyOverride,
     },
     currency: {
       ...currentProfile.currency,
       operatingCurrencies: [...currentProfile.currency.operatingCurrencies],
     },
-    entitlements: {
-      ...currentProfile.entitlements,
-    },
+    entitlements: nextEntitlements,
     federation: {
       ...currentProfile.federation,
       allowedSupplierDids: [...currentProfile.federation.allowedSupplierDids],

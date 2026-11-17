@@ -160,6 +160,38 @@ describe('@shac/editions', () => {
     expect(updated.activeModules).toContain('customers');
   });
 
+  it('replaces activeModules, vocabulary, and entitlements when presetMode is replace', () => {
+    const omni = buildMarketProfileFromPreset({
+      deploymentId: 'dep-replace-1',
+      tenantId: 'ten-replace-1',
+      editionPreset: 'omni-enterprise',
+      regionPack: 've',
+    });
+
+    const clinic = applyAppStoreToggle(omni, {
+      switchPreset: 'clinic-practice',
+      presetMode: 'replace',
+      updatedAt: '2026-11-16T18:00:00.000Z',
+    });
+
+    expect(clinic.editionPreset).toBe('clinic-practice');
+    expect(clinic.activeModules).not.toContain('pos');
+    expect(clinic.activeModules).not.toContain('wms');
+    expect(clinic.activeModules).not.toContain('leases');
+    expect(clinic.activeModules).not.toContain('physical');
+    expect(clinic.activeModules).toContain('cases');
+    expect(clinic.vocabulary.partySingular).toBe('Paciente');
+    expect(clinic.vocabulary.branchSingular).toBe('Sede Clínica');
+    expect(clinic.entitlements.maxBranches).toBe(3);
+
+    const hosp = getEditionPreset('hospitality-pms');
+    expect(hosp.vocabulary.partySingular).toBe('Huésped');
+    expect(hosp.vocabulary.spaceSingular).toBe('Habitación');
+    expect(hosp.activeModules).toContain('finance');
+    expect(getEditionPreset('retail-pos').activeModules).toContain('services');
+    expect(getEditionPreset('distro-wms').activeModules).toContain('services');
+  });
+
   it('returns complete catalog summary for App Store and Control Plane', () => {
     const summary = getEditionCatalogSummary();
     expect(summary.presets).toHaveLength(9);
