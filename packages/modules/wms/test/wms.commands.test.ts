@@ -273,4 +273,24 @@ describe('@shac/mod-wms D1 + BranchInventoryDO workerd commands', () => {
     const pickingRows = await ctx.db.select().from(wmsPickings).where(eq(wmsPickings.tenantId, 'ten_a'));
     expect(pickingRows.length).toBeGreaterThanOrEqual(3);
   });
+
+  it('chunks 120 productIds and batch ops safely below D1 90-param ceiling', async () => {
+    const batchMod = (await import('../src/commands/pickings-batch-ops.js')) as {
+      chunkPickingIdsForD1?: (ids: readonly string[]) => string[][];
+      chunkWmsBatchOpsForD1?: <T>(ops: readonly T[]) => T[][];
+    };
+    expect(batchMod.chunkPickingIdsForD1).toBeDefined();
+    expect(batchMod.chunkWmsBatchOpsForD1).toBeDefined();
+
+    const ids = Array.from({ length: 120 }, (_, i) => `prod_${i}`);
+    const idChunks = batchMod.chunkPickingIdsForD1!(ids);
+    expect(idChunks.length).toBeGreaterThan(1);
+    for (const chunk of idChunks) {
+      expect(chunk.length + 4).toBeLessThanOrEqual(90);
+    }
+
+    const opChunks = batchMod.chunkWmsBatchOpsForD1!(ids);
+    expect(opChunks.length).toBeGreaterThan(1);
+    expect(opChunks.flat()).toHaveLength(120);
+  });
 });

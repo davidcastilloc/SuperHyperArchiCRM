@@ -14,6 +14,8 @@ import { assertWmsResourceScope, resolveWmsTargetOrg } from '../lib/scope.js';
 import {
   buildLotAndBackorderOps,
   buildValuationBatchOps,
+  chunkPickingIdsForD1,
+  chunkWmsBatchOpsForD1,
   type WmsBatchOp,
 } from './pickings-batch-ops.js';
 import {
@@ -101,26 +103,32 @@ export const wmsPickingsProcessCommand = defineCommand<
 
     const isInbound = operationKind === 'asn_receipt';
     const existingLayers = isInbound
-      ? await ctx.db
-          .select({
-            id: wmsValuationAndLandedCosts.id,
-            productId: wmsValuationAndLandedCosts.productId,
-            qtyMicros: wmsValuationAndLandedCosts.qtyMicros,
-            unitCostMinor: wmsValuationAndLandedCosts.unitCostMinor,
-            totalValueMinor: wmsValuationAndLandedCosts.totalValueMinor,
-            remainingQtyMicros: wmsValuationAndLandedCosts.remainingQtyMicros,
-            remainingValueMinor: wmsValuationAndLandedCosts.remainingValueMinor,
-            version: wmsValuationAndLandedCosts.version,
-          })
-          .from(wmsValuationAndLandedCosts)
-          .where(
-            and(
-              eq(wmsValuationAndLandedCosts.tenantId, ctx.tenantId),
-              eq(wmsValuationAndLandedCosts.recordKind, 'valuation_layer'),
-              inArray(wmsValuationAndLandedCosts.productId, productIds),
-              isNull(wmsValuationAndLandedCosts.deletedAt),
+      ? (
+          await Promise.all(
+            chunkPickingIdsForD1(productIds).map((idChunk) =>
+              ctx.db
+                .select({
+                  id: wmsValuationAndLandedCosts.id,
+                  productId: wmsValuationAndLandedCosts.productId,
+                  qtyMicros: wmsValuationAndLandedCosts.qtyMicros,
+                  unitCostMinor: wmsValuationAndLandedCosts.unitCostMinor,
+                  totalValueMinor: wmsValuationAndLandedCosts.totalValueMinor,
+                  remainingQtyMicros: wmsValuationAndLandedCosts.remainingQtyMicros,
+                  remainingValueMinor: wmsValuationAndLandedCosts.remainingValueMinor,
+                  version: wmsValuationAndLandedCosts.version,
+                })
+                .from(wmsValuationAndLandedCosts)
+                .where(
+                  and(
+                    eq(wmsValuationAndLandedCosts.tenantId, ctx.tenantId),
+                    eq(wmsValuationAndLandedCosts.recordKind, 'valuation_layer'),
+                    inArray(wmsValuationAndLandedCosts.productId, idChunk),
+                    isNull(wmsValuationAndLandedCosts.deletedAt),
+                  ),
+                ),
             ),
           )
+        ).flat()
       : [];
 
     const doSynced = await syncPickingWithBranchDo(
@@ -249,11 +257,11 @@ export const wmsPickingsProcessCommand = defineCommand<
     };
 
     const responseJson = JSON.stringify(response);
+    const dynamicOps: WmsBatchOp[] = [...moveOps, ...valuationOps, ...lotAndBoOps];
+    const opChunks = chunkWmsBatchOpsForD1(dynamicOps);
     await ctx.db.batch([
       pickingOp,
-      ...moveOps,
-      ...valuationOps,
-      ...lotAndBoOps,
+      ...(opChunks[0] ?? []),
       buildIdempotencyInsert(ctx.db, {
         tenantId: ctx.tenantId,
         orgId: targetOrgId,
@@ -275,6 +283,11 @@ export const wmsPickingsProcessCommand = defineCommand<
         targetPartyId: partyId,
       }),
     ]);
+    for (const extraChunk of opChunks.slice(1)) {
+      if (extraChunk.length > 0) {
+        await ctx.db.batch(extraChunk as [WmsBatchOp, ...WmsBatchOp[]]);
+      }
+    }
 
     return response;
   },
