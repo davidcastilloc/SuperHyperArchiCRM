@@ -23,6 +23,8 @@ import type {
   ClosePosShiftResult,
 } from './pos-contracts.js';
 
+import { parseRealtimeTopicsToTags } from './realtime-hub.js';
+
 export interface BranchActorHttpTarget {
   receiveLot(input: ReceiveLotInput): Promise<ReceiveLotResult>;
   allocateFefo(input: AllocateFefoInput): Promise<AllocateFefoResult>;
@@ -38,7 +40,7 @@ export interface BranchActorHttpTarget {
   ): Promise<ApprovePhysicalReturnResult>;
   listOutbox(limit?: number): Promise<OutboxEvent[]>;
   drainOutbox(options?: DrainOutboxOptions): Promise<OutboxEvent[]>;
-  acceptBranchWebSocket?(ws: WebSocket): void;
+  acceptBranchWebSocket?(ws: WebSocket, tags?: string[], sinceSeq?: number): void;
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -171,14 +173,17 @@ export async function handleBranchHttpRequest(
       const body = (await readJsonBody(request)) as ApprovePhysicalReturnInput;
       return jsonResponse(await actor.approvePhysicalReturn(body));
     }
-    if (method === 'GET' && path === '/ws') {
+    if (method === 'GET' && (path === '/ws' || path === '/branch/realtime/ws')) {
       if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
         return new Response('Expected Upgrade: websocket', { status: 426 });
       }
+      const tags = parseRealtimeTopicsToTags(url.searchParams.get('topics'));
+      const rawSince = Number(url.searchParams.get('sinceSeq') ?? '0');
+      const sinceSeq = Number.isFinite(rawSince) && rawSince > 0 ? Math.floor(rawSince) : 0;
       const pair = new WebSocketPair();
       const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
       if (actor.acceptBranchWebSocket) {
-        actor.acceptBranchWebSocket(server);
+        actor.acceptBranchWebSocket(server, tags, sinceSeq);
       } else {
         server.accept();
       }

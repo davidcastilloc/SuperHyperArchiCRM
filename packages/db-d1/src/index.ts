@@ -18,3 +18,4 @@ export * from './schema/docs-automation.js';
 export * from './schema/physical.js';
 export * from './idempotency.js';
 export * from './scope.js';
+export * from './d1-batch-chunker.js';

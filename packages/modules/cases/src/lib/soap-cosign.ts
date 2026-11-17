@@ -6,7 +6,12 @@ import {
   medSupervisionQueue,
   type ShacD1Database,
 } from '@shac/db-d1';
-import { AppError, type ExecutionContext } from '@shac/kernel';
+import {
+  AppError,
+  computeAuditEntryHashHex,
+  GENESIS_AUDIT_HASH,
+  type ExecutionContext,
+} from '@shac/kernel';
 import { and, eq, isNull } from 'drizzle-orm';
 import { parseJsonRecord, verifyScopedRow } from './scope-helpers.js';
 
@@ -97,6 +102,17 @@ export async function cosignSoapNote(
     createdAt: note.createdAt,
   };
   const responseJson = JSON.stringify(result);
+  await computeAuditEntryHashHex({
+    orgId: params.targetOrgId,
+    streamKey: 'clinical:soap',
+    seqNo: params.nowSec,
+    actorId: supervisorId,
+    action: nextNoteStatus,
+    targetId: note.id,
+    occurredAtMs: params.nowSec * 1000,
+    prevHashHex: GENESIS_AUDIT_HASH,
+    payload: result,
+  });
 
   await ctx.db.batch([
     ctx.db

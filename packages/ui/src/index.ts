@@ -31,9 +31,11 @@ export {
   type FilterChipOption,
 } from './components/FilterBar.js';
 export {
+  computeVirtualWindowSlice,
   DataTable,
   type DataTableColumn,
   type DataTableProps,
+  type VirtualWindowSlice,
 } from './components/DataTable.js';
 export {
   PageHeader,

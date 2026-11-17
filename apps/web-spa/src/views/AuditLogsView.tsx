@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { History } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { History, ShieldCheck } from 'lucide-react';
 import { DataTable, FilterBar, PageHeader, StatusBadge, type DataTableColumn } from '@shac/ui';
+import { getAuthSession } from '../lib/authSession';
 import { readApiError, type Phase2ViewProps } from './phase2-format';
 
 /** Open Mercato DS v3 Immutable Action & Audit Logs viewer (kernel_action_logs). */
@@ -14,6 +15,22 @@ export function AuditLogsView({ rpc }: Phase2ViewProps) {
       const res = await rpc.api.system['audit-logs'].$get();
       if (!res.ok) throw await readApiError(res);
       return res.json();
+    },
+  });
+
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      const session = getAuthSession();
+      const res = await fetch('/api/audit-chain/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session ? { Authorization: `Bearer ${session.token}`, 'X-Org-Id': session.actor.orgId } : {}),
+        },
+        body: JSON.stringify({ streamKey: 'finance:trust' }),
+      });
+      if (!res.ok) throw await readApiError(res);
+      return (await res.json()) as { valid: boolean; checkedCount: number };
     },
   });
 
@@ -73,7 +90,27 @@ export function AuditLogsView({ rpc }: Phase2ViewProps) {
         description="Bitácora inmutable de mutaciones sobre comandos del kernel y recursos del tenant."
         onRefresh={() => void logsQuery.refetch()}
         refreshing={logsQuery.isFetching}
-        actions={<StatusBadge label="Inmutable D1" tone="info" icon={<History className="size-3" />} />}
+        actions={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => verifyMutation.mutate()}
+              disabled={verifyMutation.isPending}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-xs font-medium hover:bg-muted"
+            >
+              <ShieldCheck className="size-3.5 text-emerald-500" />
+              <span>{verifyMutation.isPending ? 'Verificando...' : 'Verificar Hash-Chain'}</span>
+            </button>
+            {verifyMutation.data ? (
+              <StatusBadge
+                label={verifyMutation.data.valid ? `Hash-Chain Verified (${verifyMutation.data.checkedCount})` : 'Cadena Alterada'}
+                tone={verifyMutation.data.valid ? 'success' : 'error'}
+              />
+            ) : (
+              <StatusBadge label="Inmutable D1" tone="info" icon={<History className="size-3" />} />
+            )}
+          </div>
+        }
       />
 
       <FilterBar searchValue={search} onSearchChange={setSearch} searchPlaceholder="Filtrar por comando, recurso o ID..." />

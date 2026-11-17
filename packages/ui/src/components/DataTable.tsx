@@ -1,8 +1,38 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../lib/cn.js';
 import { EmptyState } from './EmptyState.js';
 import { RowActions, type RowActionItem } from './SectionHeader.js';
+
+export interface VirtualWindowSlice {
+  readonly startIndex: number;
+  readonly endIndex: number;
+  readonly topSpacerPx: number;
+  readonly bottomSpacerPx: number;
+}
+
+export function computeVirtualWindowSlice(
+  totalRows: number,
+  scrollTopPx: number,
+  viewportHeightPx: number,
+  rowHeightPx = 44,
+  overscanRows = 6,
+): VirtualWindowSlice {
+  if (totalRows <= 0) {
+    return { startIndex: 0, endIndex: 0, topSpacerPx: 0, bottomSpacerPx: 0 };
+  }
+  const visibleCount = Math.ceil(Math.max(1, viewportHeightPx) / rowHeightPx);
+  const rawStart = Math.floor(Math.max(0, scrollTopPx) / rowHeightPx);
+  const startIndex = Math.max(0, rawStart - overscanRows);
+  const endIndex = Math.min(totalRows, rawStart + visibleCount + overscanRows);
+
+  return {
+    startIndex,
+    endIndex,
+    topSpacerPx: startIndex * rowHeightPx,
+    bottomSpacerPx: Math.max(0, (totalRows - endIndex) * rowHeightPx),
+  };
+}
 
 export interface DataTableColumn<TRow> {
   id: string;
@@ -45,6 +75,8 @@ export function DataTable<TRow>({
 }: DataTableProps<TRow>) {
   const [sortColId, setSortColId] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [scrollTop, setScrollTop] = useState(0);
+  const [focusedIdx, setFocusedIdx] = useState<number>(-1);
 
   function toggleSort(colId: string) {
     if (sortColId === colId) {
@@ -96,10 +128,37 @@ export function DataTable<TRow>({
     );
   }
 
+  const isVirtualized = sortedData.length > 80;
+  const windowSlice = isVirtualized
+    ? computeVirtualWindowSlice(sortedData.length, scrollTop, 480)
+    : { startIndex: 0, endIndex: sortedData.length, topSpacerPx: 0, bottomSpacerPx: 0 };
+  const visibleRows = sortedData.slice(windowSlice.startIndex, windowSlice.endIndex);
+
+  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    if (sortedData.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedIdx((prev) => Math.min(sortedData.length - 1, prev + 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedIdx((prev) => Math.max(0, prev - 1));
+    } else if (e.key === 'Enter' && focusedIdx >= 0 && onRowClick) {
+      const target = sortedData[focusedIdx];
+      if (target) onRowClick(target);
+    }
+  }
+
   return (
     <div
       data-slot="data-table"
-      className={cn('overflow-x-auto rounded-lg border border-border bg-card shadow-xs', className)}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onScroll={isVirtualized ? (e) => setScrollTop(e.currentTarget.scrollTop) : undefined}
+      className={cn(
+        'overflow-x-auto rounded-lg border border-border bg-card shadow-xs outline-none',
+        isVirtualized && 'max-h-[480px] overflow-y-auto',
+        className,
+      )}
     >
       <table className="w-full text-left text-sm">
         <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
@@ -147,12 +206,19 @@ export function DataTable<TRow>({
           </tr>
         </thead>
         <tbody>
-          {sortedData.map((row) => {
+          {windowSlice.topSpacerPx > 0 ? (
+            <tr aria-hidden="true">
+              <td colSpan={columns.length + (rowActions ? 1 : 0)} style={{ height: windowSlice.topSpacerPx, padding: 0 }} />
+            </tr>
+          ) : null}
+          {visibleRows.map((row, localIdx) => {
+            const absIdx = windowSlice.startIndex + localIdx;
             const rowId = getRowId(row);
-            const selected = selectedRowId === rowId;
+            const selected = selectedRowId === rowId || focusedIdx === absIdx;
             return (
               <tr
                 key={rowId}
+                data-row-id={rowId}
                 onClick={onRowClick ? () => onRowClick(row) : undefined}
                 data-selected={selected ? 'true' : 'false'}
                 className={cn(
@@ -177,6 +243,11 @@ export function DataTable<TRow>({
               </tr>
             );
           })}
+          {windowSlice.bottomSpacerPx > 0 ? (
+            <tr aria-hidden="true">
+              <td colSpan={columns.length + (rowActions ? 1 : 0)} style={{ height: windowSlice.bottomSpacerPx, padding: 0 }} />
+            </tr>
+          ) : null}
         </tbody>
       </table>
     </div>
