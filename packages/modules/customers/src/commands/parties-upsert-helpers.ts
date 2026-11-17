@@ -1,7 +1,9 @@
 import {
   assertOrgScope,
+  chunkRowsForD1Insert,
   crmParties,
   crmPartyProfiles,
+  customFieldSearchProjections,
   iamOrganizations,
   type ShacD1Database,
 } from '@shac/db-d1';
@@ -133,4 +135,68 @@ export function buildMutableProfileFields(
     notes: profile.notes ?? null,
     updatedAt: nowSec,
   };
+}
+
+export interface ProjectedCustomFieldEntry {
+  readonly fieldKey: string;
+  readonly textVal: string | null;
+  readonly numVal: number | null;
+}
+
+export function extractIndexableCustomFieldEntries(
+  customFields: Record<string, unknown> | null | undefined,
+): ProjectedCustomFieldEntry[] {
+  if (!customFields || typeof customFields !== 'object') return [];
+  const entries: ProjectedCustomFieldEntry[] = [];
+  for (const [rawKey, rawVal] of Object.entries(customFields)) {
+    const fieldKey = rawKey.trim();
+    if (!fieldKey || rawVal === undefined || rawVal === null || rawVal === '') continue;
+    if (typeof rawVal === 'number' && Number.isFinite(rawVal)) {
+      entries.push({ fieldKey, textVal: null, numVal: rawVal });
+    } else if (typeof rawVal === 'boolean') {
+      entries.push({ fieldKey, textVal: rawVal ? 'true' : 'false', numVal: rawVal ? 1 : 0 });
+    } else if (typeof rawVal === 'string') {
+      const trimmed = rawVal.trim();
+      if (trimmed.length > 0 && trimmed.length <= 256) {
+        entries.push({ fieldKey, textVal: trimmed, numVal: null });
+      }
+    }
+  }
+  return entries;
+}
+
+export function buildPartyCustomFieldProjectionStatements(
+  db: ShacD1Database,
+  orgId: string,
+  partyId: string,
+  customFields: Record<string, unknown> | null | undefined,
+  nowMs: number = Date.now(),
+) {
+  const entries = extractIndexableCustomFieldEntries(customFields);
+  const deleteStmt = db
+    .delete(customFieldSearchProjections)
+    .where(
+      and(
+        eq(customFieldSearchProjections.orgId, orgId),
+        eq(customFieldSearchProjections.entityType, 'party'),
+        eq(customFieldSearchProjections.entityId, partyId),
+      ),
+    );
+  if (entries.length === 0) {
+    return [deleteStmt];
+  }
+  const rows = entries.map((entry) => ({
+    orgId,
+    entityType: 'party',
+    entityId: partyId,
+    fieldKey: entry.fieldKey,
+    textVal: entry.textVal,
+    numVal: entry.numVal,
+    updatedAtMs: nowMs,
+  }));
+  const chunks = chunkRowsForD1Insert(rows, 7);
+  const insertStmts = chunks.map((chunk) =>
+    db.insert(customFieldSearchProjections).values(chunk),
+  );
+  return [deleteStmt, ...insertStmts];
 }

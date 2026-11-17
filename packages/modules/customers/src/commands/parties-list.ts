@@ -1,6 +1,7 @@
 import {
   crmParties,
   crmPartyProfiles,
+  customFieldSearchProjections,
   type ShacD1Database,
 } from '@shac/db-d1';
 import {
@@ -9,7 +10,7 @@ import {
   defineCommand,
   sha256Hex,
 } from '@shac/kernel';
-import { and, asc, eq, gt, isNull, like, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, gt, inArray, isNull, like, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { partyKindSchema, partyRoleSchema } from '../lib/identity.js';
 import { buildOrgSubtreeFilter, escapeSqlLike } from '../lib/scope-helpers.js';
@@ -27,6 +28,14 @@ const listPartiesInputSchema = z.object({
   partyKind: partyKindSchema.optional(),
   search: z.string().max(120).optional(),
   includeInactive: z.coerce.boolean().default(false),
+  cfFilter: z
+    .object({
+      fieldKey: z.string().min(1).max(64),
+      textEquals: z.string().min(1).max(256).optional(),
+      numMin: z.number().optional(),
+      numMax: z.number().optional(),
+    })
+    .optional(),
 });
 
 const listPartiesOutputSchema = z.object({
@@ -98,6 +107,27 @@ export const customersPartiesListCommand = defineCommand<
     const decodedCursor = decodeKeysetCursor(input.cursor);
     if (decodedCursor && typeof decodedCursor.sortValue === 'string') {
       conditions.push(gt(crmParties.displayName, decodedCursor.sortValue));
+    }
+
+    if (input.cfFilter) {
+      const cfConds = [
+        eq(customFieldSearchProjections.entityType, 'party'),
+        eq(customFieldSearchProjections.fieldKey, input.cfFilter.fieldKey),
+      ];
+      if (input.cfFilter.textEquals !== undefined) {
+        cfConds.push(eq(customFieldSearchProjections.textVal, input.cfFilter.textEquals));
+      }
+      if (input.cfFilter.numMin !== undefined) {
+        cfConds.push(gte(customFieldSearchProjections.numVal, input.cfFilter.numMin));
+      }
+      if (input.cfFilter.numMax !== undefined) {
+        cfConds.push(lte(customFieldSearchProjections.numVal, input.cfFilter.numMax));
+      }
+      const matchedIds = ctx.db
+        .select({ id: customFieldSearchProjections.entityId })
+        .from(customFieldSearchProjections)
+        .where(and(...cfConds));
+      conditions.push(inArray(crmParties.id, matchedIds));
     }
 
     const whereClause = and(...conditions);

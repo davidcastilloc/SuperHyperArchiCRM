@@ -22,6 +22,7 @@ import {
 import {
   buildMutablePartyFields,
   buildMutableProfileFields,
+  buildPartyCustomFieldProjectionStatements,
   findExistingPartyForUpsert,
 } from './parties-upsert-helpers.js';
 
@@ -183,6 +184,24 @@ export const customersPartiesUpsertCommand = defineCommand<
       await ctx.db.batch([partyStmt, profileStmt, idempotencyStmt, actionLogStmt]);
     } else {
       await ctx.db.batch([partyStmt, idempotencyStmt, actionLogStmt]);
+    }
+
+    const cfStmts = buildPartyCustomFieldProjectionStatements(
+      ctx.db,
+      orgId,
+      partyId,
+      input.customFields,
+      nowSec * 1000,
+    );
+    if (cfStmts.length > 1 || existingHit) {
+      try {
+        await ctx.db.batch(cfStmts as [typeof cfStmts[0], ...typeof cfStmts]);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!msg.includes('no such table')) {
+          throw err;
+        }
+      }
     }
 
     return result;
