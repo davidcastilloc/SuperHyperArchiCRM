@@ -3,8 +3,13 @@ import {
   crmPartyProfiles,
   type ShacD1Database,
 } from '@shac/db-d1';
-import { defineCommand, sha256Hex } from '@shac/kernel';
-import { and, asc, eq, isNull, like, or, sql } from 'drizzle-orm';
+import {
+  buildCursorPage,
+  decodeKeysetCursor,
+  defineCommand,
+  sha256Hex,
+} from '@shac/kernel';
+import { and, asc, eq, gt, isNull, like, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { partyKindSchema, partyRoleSchema } from '../lib/identity.js';
 import { buildOrgSubtreeFilter, escapeSqlLike } from '../lib/scope-helpers.js';
@@ -17,6 +22,7 @@ import {
 const listPartiesInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+  cursor: z.string().min(1).optional(),
   role: partyRoleSchema.optional(),
   partyKind: partyKindSchema.optional(),
   search: z.string().max(120).optional(),
@@ -28,6 +34,8 @@ const listPartiesOutputSchema = z.object({
   total: z.number().int().nonnegative(),
   limit: z.number().int().positive(),
   offset: z.number().int().nonnegative(),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean().optional(),
 });
 
 export const customersPartiesListCommand = defineCommand<
@@ -87,6 +95,11 @@ export const customersPartiesListCommand = defineCommand<
       }
     }
 
+    const decodedCursor = decodeKeysetCursor(input.cursor);
+    if (decodedCursor && typeof decodedCursor.sortValue === 'string') {
+      conditions.push(gt(crmParties.displayName, decodedCursor.sortValue));
+    }
+
     const whereClause = and(...conditions);
 
     const itemsQuery = ctx.db
@@ -104,21 +117,27 @@ export const customersPartiesListCommand = defineCommand<
       )
       .where(whereClause)
       .orderBy(asc(crmParties.displayName), asc(crmParties.id))
-      .limit(input.limit)
-      .offset(input.offset);
+      .limit(input.limit + 1)
+      .offset(decodedCursor ? 0 : input.offset);
 
     const countQuery = ctx.db
       .select({ count: sql<number>`count(*)` })
       .from(crmParties)
       .where(whereClause);
 
-    const [rows, countRows] = await ctx.db.batch([itemsQuery, countQuery]);
+    const [rowsPlusOne, countRows] = await ctx.db.batch([itemsQuery, countQuery]);
+    const page = buildCursorPage(rowsPlusOne, input.limit, (r) => ({
+      sortValue: r.party.displayName,
+      id: r.party.id,
+    }));
 
     return {
-      items: rows.map((r) => mapPartyRow(r.party, r.profile)),
-      total: Number(countRows[0]?.count ?? 0),
+      items: page.items.map((r) => mapPartyRow(r.party, r.profile)),
+      total: Number(countRows[0]?.count ?? page.items.length),
       limit: input.limit,
       offset: input.offset,
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
     };
   },
 });

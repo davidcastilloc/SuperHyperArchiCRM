@@ -88,6 +88,7 @@ export const processPickingOutputSchema = z.object({
 export const listPickingsInputSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+  cursor: z.string().min(1).optional(),
   orgId: z.string().min(1).optional(),
   status: pickingStatusSchema.optional(),
   operationKind: pickingOperationKindSchema.optional(),
@@ -125,6 +126,8 @@ export const listPickingsOutputSchema = z.object({
   total: z.number().int().nonnegative(),
   limit: z.number().int().positive(),
   offset: z.number().int().nonnegative(),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean().optional(),
 });
 
 const splitMethodSchema = z.enum([

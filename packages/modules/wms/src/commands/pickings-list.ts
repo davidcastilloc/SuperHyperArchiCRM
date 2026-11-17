@@ -1,6 +1,6 @@
 import { wmsLocations, wmsPickings, type ShacD1Database } from '@shac/db-d1';
-import { defineCommand } from '@shac/kernel';
-import { and, asc, desc, eq, isNull, like, sql } from 'drizzle-orm';
+import { buildCursorPage, decodeKeysetCursor, defineCommand } from '@shac/kernel';
+import { and, asc, desc, eq, isNull, like, lt, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { z } from 'zod';
 import { buildPickingsOrgSubtreeFilter } from '../lib/scope.js';
@@ -48,6 +48,11 @@ export const wmsPickingsListCommand = defineCommand<
     if (input.search?.trim()) {
       const escaped = input.search.trim().replace(/[\\%_]/g, '\\$&');
       conditions.push(like(wmsPickings.pickingNumber, `%${escaped}%`));
+    }
+
+    const decodedCursor = decodeKeysetCursor(input.cursor);
+    if (decodedCursor && typeof decodedCursor.sortValue === 'number') {
+      conditions.push(lt(wmsPickings.createdAt, decodedCursor.sortValue));
     }
 
     const whereClause = and(...conditions);
@@ -106,21 +111,27 @@ export const wmsPickingsListCommand = defineCommand<
       )
       .where(whereClause)
       .orderBy(desc(wmsPickings.createdAt), asc(wmsPickings.pickingNumber))
-      .limit(input.limit)
-      .offset(input.offset);
+      .limit(input.limit + 1)
+      .offset(decodedCursor ? 0 : input.offset);
 
     const countQuery = ctx.db
       .select({ count: sql<number>`count(*)` })
       .from(wmsPickings)
       .where(whereClause);
 
-    const [items, countRows] = await ctx.db.batch([itemsQuery, countQuery]);
+    const [rowsPlusOne, countRows] = await ctx.db.batch([itemsQuery, countQuery]);
+    const page = buildCursorPage(rowsPlusOne, input.limit, (row) => ({
+      sortValue: row.createdAt,
+      id: row.id,
+    }));
 
     return {
-      items,
-      total: Number(countRows[0]?.count ?? 0),
+      items: [...page.items],
+      total: Number(countRows[0]?.count ?? page.items.length),
       limit: input.limit,
       offset: input.offset,
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
     };
   },
 });

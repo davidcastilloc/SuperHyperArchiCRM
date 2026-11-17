@@ -1,6 +1,6 @@
 import { crmDeals, crmParties, type ShacD1Database } from '@shac/db-d1';
-import { defineCommand } from '@shac/kernel';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { buildCursorPage, decodeKeysetCursor, defineCommand } from '@shac/kernel';
+import { and, desc, eq, isNull, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import { buildOrgSubtreeFilter } from '../lib/scope-helpers.js';
 
@@ -8,6 +8,7 @@ const listDealsInputSchema = z.object({
   partyId: z.string().min(1).optional(),
   outcome: z.enum(['open', 'won', 'lost']).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
+  cursor: z.string().min(1).optional(),
 });
 
 const dealItemSchema = z.object({
@@ -29,6 +30,8 @@ const dealItemSchema = z.object({
 
 const listDealsOutputSchema = z.object({
   items: z.array(dealItemSchema),
+  nextCursor: z.string().nullable().optional(),
+  hasMore: z.boolean().optional(),
   summary: z.object({
     totalCount: z.number().int().nonnegative(),
     openValueMinor: z.number().int().nonnegative(),
@@ -70,6 +73,11 @@ export const customersDealsListCommand = defineCommand<
       listConditions.push(eq(crmDeals.outcome, input.outcome));
     }
 
+    const decodedCursor = decodeKeysetCursor(input.cursor);
+    if (decodedCursor && typeof decodedCursor.sortValue === 'number') {
+      listConditions.push(lt(crmDeals.createdAt, decodedCursor.sortValue));
+    }
+
     const itemsQuery = ctx.db
       .select({
         id: crmDeals.id,
@@ -98,7 +106,7 @@ export const customersDealsListCommand = defineCommand<
       )
       .where(and(...listConditions))
       .orderBy(desc(crmDeals.createdAt))
-      .limit(input.limit);
+      .limit(input.limit + 1);
 
     const summaryQuery = ctx.db
       .select({
@@ -109,7 +117,11 @@ export const customersDealsListCommand = defineCommand<
       .from(crmDeals)
       .where(and(...baseConditions));
 
-    const [items, allDeals] = await ctx.db.batch([itemsQuery, summaryQuery]);
+    const [rowsPlusOne, allDeals] = await ctx.db.batch([itemsQuery, summaryQuery]);
+    const page = buildCursorPage(rowsPlusOne, input.limit, (d) => ({
+      sortValue: d.createdAt,
+      id: d.id,
+    }));
 
     let openMinor = 0n;
     let wonMinor = 0n;
@@ -125,7 +137,9 @@ export const customersDealsListCommand = defineCommand<
     }
 
     return {
-      items,
+      items: [...page.items],
+      nextCursor: page.nextCursor,
+      hasMore: page.hasMore,
       summary: {
         totalCount: allDeals.length,
         openValueMinor: Number(openMinor),
